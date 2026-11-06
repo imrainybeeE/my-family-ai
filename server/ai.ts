@@ -237,7 +237,14 @@ type Generated<T> = { ok: true; data: T } | { ok: false; status: number; error: 
  * against the schema (including length limits) and against the family's saved picks, and an
  * invalid reply gets one retry that says what was wrong.
  */
-async function generate<T extends z.ZodType>(ai: GoogleGenAI, brief: FamilyBrief, task: string, prompt: string | Content[], schema: T): Promise<Generated<z.infer<T>>> {
+async function generate<T extends z.ZodType>(
+  ai: GoogleGenAI,
+  brief: FamilyBrief,
+  task: string,
+  prompt: string | Content[],
+  schema: T,
+  rules?: (data: z.infer<T>) => string[]
+): Promise<Generated<z.infer<T>>> {
   const jsonSchema = z.toJSONSchema(schema, { target: 'draft-2020-12' });
   let feedback = '';
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -277,6 +284,14 @@ async function generate<T extends z.ZodType>(ai: GoogleGenAI, brief: FamilyBrief
       continue;
     }
     const data = parsed.data;
+    // Rules the endpoint states in code (such as "all three ideas are take-out"): one retry, then nothing is sent.
+    const broken = rules?.(data) || [];
+    if (broken.length) {
+      feedback = broken.slice(0, 4).join('; ');
+      console.warn('Gemini reply broke a rule', { attempt, rules: broken.length });
+      if (attempt === 0) continue;
+      return { ok: false, status: 502, error: 'ai_invalid' };
+    }
     // Who-likes-what claims are checked against the saved picks: one retry, then wrong sentences go.
     const issues = checkClaims(data, brief);
     if (issues.length && attempt === 0) {
@@ -287,18 +302,24 @@ async function generate<T extends z.ZodType>(ai: GoogleGenAI, brief: FamilyBrief
       console.warn('Gemini reply had wrong attributions', { issues: issues.length });
       continue;
     }
+    // After the retry, wrong sentences are removed. If that leaves the reply invalid, or anything
+    // false survives, nothing is sent: no flagged claim ever reaches the family.
     const fixed = alignMembers(issues.length ? stripClaims(data, issues) : data, brief);
     const checked = schema.safeParse(fixed);
-    if (issues.length) console.warn('Removed wrong attributions', { issues: issues.length, valid: checked.success });
-    return { ok: true, data: checked.success ? checked.data : alignMembers(data, brief) };
+    if (!checked.success || checkClaims(checked.data, brief).length) {
+      console.warn('Reply still had wrong attributions after a retry; not sent');
+      return { ok: false, status: 502, error: 'ai_invalid' };
+    }
+    if (issues.length) console.warn('Removed wrong attributions', { issues: issues.length });
+    return { ok: true, data: checked.data };
   }
   return { ok: false, status: 502, error: 'ai_invalid' };
 }
 
 /** Runs one structured request and replies with the checked object. */
-async function structured<T extends z.ZodType>(res: Response, ai: GoogleGenAI, brief: FamilyBrief, task: string, user: string, schema: T) {
+async function structured<T extends z.ZodType>(res: Response, ai: GoogleGenAI, brief: FamilyBrief, task: string, user: string, schema: T, rules?: (data: z.infer<T>) => string[]) {
   try {
-    const out = await generate(ai, brief, task, user, schema);
+    const out = await generate(ai, brief, task, user, schema, rules);
     return out.ok ? res.json(out.data) : res.status(out.status).json({ error: out.error });
   } catch (err) {
     return sendError(res, err);
@@ -353,6 +374,27 @@ const SuggestSchema = z.object({ suggestions: z.array(words(9, 80)).min(1).max(4
 
 // Only the opening sentence fails a reply for length; a long fact or idea line is dropped instead.
 const ChatSchema = z.object({ answer: words(16, 120), facts: z.array(line(120)).max(3), ideas: z.array(line(120)).max(3) });
+
+/** Where the family said they'd eat or be: at home, out, or take-out. */
+type Setting = 'home' | 'out' | 'takeout';
+const TAKEOUT = /\b(take-?out|takeaway|delivery|deliver|order(ing)? in|order(ing)? food)\b/i;
+const OUT = /\b(restaurant|eat(ing)? out|go(ing)? out|dine out|dining out|café|cafe|hawker|food court|cinema|venue)\b/i;
+const HOME = /\b(at home|home|cook|cooking|bake|baking|kitchen|homemade|make your own|build your own)\b/i;
+export function settingOf(answers: string): Setting | null {
+  if (TAKEOUT.test(answers)) return 'takeout';
+  if (OUT.test(answers) || /\bout\b/i.test(answers)) return 'out';
+  if (HOME.test(answers)) return 'home';
+  return null;
+}
+export function breaksSetting(idea: string, setting: Setting): string[] {
+  const takeout = TAKEOUT.test(idea);
+  const out = OUT.test(idea);
+  const home = HOME.test(idea) && !takeout;
+  if (setting === 'home' && (takeout || out)) return ['must be at home: they chose to stay in'];
+  if (setting === 'takeout' && (home || out) && !takeout) return ['must be take-out: they chose to order in'];
+  if (setting === 'out' && home && !out) return ['must be out: they chose to go out'];
+  return [];
+}
 
 const TASKS: Record<string, string> = {
   eat: 'What should we eat?',
@@ -552,10 +594,11 @@ aiRouter.post('/plan/ideas', async (req, res) => {
   const taskKey = text(req.body?.task, 10);
   const taskTitle = TASKS[taskKey];
   const who = names(req.body?.who);
-  const practical = (Array.isArray(req.body?.answers) ? req.body.answers : [])
+  const practicalAnswers: { question: string; answer: string }[] = (Array.isArray(req.body?.answers) ? req.body.answers : [])
     .slice(0, 5)
-    .map((a: any) => `- ${text(a?.question, 120)}: ${text(a?.answer, 200)}`)
-    .join('\n');
+    .map((a: any) => ({ question: text(a?.question, 120), answer: text(a?.answer, 200) }));
+  const practical = practicalAnswers.map((a) => `- ${a.question}: ${a.answer}`).join('\n');
+  const setting = settingOf(practicalAnswers.map((a) => a.answer).join(' '));
   if (!taskTitle || !who.length) {
     res.status(400).json({ error: 'missing_task' });
     return;
@@ -579,5 +622,6 @@ Give exactly 3 options that fit these people, using their saved answers and prac
 These are AI ideas: never claim something exists, is open, is available or costs a certain amount. ${watchNote}`,
     `Practical answers:\n${practical || '- none given'}`,
     PlanIdeasSchema,
+    (data) => (setting ? data.ideas.flatMap((idea, i) => breaksSetting(`${idea.title}. ${idea.summary}`, setting).map((why) => `ideas.${i} ${why}`)) : []),
   );
 });

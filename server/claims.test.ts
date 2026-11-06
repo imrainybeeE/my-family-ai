@@ -14,13 +14,28 @@ test('lists who shares each taste pick', () => {
 test('flags people credited with picks they did not make', () => {
   const issues = checkClaims({ together: [{ title: 'Mystery night', detail: 'Mum, Dad and Nai Nai love mysteries.', members: [] }] }, brief);
   assert.equal(issues.length, 1);
-  assert.match(issues[0].message, /names Dad/);
+  assert.match(issues[0].message, /Dad didn't pick/);
   assert.equal(checkClaims({ why: 'Dad avoids seafood, so skip the fish.' }, brief).length, 1);
+});
+
+test('checks each person against their own claim', () => {
+  assert.equal(checkClaims({ answer: 'Maya likes curry and Mum likes tacos.' }, brief).length, 1);
+  assert.equal(checkClaims({ answer: 'Mum loves seafood.' }, brief).length, 1, 'Mum avoids seafood');
+  assert.equal(checkClaims({ answer: 'Dad likes mysteries.' }, brief).length, 1);
+  assert.equal(checkClaims({ facts: ['Asian stir fry is loved by you, Mum and Nai Nai.'] }, brief).length, 1, 'Mum did not pick stir fry');
+  assert.equal(checkClaims({ headline: 'Everyone loves curry and rice.' }, brief).length, 1);
+});
+
+test('does not check suggestions', () => {
+  assert.deepEqual(checkClaims({ ideas: ['Cook curry with Dad this weekend.'], tip: 'Ask Dad to try mysteries.' }, brief), []);
 });
 
 test('lets true claims through', () => {
   assert.deepEqual(checkClaims({ detail: 'Mum and Nai Nai both love mysteries.' }, brief), []);
   assert.deepEqual(checkClaims({ detail: 'Mum avoids seafood.' }, brief), []);
+  assert.deepEqual(checkClaims({ answer: 'You and Nai Nai both love Asian stir fry and noodles.' }, brief), []);
+  assert.deepEqual(checkClaims({ facts: ['Maya shares noodles with Nai Nai.'] }, brief), []);
+  assert.deepEqual(checkClaims({ answer: 'Maya likes tacos, so cook curry with Mum.' }, brief), []);
   assert.deepEqual(checkClaims({ detail: 'A quiet evening for everyone.' }, brief), []);
 });
 

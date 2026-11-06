@@ -8,7 +8,8 @@ import type { FamilyBrief } from './familyBrief.ts';
 const CHECKED = new Set(['Favourite food', 'Food they avoid', 'Favourite film and show genres', 'Favourite weekend activities', 'Favourite snack']);
 
 const STOP = new Set(
-  'and with or the a an of in on for to out own your new food foods dish dishes game games party show shows film films family night time day days home style fast paced playful active quick calm cosy simple'.split(' ')
+  // Generic words that also appear in ordinary sentences, so they never count as evidence of a pick.
+  'and with or the a an of in on for to out own your new food foods dish dishes game games party show shows film films family night time day days home style fast paced playful active quick calm cosy simple quiet creative hobbies reading healthy dinner none anything fresh couch cooking treat building project adventure light funny laughs sweet salty space'.split(' ')
 );
 
 export interface Pick {
@@ -60,10 +61,6 @@ export function sharedPickLines(brief: FamilyBrief): string[] {
     .map((p) => `${p.label}, "${p.option}": ${p.people.join(', ')}`);
 }
 
-function namesIn(text: string, names: string[]): string[] {
-  return names.filter((n) => new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(text));
-}
-
 function picksIn(text: string, picks: Pick[]): Pick[] {
   const ws = words(text);
   return picks.filter((p) => p.keys.some((k) => ws.some((w) => hits(k, w))));
@@ -74,34 +71,93 @@ export function sentences(text: string): string[] {
   return text.match(/[^.!?]+[.!?]*\s*/g)?.map((s) => s.trim()).filter(Boolean) || [text];
 }
 
-/** Finds sentences that tie a pick to someone who didn't choose it. */
+/** Fields that state facts. Suggestions (ideas, tips, titles, questions) are not checked. */
+const FACT_KEYS = new Set(['answer', 'facts', 'detail', 'why', 'known', 'headline', 'note', 'reflection']);
+const NEGATIVE = /\b(avoid|avoids|avoiding|skip|skips|dislike|dislikes|hate|hates|no|not|never|without|won't|doesn't|don't|isn't|aren't|can't)\b/i;
+const EVERYONE = /\b(everyone|everybody|whole family|all of you|the family)\b/i;
+const AVOID_LABEL = 'Food they avoid';
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+interface Mention {
+  name: string;
+  start: number;
+  end: number;
+}
+
+/**
+ * Splits a sentence into claims: a group of people ("Mum and Nai Nai", "you") and what is said
+ * about them, up to the next group or the end of the clause. "You" is the person asking.
+ */
+function claimsIn(sentence: string, names: string[], asker: string): { people: string[]; about: string }[] {
+  const found: Mention[] = [];
+  for (const name of names) {
+    for (const m of sentence.matchAll(new RegExp(`\\b${escape(name)}\\b`, 'g'))) found.push({ name, start: m.index!, end: m.index! + name.length });
+  }
+  for (const m of sentence.matchAll(/\b(you|your)\b/gi)) found.push({ name: asker, start: m.index!, end: m.index! + m[0].length });
+  found.sort((a, b) => a.start - b.start || b.end - a.end);
+  const mentions = found.filter((m, i) => !found.slice(0, i).some((o) => m.start < o.end));
+  const groups: { people: string[]; start: number; end: number }[] = [];
+  for (const m of mentions) {
+    const last = groups[groups.length - 1];
+    if (last && /^\s*(,\s*(and\s+)?|and\s+|&\s+)$/i.test(sentence.slice(last.end, m.start))) {
+      last.people.push(m.name);
+      last.end = m.end;
+    } else groups.push({ people: [m.name], start: m.start, end: m.end });
+  }
+  const clauses = (t: string) => t.split(/[,;:]|\b(?:so|but|while|whereas|then|which|unlike)\b/i);
+  const clause = (t: string) => clauses(t)[0];
+  return groups.map((g, i) => {
+    const after = clause(sentence.slice(g.end, groups[i + 1]?.start ?? sentence.length));
+    // "Curry is loved by Mum and Nai Nai": when nothing follows the names, the claim comes before them.
+    const before = clauses(sentence.slice(groups[i - 1]?.end ?? 0, g.start)).pop() || '';
+    return { people: [...new Set(g.people)], about: words(after).length > 1 ? after : `${before} ${after}` };
+  });
+}
+
+/** Finds sentences that tie a pick to someone who didn't make it, or contradict what they avoid. */
 export function checkClaims(value: unknown, brief: FamilyBrief): ClaimIssue[] {
   const picks = tastePicks(brief);
   const names = brief.members.map((m) => m.name).sort((a, b) => b.length - a.length);
+  const tasters = brief.members.filter((m) => m.tastes?.length).map((m) => m.name);
+  const surname = brief.householdName.replace(/^the\s+/i, '').replace(/\s+family$/i, '').trim();
+  const familyWide = new RegExp(`${EVERYONE.source}|\\bthe ${escape(surname)}s?\\b`, 'i');
   const issues: ClaimIssue[] = [];
-  const walk = (v: unknown, path: (string | number)[]) => {
-    if (typeof v === 'string') {
-      for (const sentence of sentences(v)) {
-        // "Nai Nai" also contains no other member's name, but "Nai" could; take whole names only.
-        const who = namesIn(sentence, names);
-        if (!who.length) continue;
-        const matched = picksIn(sentence, picks);
-        if (!matched.length) continue;
-        const allowed = new Set(matched.flatMap((p) => p.people));
-        const wrong = who.filter((n) => !allowed.has(n));
-        if (wrong.length) {
-          const truth = matched.map((p) => `"${p.option}" was picked by ${p.people.join(', ')}`).join('; ');
-          issues.push({ path, sentence, message: `"${sentence}" names ${wrong.join(', ')}, but ${truth}` });
+
+  const checkSentence = (sentence: string): string | null => {
+    const problems: string[] = [];
+    const claims = claimsIn(sentence, names, brief.asker);
+    for (const { people, about } of claims) {
+      const negative = NEGATIVE.test(about);
+      for (const p of picksIn(about, picks)) {
+        const avoid = p.label === AVOID_LABEL;
+        for (const person of people) {
+          const made = p.people.includes(person);
+          if (avoid === negative && !made) problems.push(`${person} didn't pick "${p.option}" (${p.people.join(', ')} did)`);
+          if (avoid !== negative && made) problems.push(`${person} ${avoid ? 'avoids' : 'picked'} "${p.option}", so the sentence gets it backwards`);
         }
+      }
+    }
+    if (!claims.length && familyWide.test(sentence)) {
+      for (const p of picksIn(sentence, picks)) {
+        if (p.label !== AVOID_LABEL && tasters.some((n) => !p.people.includes(n))) problems.push(`only ${p.people.join(', ')} picked "${p.option}", not the whole family`);
+      }
+    }
+    return problems.length ? `"${sentence}": ${[...new Set(problems)].join('; ')}` : null;
+  };
+
+  const walk = (v: unknown, path: (string | number)[], key: string) => {
+    if (typeof v === 'string') {
+      if (!FACT_KEYS.has(key)) return;
+      for (const sentence of sentences(v)) {
+        const message = checkSentence(sentence);
+        if (message) issues.push({ path, sentence, message });
       }
       return;
     }
-    if (Array.isArray(v)) return v.forEach((x, i) => walk(x, [...path, i]));
-    if (v && typeof v === 'object') {
-      for (const [k, child] of Object.entries(v)) if (k !== 'members' && k !== 'id' && k !== 'options') walk(child, [...path, k]);
-    }
+    if (Array.isArray(v)) return v.forEach((x, i) => walk(x, [...path, i], key));
+    if (v && typeof v === 'object') for (const [k, child] of Object.entries(v)) walk(child, [...path, k], k);
   };
-  walk(value, []);
+  walk(value, [], '');
   return issues;
 }
 
@@ -118,10 +174,9 @@ export function stripClaims<T>(value: T, issues: ClaimIssue[]): T {
     const last = issue.path[issue.path.length - 1];
     if (!parent || typeof parent[last] !== 'string') continue;
     const kept = sentences(parent[last]).filter((s) => s !== issue.sentence).join(' ');
-    if (kept) {
-      parent[last] = kept;
-      continue;
-    }
+    // An emptied field stays empty: validation then rejects the reply rather than keep a false claim.
+    parent[last] = kept;
+    if (kept) continue;
     // Find the nearest list above this field and drop that entry.
     for (let depth = issue.path.length - 1; depth >= 0; depth--) {
       if (typeof issue.path[depth] !== 'number') continue;
