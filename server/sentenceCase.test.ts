@@ -1,0 +1,23 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { sentenceCase } from './ai.ts';
+
+const names = ['Maya', 'Mum', 'Dad', 'Nai Nai', 'Leo', 'The Tan family'];
+
+test('lower-cases Title Case words but keeps the first word', () => {
+  assert.equal(sentenceCase('Family Table Time', names), 'Family table time');
+  assert.equal(sentenceCase('Mystery And Puzzles', names), 'Mystery and puzzles');
+});
+
+test('keeps family names, the surname, proper adjectives and acronyms', () => {
+  assert.equal(sentenceCase('Dinner Brings The Tans Together', names), 'Dinner brings the Tans together');
+  assert.equal(sentenceCase('Walks With Nai Nai', names), 'Walks with Nai Nai');
+  assert.equal(sentenceCase('Asian Stir Fry Night', names), 'Asian stir fry night');
+  assert.equal(sentenceCase('DIY Taco Bar', names), 'DIY taco bar');
+  assert.equal(sentenceCase("Maya's Sunday Market Walk", names), "Maya's Sunday market walk");
+});
+
+test('leaves sentence case alone', () => {
+  assert.equal(sentenceCase('Explore a hidden park', names), 'Explore a hidden park');
+  assert.equal(sentenceCase('Pizza', names), 'Pizza');
+});

@@ -25,7 +25,7 @@ Without a key the app still works; AI features show a clear message and fall bac
 
 ## AI
 
-All AI runs on the server (`server/ai.ts`) with Gemini 3.5 Flash at low thinking (falling back to Flash-Lite when Google is busy), using JSON-schema output that the server checks before replying. The browser sends a "family brief" built from saved answers (`src/services/brief.ts`); the server validates it, wraps it as data, and applies the project's AI rules: use only saved answers, separate facts from ideas, say when the answers don't cover something, never diagnose, rank or criticise, and treat answers as shared family discovery. Requests are rate-limited per IP.
+All AI runs on the server (`server/ai.ts`) with Gemini 3.5 Flash-Lite at minimal thinking (about 1.5s a reply, falling back to Gemini 3.1 Flash-Lite when Google is busy), using JSON-schema output that the server checks before replying. The browser sends a "family brief" built from saved answers (`src/services/brief.ts`); the server validates it, wraps it as data, and applies the project's AI rules: use only saved answers, separate facts from ideas, say when the answers don't cover something, never diagnose, rank or criticise, and treat answers as shared family discovery. Requests are rate-limited per IP.
 
 ## Checks
 
