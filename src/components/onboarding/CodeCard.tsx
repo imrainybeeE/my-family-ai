@@ -6,8 +6,8 @@ export function CodeCard({ code, children }: { code: string; children?: React.Re
     <section className="stock stock-sky">
       <h2 className="t-label opacity-80">Invite with your family code</h2>
       <p
-        className="mt-1 font-extrabold tabular-nums"
-        style={{ fontSize: '2rem', lineHeight: 1.1, letterSpacing: '0.04em' }}
+        className="mt-1 font-bold tabular-nums"
+        style={{ fontSize: '1.75rem', lineHeight: '34px', letterSpacing: '0.04em' }}
         aria-label={`Family code ${code.split('').join(' ')}`}
       >
         {code}

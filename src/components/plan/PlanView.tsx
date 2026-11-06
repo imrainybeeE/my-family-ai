@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { onRovingKeyDown, rovingTabIndex } from '../ui/roving';
 import { useHousehold } from '../../context/HouseholdContext';
 import { useUI } from '../../App';
@@ -38,12 +38,24 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
   const [result, setResult] = useState<PlanIdeas | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [chosen, setChosen] = useState<number | null>(null);
+  const [knownOpen, setKnownOpen] = useState(false);
+  // One request at a time: starting another, or leaving, cancels the last and drops its reply.
+  const requestRef = useRef<AbortController | null>(null);
+  const begin = () => {
+    requestRef.current?.abort();
+    const c = new AbortController();
+    requestRef.current = c;
+    return c;
+  };
 
   useEffect(() => {
     if (initialTask) onConsumeTask();
   }, [initialTask, onConsumeTask]);
 
+  useEffect(() => () => requestRef.current?.abort(), []);
+
   const reset = () => {
+    requestRef.current?.abort();
     setTask(null);
     setStage('who');
     setAsk(null);
@@ -56,14 +68,17 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
 
   const start = async () => {
     if (!task) return;
+    const c = begin();
     setStage('asking');
     setError(null);
     try {
-      const a = await ai.planAsk(brief, task, who);
+      const a = await ai.planAsk(brief, task, who, c.signal);
+      if (c.signal.aborted) return;
       setAsk({ known: a.known.slice(0, 4), questions: a.questions.slice(0, 3) });
       setPicks({});
       setStage('questions');
     } catch (err) {
+      if (c.signal.aborted) return;
       setError(aiErrorMessage(err));
       setAsk({ known: [], questions: [] });
       setStage('questions');
@@ -80,13 +95,16 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
 
   const getIdeas = async () => {
     if (!task) return;
+    const c = begin();
     setStage('thinking');
     setError(null);
     setChosen(null);
     try {
-      const r = await ai.planIdeas(brief, task, who, answers);
+      const r = await ai.planIdeas(brief, task, who, answers, c.signal);
+      if (c.signal.aborted) return;
       setResult({ ...r, ideas: r.ideas.slice(0, 3) });
     } catch (err) {
+      if (c.signal.aborted) return;
       setError(aiErrorMessage(err));
       setResult(offlineIdeas(task, members, responses));
     }
@@ -181,18 +199,29 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
             <div className="grid gap-4">
               {error && <p className="t-small" style={{ color: 'var(--danger)' }}>{error}</p>}
               {ask.known.length > 0 && (
-                <section className="stock stock-sky">
-                  <h2 className="t-hand" style={{ fontSize: '0.9375rem' }}>We already know</h2>
-                  <ul className="prose-ai t-small mt-1">
-                    {ask.known.map((k, i) => (
-                      <li key={i}>{k}</li>
-                    ))}
-                  </ul>
+                <section className="-mt-2">
+                  <button
+                    type="button"
+                    className="t-label bg-transparent border-0 p-0 min-h-[44px] flex items-center gap-1"
+                    style={{ color: 'var(--accent-ink)' }}
+                    aria-expanded={knownOpen}
+                    onClick={() => setKnownOpen((o) => !o)}
+                  >
+                    What we already know
+                    <ChevronDown size={16} strokeWidth={2.6} style={{ transform: knownOpen ? 'rotate(180deg)' : undefined, transition: 'transform 180ms' }} />
+                  </button>
+                  {knownOpen && (
+                    <ul className="prose-ai t-small ink-2">
+                      {ask.known.map((k, i) => (
+                        <li key={i}>{k}</li>
+                      ))}
+                    </ul>
+                  )}
                 </section>
               )}
               {ask.questions.map((q) => (
                 <section key={q.id} className="card p-5">
-                  <h2 className="t-head" style={{ fontSize: '1.125rem' }}>
+                  <h2 className="t-head">
                     {q.question}
                   </h2>
                   {q.multi && <p className="t-small ink-3">Pick any</p>}
@@ -233,9 +262,11 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
                 <span className="t-label">Anything else?</span>
                 <input className="field" value={extra} onChange={(e) => setExtra(e.target.value)} placeholder={task === 'eat' ? 'Nai Nai’s birthday, something soft…' : 'It might rain, we have a toddler…'} />
               </label>
-              <button type="button" className="btn btn-primary btn-block" onClick={getIdeas}>
-                Get three ideas
-              </button>
+              <div className="sticky z-10 -mx-5 px-5 pt-4" style={{ bottom: 'calc(var(--tabbar-top) + 4px + var(--safe-b))', background: 'linear-gradient(to bottom, color-mix(in srgb, var(--page) 0%, transparent), var(--page) 16px)' }}>
+                <button type="button" className="btn btn-primary btn-block" onClick={getIdeas}>
+                  Get three ideas
+                </button>
+              </div>
             </div>
           )}
 
@@ -243,9 +274,9 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
             <div className="grid gap-3">
               {error && <p className="t-small" style={{ color: 'var(--danger)' }}>{error} Here are some simpler ideas.</p>}
               {result.ideas.map((idea, i) => (
-                <IdeaCard key={i} idea={idea} index={i} chosen={chosen} byName={byName} />
+                <IdeaCard key={i} idea={idea} index={i} chosen={chosen} byName={byName} onChoose={() => setChosen((c) => (c === i ? null : i))} />
               ))}
-              <p className="t-small ink-3">Ideas by AI. Check times and prices first.</p>
+              <p className="t-small ink-3">Ideas from your saved answers.</p>
               <div className="grid gap-1 mt-1">
                 <PickForUs count={result.ideas.length} onPick={setChosen} />
                 <div className="grid grid-cols-2">
@@ -273,7 +304,7 @@ function paired(options: string[]) {
 }
 
 /** One idea: the title and one line up front; the reasoning one tap away. */
-function IdeaCard({ idea, index, chosen, byName }: { idea: PlanIdea; index: number; chosen: number | null; byName: ReturnType<typeof useFamily>['byName'] }) {
+function IdeaCard({ idea, index, chosen, byName, onChoose }: { idea: PlanIdea; index: number; chosen: number | null; byName: ReturnType<typeof useFamily>['byName']; onChoose: () => void }) {
   const [open, setOpen] = useState(false);
   const isChosen = chosen === index;
   const people = idea.members.map(byName).filter(Boolean);
@@ -296,7 +327,7 @@ function IdeaCard({ idea, index, chosen, byName }: { idea: PlanIdea; index: numb
             </span>
           )}
         </div>
-        {isChosen && <p className="t-hand mt-1">This one!</p>}
+
       </div>
       <div className="px-5 pt-4 pb-3">
         <p className="t-body">{idea.summary}</p>
@@ -332,6 +363,15 @@ function IdeaCard({ idea, index, chosen, byName }: { idea: PlanIdea; index: numb
             </span>
           </p>
         )}
+        <button type="button" className={`btn btn-sm btn-block mt-3 ${isChosen ? 'btn-primary' : ''}`} aria-pressed={isChosen} onClick={onChoose}>
+          {isChosen ? (
+            <>
+              <Check size={18} strokeWidth={2.6} /> Chosen
+            </>
+          ) : (
+            'Choose this'
+          )}
+        </button>
       </div>
     </motion.article>
   );
@@ -343,7 +383,7 @@ function PickForUs({ count, onPick }: { count: number; onPick: (i: number) => vo
   return (
     <button
       type="button"
-      className="btn btn-primary"
+      className="btn"
       disabled={spinning || count === 0}
       onClick={() => {
         setSpinning(true);

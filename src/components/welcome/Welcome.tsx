@@ -47,10 +47,10 @@ export function Welcome() {
       </div>
 
       <motion.div className="px-6 flex-1 flex flex-col" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45, duration: 0.5 }}>
-        <h1 className="t-display" style={{ fontSize: '3rem', lineHeight: 0.98 }}>
+        <h1 className="t-display" style={{ fontSize: '2.75rem', lineHeight: '46px' }}>
           My Family AI
         </h1>
-        <p className="t-body ink-2 mt-3" style={{ fontSize: '1.125rem', lineHeight: 1.4 }}>
+        <p className="t-body ink-2 mt-3" style={{ fontSize: '1.125rem', lineHeight: '26px', textWrap: 'balance' }}>
           Find your flower. Plan things everyone loves.
         </p>
 

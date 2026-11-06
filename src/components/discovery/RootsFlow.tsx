@@ -23,6 +23,9 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
   const [reflecting, setReflecting] = useState(false);
   const [followText, setFollowText] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const reflectRef = useRef<AbortController | null>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const saved = myAnswers.advancedAnswers || {};
   const savedRef = useRef(saved);
   savedRef.current = saved;
@@ -30,27 +33,41 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
   const q = ADVANCED_QUESTIONS[index];
   const answeredCount = ADVANCED_QUESTIONS.filter((x) => saved[x.id]).length;
 
+  // Opening, switching person or moving to another question starts clean from what that person saved.
   useEffect(() => {
     if (!open) return;
     const firstOpen = ADVANCED_QUESTIONS.findIndex((x) => !savedRef.current[x.id]);
     setIndex(firstOpen === -1 ? 0 : firstOpen);
     setStage('intro');
-    setReflection(null);
-    setError(null);
-  }, [open]);
+  }, [open, activeMember?.id]);
 
   useEffect(() => {
-    setText(saved[q.id]?.answer || '');
+    reflectRef.current?.abort();
+    setText(savedRef.current[q.id]?.answer || '');
     setFollowText('');
-    // Only when the question changes.
+    setReflection(null);
+    setReflecting(false);
+    setError(null);
+    // Only when the person or question changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index]);
+  }, [open, activeMember?.id, q.id]);
+
+  useEffect(() => {
+    if (stage !== 'ask') return;
+    // Each question starts at the top of the sheet, with focus on the question.
+    headingRef.current?.closest('.sheet-body')?.scrollTo({ top: 0 });
+    headingRef.current?.focus({ preventScroll: true });
+  }, [index, stage]);
+
+  useEffect(() => () => reflectRef.current?.abort(), []);
+  useEffect(() => {
+    if (!open) reflectRef.current?.abort();
+  }, [open]);
 
   const write = (id: string, value: AdvancedAnswer) =>
     updateMyAnswers({ advancedAnswers: { ...savedRef.current, [id]: value } });
 
   const next = async () => {
-    setReflection(null);
     if (index < ADVANCED_QUESTIONS.length - 1) {
       setIndex((i) => i + 1);
       setStage('ask');
@@ -62,25 +79,33 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
 
   const submit = async () => {
     const answer = text.trim();
-    if (!answer) return;
+    if (!answer || saving) return;
     setError(null);
+    setSaving(true);
     const entry: AdvancedAnswer = { answer, answeredAt: new Date().toISOString() };
     try {
       await write(q.id, entry);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Couldn’t save that answer.');
       return;
+    } finally {
+      setSaving(false);
     }
+    reflectRef.current?.abort();
+    const c = new AbortController();
+    reflectRef.current = c;
     setStage('reflect');
     setReflecting(true);
     try {
-      const r = await ai.roots(brief, name, q.question, answer, false);
+      const r = await ai.roots(brief, name, q.question, answer, false, c.signal);
+      if (c.signal.aborted) return;
       setReflection({ text: r.reflection, followUp: r.followUp });
       await write(q.id, { ...entry, reflection: r.reflection });
     } catch {
-      setReflection({ text: 'Thanks. That’s saved for your family to see.', followUp: null });
+      if (c.signal.aborted) return;
+      setReflection({ text: 'Saved for your family to see.', followUp: null });
     } finally {
-      setReflecting(false);
+      if (!c.signal.aborted) setReflecting(false);
     }
   };
 
@@ -88,11 +113,15 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
     const a = followText.trim();
     const current = savedRef.current[q.id];
     if (!a || !reflection?.followUp || !current) return next();
+    if (saving) return;
+    setSaving(true);
     try {
       await write(q.id, { ...current, followUpQuestion: reflection.followUp, followUpAnswer: a });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Couldn’t save that answer.');
       return;
+    } finally {
+      setSaving(false);
     }
     next();
   };
@@ -124,12 +153,12 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
             <button type="button" className="btn" onClick={next}>
               Skip
             </button>
-            <button type="button" className="btn btn-primary" disabled={!text.trim()} onClick={submit}>
+            <button type="button" className="btn btn-primary" disabled={!text.trim() || saving} onClick={submit}>
               Save
             </button>
           </div>
         ) : stage === 'reflect' && !reflecting ? (
-          <button type="button" className="btn btn-primary btn-block" onClick={reflection?.followUp && followText.trim() ? submitFollowUp : next}>
+          <button type="button" className="btn btn-primary btn-block" disabled={saving} onClick={reflection?.followUp && followText.trim() ? submitFollowUp : next}>
             {reflection?.followUp ? (followText.trim() ? 'Save and continue' : 'Skip') : index === ADVANCED_QUESTIONS.length - 1 ? 'Finish' : 'Next question'}
           </button>
         ) : undefined
@@ -157,11 +186,13 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
         {stage === 'ask' && (
           <motion.div key={`q${q.id}`} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.22 }} className="grid gap-4 pt-1">
             <section className="stock stock-lilac">
-              <p className="t-hand" style={{ fontSize: '0.9375rem' }}>
+              <p className="t-hand">
                 {q.theme}
                 <span className="sr-only">. Question {index + 1} of {ADVANCED_QUESTIONS.length}.</span>
               </p>
-              <h3 className="t-title mt-1.5">{q.question}</h3>
+              <h3 ref={headingRef} tabIndex={-1} className="t-title mt-1.5 outline-none">
+                {q.question}
+              </h3>
             </section>
             {quickPicks.length > 0 && (
               <div

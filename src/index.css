@@ -20,7 +20,7 @@
   --card-2: #f3f6fb;
   --ink: #1e2a44;
   --ink-2: #55617a;
-  --ink-3: #79849b;
+  --ink-3: #5b677f;
   --line: #d6deea;
   --line-strong: #bcc8d9;
 
@@ -50,17 +50,16 @@
   --danger-soft: #fbe3e0;
   --focus: #24345e;
 
-  --shadow-paper: 0 1px 1px rgba(30, 42, 68, 0.06), 0 1px 3px rgba(30, 42, 68, 0.05), 0 14px 26px -18px rgba(30, 42, 68, 0.42);
-  --shadow-lift: 0 2px 4px rgba(30, 42, 68, 0.08), 0 24px 44px -20px rgba(30, 42, 68, 0.5);
+  --shadow-paper: 0 0 0 0.5px rgba(30, 42, 68, 0.06), 0 2px 8px rgba(30, 42, 68, 0.08);
+  --shadow-lift: 0 1px 2px rgba(30, 42, 68, 0.06), 0 8px 24px -8px rgba(30, 42, 68, 0.22);
   --grain: 0.55;
 
   --r-paper: 12px;
   --r-ctl: 14px;
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
-  /* The floating dock: the composer sits on top of the tab bar. */
-  --tabbar-top: 92px;
-  --composer-h: 58px;
+  /* The floating dock: the tab bar is 64px tall and 12px off the bottom; the Ask composer sits 8px above it. */
+  --tabbar-top: 84px;
 }
 
 .dark {
@@ -71,7 +70,7 @@
   --card-2: #232e47;
   --ink: #eef2fa;
   --ink-2: #aab5cb;
-  --ink-3: #808ba4;
+  --ink-3: #9aa7c0;
   --line: #2b3650;
   --line-strong: #3d4a68;
 
@@ -86,9 +85,9 @@
 
   --stock-pink: color-mix(in srgb, #f08aa6 14%, var(--card));
   --stock-pink-ink: #ffd9e4;
-  /* Yellow over navy turns olive, so at night butter stock is plain paper with gold ink. */
+  /* Yellow over navy turns olive, so at night butter stock is plain paper. */
   --stock-butter: var(--card);
-  --stock-butter-ink: #fbe7ae;
+  --stock-butter-ink: var(--ink);
   --stock-mint: color-mix(in srgb, #7fc49a 18%, var(--card));
   --stock-mint-ink: #cdf0da;
   --stock-lilac: color-mix(in srgb, #b8a3ee 22%, var(--card));
@@ -102,8 +101,8 @@
   --danger-soft: #3a1a17;
   --focus: #e6ecf8;
 
-  --shadow-paper: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 14px 26px -18px rgba(0, 0, 0, 0.8);
-  --shadow-lift: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 24px 44px -20px rgba(0, 0, 0, 0.85);
+  --shadow-paper: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 2px 8px rgba(0, 0, 0, 0.28);
+  --shadow-lift: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 8px 24px -8px rgba(0, 0, 0, 0.6);
   --grain: 0.3;
 }
 
@@ -183,29 +182,29 @@
    Type
    ------------------------------------------------------------------------------------------ */
 .t-display {
-  font-size: 2.125rem;
-  line-height: 1.02;
-  font-weight: 800;
+  font-size: 2rem;
+  line-height: 35px;
+  font-weight: 700;
   letter-spacing: -0.03em;
   font-variation-settings: 'opsz' 96;
 }
 .t-title {
   font-size: 1.5rem;
-  line-height: 1.14;
-  font-weight: 750;
+  line-height: 28px;
+  font-weight: 650;
   letter-spacing: -0.02em;
   font-variation-settings: 'opsz' 72;
 }
 .t-head {
-  font-size: 1.1875rem;
-  line-height: 1.22;
-  font-weight: 700;
+  font-size: 1.125rem;
+  line-height: 23px;
+  font-weight: 650;
   letter-spacing: -0.012em;
   font-variation-settings: 'opsz' 40;
 }
 .t-body {
   font-size: 1rem;
-  line-height: 1.5;
+  line-height: 24px;
   font-weight: 420;
 }
 .t-small {
@@ -219,6 +218,8 @@
 }
 .t-hand {
   font-family: var(--font-hand);
+  font-size: 0.9375rem;
+  line-height: 20px;
   font-weight: 600;
 }
 .ink-2 {
@@ -232,7 +233,7 @@
    Buttons. Rounded rectangles with a little thickness, like a mounted card; they press in.
    ------------------------------------------------------------------------------------------ */
 .btn {
-  --depth: 3px;
+  --depth: 2px;
   --btn-bg: var(--card);
   --btn-fg: var(--ink);
   --btn-edge: var(--line-strong);
@@ -274,7 +275,7 @@
   position: absolute;
   inset: 5px;
   border-radius: 10px;
-  border: 1.5px dashed color-mix(in srgb, var(--on-accent) 34%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--on-accent) 25%, transparent);
   pointer-events: none;
 }
 .btn-quiet {
@@ -546,8 +547,8 @@ textarea.field {
   transform: translateX(-50%);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  padding: 6px;
-  border-radius: 28px;
+  padding: 4px;
+  border-radius: 18px;
   background: color-mix(in srgb, var(--card) 95%, transparent);
   backdrop-filter: blur(28px) saturate(1.5);
   -webkit-backdrop-filter: blur(28px) saturate(1.5);
@@ -569,8 +570,8 @@ textarea.field {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  min-height: 54px;
+  gap: 2px;
+  min-height: 56px;
   border: 0;
   background: transparent;
   color: var(--ink-3);
@@ -583,7 +584,7 @@ textarea.field {
 .tabbar .tab-well {
   position: absolute;
   inset: 0;
-  border-radius: 22px;
+  border-radius: 14px;
   background: var(--accent-soft);
   z-index: -1;
 }

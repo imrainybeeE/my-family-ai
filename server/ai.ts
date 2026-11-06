@@ -44,7 +44,7 @@ How you work:
 7. Stay positive, practical and kind, suitable for children and grandparents alike.
 8. Don't state real-world facts you can't check (opening hours, prices, availability, weather, travel rules). Present places and plans as ideas to check.
 9. If something suggests a person might be unsafe or very upset, respond gently and encourage them to talk with a trusted adult.
-10. Write for a small phone screen: plain words, short sentences, no filler. Be concrete: name the real foods, places, films and activities from the answers. Never use empty praise words (amazing, brilliant, unique, vibrant, wonderful, curious, caring). Use British spelling (favourite, colour, cosy, Mum). Start every sentence and title with a capital letter and capitalise people's names (Mum, Nai Nai); otherwise write titles in sentence case, never Title Case.`;
+10. Write for a small phone screen: plain words, short sentences, no filler. Be concrete: name the real foods, places, films and activities from the answers. Never use empty praise or filler words (amazing, brilliant, unique, vibrant, wonderful, curious, caring, fun, great, perfect, special). Use British spelling (favourite, colour, cosy, Mum). Start every sentence and title with a capital letter and capitalise people's names (Mum, Nai Nai); otherwise write titles in sentence case, never Title Case.`;
 
 function system(brief: FamilyBrief, task: string): string {
   return `${RULES}\n\n<family_answers>\n${renderBrief(brief)}\n</family_answers>\n\n${task}`;
@@ -329,7 +329,7 @@ aiRouter.post('/chat', async (req, res) => {
   res.flushHeaders();
   const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 
-  const task = `You're chatting in the app's Ask tab with ${g.brief.asker}. Hard limit: 70 words in total. Your first sentence is the answer itself and names at least one specific food, place, activity, film or person (good: "Walks in the park and stir fry are your shared favourites."). Never open by describing the answers or announcing a list ("You share some great favourites", "Here are some ideas", "Based on"). Don't end with a question. After the first sentence, then at most three "- " bullets of under 12 words each, or one more short sentence instead of bullets. Use **bold** only for the name of an idea, in sentence case ("**Curry and rice**"). No headings, tables or emojis. Speak to ${g.brief.asker} directly and call family members by the names shown. Name concrete things from their answers (foods, places, activities) rather than style labels.`;
+  const task = `You're chatting in the app's Ask tab with ${g.brief.asker}. Hard limit: 45 words in total. Your first sentence is the answer itself, under 14 words, and names at least one specific food, place, activity, film or person (good: "Walks in the park and stir fry are your shared favourites."). Never open by describing the answers or announcing a list ("You share some great favourites", "Here are some ideas", "Based on"). Don't end with a question. After the first sentence, at most three "- " bullets of under 8 words each, or one more short sentence instead of bullets. Use **bold** only for the name of an idea, in sentence case ("**Curry and rice**"). No headings, tables or emojis. Call ${g.brief.asker} "you", never by name, and call everyone else by the names shown. Keep facts and ideas apart: a bullet that suggests something not in the answers starts with "Idea: ". Name concrete things from their answers (foods, places, activities) rather than style labels.`;
 
   const proper = [...g.brief.members.map((m) => m.name), g.brief.householdName];
   const abort = new AbortController();
@@ -421,7 +421,7 @@ aiRouter.post('/bloom', async (req, res) => {
     g.ai,
     g.brief,
     `${m.name} just finished the Foundation discovery. Their top style is ${m.topStyle} and their second style is ${m.secondStyle}. Write a short, warm note to them about their result.
-- note: 2 sentences, under 25 words, never naming the styles, speaking to them as "you". Mention two or three specific things they picked (paraphrased) and show how both their top and second style appear in those picks.
+- note: one plain sentence under 18 words, speaking to them as "you", that links two specific things they picked (paraphrased), for example "You'd rather build something new and then talk it through with Nai Nai." Never name the styles. No praise or judgement words (shine, great, amazing, love, really, creative, thoughtful, special).
 - tryThis: one small, concrete thing to do with someone in the family, under 12 words, naming that person if it fits their answers. Start with a verb and don't mention when (the app already labels it "Try this week").
 Never mention percentages, scores, or the other four styles.`,
     `Write the note for ${m.name}.`,
@@ -445,7 +445,7 @@ aiRouter.post('/roots', async (req, res) => {
     g.ai,
     g.brief,
     `${member} is answering the Advanced discovery questions, a deeper and optional layer after the Foundation discovery.
-- reflection: one warm sentence under 16 words, speaking to them as "you", that names one concrete thing from their answer, so they know you heard it. No general statements, don't judge or analyse them, and don't repeat their words back verbatim.
+- reflection: one sentence under 16 words, speaking to them as "you", that adds something rather than restating their answer: link it to a specific thing another family member saved (for example "Mum also listed remembering birthdays."), or, if nothing links, one small way the family could act on it. Don't judge or analyse them, and no praise words.
 - followUp: at most one short follow-up question (under 16 words) about something not already in the question or their answer, only when the answer is very short or vague and one more detail would help the family plan together or understand them. Otherwise null. Never follow up on worries, stress, health, or anything they seemed hesitant about.${followUpAnswered ? ' They have already answered a follow-up for this question, so followUp must be null.' : ''}`,
     `Question: "${question}"\n${member}'s answer: "${answer}"`,
     RootsSchema,
@@ -461,10 +461,10 @@ aiRouter.post('/insights', async (req, res) => {
     g.brief,
     `Write the family profile for the app's Together screen, using only the saved answers.
 - headline: one sentence under 8 words naming one concrete thing most of the family shares (for example "Dinner brings the Tans together").
-- together: 2–3 things several people enjoy or value. title under 5 words; detail is under 14 words naming who and what. members: the names involved.
+- together: 2–3 things two or more people enjoy or value. title under 5 words; detail is under 12 words naming exactly who and what, never "everyone" unless it is true. members: the names involved.
 - differences: 1–2 interesting differences, described neutrally. detail is under 14 words naming who prefers what; bridge is under 12 words with a practical, positive way to enjoy that difference.
 - ideas: exactly 3 things to try together, each grounded in answers. title under 5 words; why is under 12 words; tip is one practical sentence under 12 words. members: who it suits.
-Use the family facts for any numbers. Write for a phone screen: short, concrete, warm.
+Use the family facts for any numbers. Write for a phone screen: short, concrete, plain. No praise words.
 - missing: if some people haven't answered the Foundation discovery yet, under 8 words naming them (for example "Leo hasn't answered yet"); otherwise null.
 If only one person has answered, stay honest: describe what that person brings and what the family could discover next, and say so in missing.`,
     'Write the family profile.',

@@ -111,7 +111,7 @@ function TableQuestion() {
     <section className="card mt-8 px-5 pt-6 pb-5" aria-label="Tonight’s table question" aria-busy={spark.loading}>
       <span className="tape" style={{ top: -10, left: '50%', marginLeft: -38, transform: 'rotate(-2deg)' }} aria-hidden />
       <div className="flex items-center justify-between gap-2">
-        <h2 className="t-hand ink-2" style={{ fontSize: '0.9375rem' }}>
+        <h2 className="t-hand ink-2">
           Tonight at the table
         </h2>
         <button

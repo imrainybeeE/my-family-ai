@@ -86,12 +86,12 @@ export interface PlanIdeas {
 export const ai = {
   spark: (brief: FamilyBrief, recent: string[], signal?: AbortSignal) => post<Spark>('spark', { brief, recent }, signal),
   bloom: (brief: FamilyBrief, member: string) => post<BloomNoteResult>('bloom', { brief, member }),
-  roots: (brief: FamilyBrief, member: string, question: string, answer: string, followUpAnswered: boolean) =>
-    post<RootsResult>('roots', { brief, member, question, answer, followUpAnswered }),
+  roots: (brief: FamilyBrief, member: string, question: string, answer: string, followUpAnswered: boolean, signal?: AbortSignal) =>
+    post<RootsResult>('roots', { brief, member, question, answer, followUpAnswered }, signal),
   insights: (brief: FamilyBrief, signal?: AbortSignal) => post<Insights>('insights', { brief }, signal),
-  planAsk: (brief: FamilyBrief, task: PlanTask, who: string[]) => post<PlanAsk>('plan/ask', { brief, task, who }),
-  planIdeas: (brief: FamilyBrief, task: PlanTask, who: string[], answers: { question: string; answer: string }[]) =>
-    post<PlanIdeas>('plan/ideas', { brief, task, who, answers }),
+  planAsk: (brief: FamilyBrief, task: PlanTask, who: string[], signal?: AbortSignal) => post<PlanAsk>('plan/ask', { brief, task, who }, signal),
+  planIdeas: (brief: FamilyBrief, task: PlanTask, who: string[], answers: { question: string; answer: string }[], signal?: AbortSignal) =>
+    post<PlanIdeas>('plan/ideas', { brief, task, who, answers }, signal),
   suggest: (brief: FamilyBrief, last?: { question: string; answer: string }, signal?: AbortSignal) =>
     post<{ suggestions: string[] }>('suggest', { brief, lastQuestion: last?.question, lastAnswer: last?.answer }, signal),
 };

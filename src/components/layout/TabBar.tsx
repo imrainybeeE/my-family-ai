@@ -53,7 +53,7 @@ export function PageHeader({
         <h1 className="t-display">{title}</h1>
         {subtitle && <p className="t-small ink-2 mt-1.5">{subtitle}</p>}
         {isDemo && demoNote && (
-          <p className="t-hand ink-3 mt-1" style={{ fontSize: '0.875rem' }}>
+          <p className="t-hand ink-3 mt-1">
             Demo family, nothing is saved
           </p>
         )}

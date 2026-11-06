@@ -126,7 +126,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
         </section>
 
         <section className="card p-4">
-          <h3 className="t-head" style={{ fontSize: '1.0625rem' }}>
+          <h3 className="t-head">
             About this app
           </h3>
           <ul className="prose-ai t-small ink-2 mt-2">

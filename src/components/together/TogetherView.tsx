@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
-import { motion } from 'motion/react';
-import { RefreshCw } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { useHousehold } from '../../context/HouseholdContext';
 import { useUI } from '../../App';
 import { FamilyPerson, useAiResource, useFamily } from '../../hooks/useFamily';
@@ -12,7 +12,7 @@ import { Strand, useWidth } from '../art/Garland';
 import { SectionTitle, Thinking } from '../ui/bits';
 
 /** One yarn colour per shared thing, used for its strand in the circle and its row below. */
-const YARNS = ['#e86f8f', '#e0a526', '#5e93d1'];
+const YARNS = ['#e86f8f', '#648b79', '#5e93d1'];
 
 export function TogetherView() {
   const { brief, members, responses, myAnswers } = useHousehold();
@@ -64,12 +64,12 @@ export function TogetherView() {
             </div>
           ) : (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <p className="t-head mt-2" style={{ fontSize: '1.25rem' }}>
+              <p className="t-head mt-2" style={{ fontSize: '1.375rem', lineHeight: '26px' }}>
                 {data.headline}
               </p>
               {Boolean(insights.error) && <p className="t-small ink-2 mt-2">{aiErrorMessage(insights.error)}</p>}
 
-              <SectionTitle>You all enjoy</SectionTitle>
+              <SectionTitle>Shared interests</SectionTitle>
               <ul className="card px-4" aria-label="Things you enjoy together">
                 {data.together.map((t, i) => (
                   <Row key={i} first={i === 0} yarn={YARNS[i % YARNS.length]} people={who(t.members)} title={t.title} body={t.detail} />
@@ -82,7 +82,7 @@ export function TogetherView() {
                   <ul className="card px-4" aria-label="Where you differ">
                     {data.differences.map((d, i) => (
                       <Row key={i} first={i === 0} people={who(d.members)} title={d.title} body={d.detail}>
-                        <p className="mt-2 flex gap-2 items-start" style={{ color: 'var(--accent-ink)', fontSize: '0.9375rem', lineHeight: 1.4, fontWeight: 500 }}>
+                        <p className="t-small mt-2 flex gap-2 items-start font-medium" style={{ color: 'var(--accent-ink)' }}>
                           <span aria-hidden className="shrink-0 rounded-full mt-2" style={{ width: 12, height: 4, background: 'var(--yarn)', transform: 'rotate(-20deg)' }} />
                           <span>{d.bridge}</span>
                         </p>
@@ -93,11 +93,12 @@ export function TogetherView() {
               )}
 
               <SectionTitle>Ideas to try</SectionTitle>
-              <div className="-mx-5 px-5 -mt-1 -mb-5 flex gap-3 overflow-x-auto no-scrollbar pt-4 pb-8" style={{ scrollSnapType: 'x mandatory', scrollPaddingInline: 20 }} aria-label="Ideas to try, scroll for more">
-                {data.ideas.map((idea, i) => (
-                  <Ticket key={i} index={i} title={idea.title} why={idea.why} people={who(idea.members)} onPlan={() => ui.askAbout(`Help us plan this: ${idea.title}`)} />
-                ))}
-              </div>
+              <IdeaPager count={data.ideas.length}>
+                {(i) => {
+                  const idea = data.ideas[i];
+                  return <Ticket index={i} title={idea.title} why={idea.why} people={who(idea.members)} onPlan={() => ui.askAbout(`Help us plan this: ${idea.title}`)} />;
+                }}
+              </IdeaPager>
 
               <div className="flex items-center justify-between gap-3 mt-2">
                 <p className="t-small ink-3">{data.missing || 'Written by AI from your answers.'}</p>
@@ -188,7 +189,7 @@ function Row({ first, people, title, body, yarn, children }: { first: boolean; p
         ))}
       </span>
       <div className="min-w-0 flex-1">
-        <h3 className="font-bold flex items-start gap-2" style={{ fontSize: '1.0625rem', lineHeight: 1.3 }}>
+        <h3 className="t-head flex items-start gap-2">
           {yarn && <span aria-hidden className="shrink-0 rounded-full mt-[0.55em]" style={{ width: 14, height: 4, background: yarn }} />}
           {title}
         </h3>
@@ -199,15 +200,65 @@ function Row({ first, people, title, body, yarn, children }: { first: boolean; p
   );
 }
 
+/** One idea at a time, full width: swipe, or use the arrows. */
+function IdeaPager({ count, children }: { count: number; children: (i: number) => React.ReactNode }) {
+  const [[i, dir], setPage] = useState<[number, number]>([0, 0]);
+  const at = Math.min(i, count - 1);
+  const go = (d: number) => setPage(([cur]) => [Math.max(0, Math.min(count - 1, cur + d)), d]);
+  if (count < 1) return null;
+  return (
+    <section aria-roledescription="carousel" aria-label="Ideas to try">
+      <div className="pt-3 overflow-hidden -mx-2 px-2 pb-2">
+        <AnimatePresence mode="popLayout" initial={false} custom={dir}>
+          <motion.div
+            key={at}
+            custom={dir}
+            initial={{ opacity: 0, x: dir * 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: dir * -40 }}
+            transition={{ duration: 0.22, ease: [0.3, 0.7, 0.4, 1] }}
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.2}
+            onDragEnd={(_, info) => {
+              if (info.offset.x < -50) go(1);
+              else if (info.offset.x > 50) go(-1);
+            }}
+            aria-roledescription="slide"
+            aria-label={`${at + 1} of ${count}`}
+          >
+            {children(at)}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+      {count > 1 && (
+        <div className="flex items-center justify-between mt-2">
+          <button type="button" className="icon-btn" style={{ background: 'transparent', boxShadow: 'none' }} onClick={() => go(-1)} disabled={at === 0} aria-label="Previous idea">
+            <ChevronLeft size={22} strokeWidth={2.2} style={{ opacity: at === 0 ? 0.3 : 1 }} />
+          </button>
+          <span className="flex gap-2" aria-hidden>
+            {Array.from({ length: count }, (_, d) => (
+              <span key={d} className="rounded-full transition-colors" style={{ width: 7, height: 7, background: d === at ? 'var(--ink)' : 'var(--line-strong)' }} />
+            ))}
+          </span>
+          <button type="button" className="icon-btn" style={{ background: 'transparent', boxShadow: 'none' }} onClick={() => go(1)} disabled={at === count - 1} aria-label="Next idea">
+            <ChevronRight size={22} strokeWidth={2.2} style={{ opacity: at === count - 1 ? 0.3 : 1 }} />
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 const TICKETS = ['stock-butter', 'stock-pink', 'stock-sky'];
 const TAPES = ['tape-sky', '', 'tape-butter'];
 
 /** An idea as a ticket taped to the page: the title is the thing, the reason stays short. */
 function Ticket({ index, title, why, people, onPlan }: { index: number; title: string; why: string; people: FamilyPerson[]; onPlan: () => void }) {
   return (
-    <article className={`stock ${TICKETS[index % 3]} relative shrink-0 flex flex-col`} style={{ width: '74%', scrollSnapAlign: 'start', minHeight: 220, transform: `rotate(${index % 2 ? 1 : -1}deg)` }}>
+    <article className={`stock ${TICKETS[index % 3]} relative flex flex-col`} style={{ padding: 16, minHeight: 176, transform: `rotate(${index % 2 ? 0.6 : -0.6}deg)` }}>
       <span className={`tape ${TAPES[index % 3]}`} style={{ top: -10, left: 18, transform: 'rotate(-4deg)' }} aria-hidden />
-      <h3 className="t-title mt-1">{title}</h3>
+      <h3 className="t-title mt-1" style={{ fontSize: '1.375rem', lineHeight: '26px' }}>{title}</h3>
       <p className="t-small mt-2 opacity-85">{why}</p>
       <div className="flex items-center justify-between gap-2 mt-auto pt-4">
         <span className="flex -space-x-2" aria-label={people.length ? `Suits ${people.map((p) => p.name).join(', ')}` : undefined}>

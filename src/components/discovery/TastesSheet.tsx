@@ -99,7 +99,7 @@ export function TastesSheet({ open, onClose }: { open: boolean; onClose: () => v
       <div className="grid gap-6 pb-2">
         {GROUPS.map((g) => (
           <fieldset key={g.key}>
-            <legend className="t-head" style={{ fontSize: '1.0625rem' }}>
+            <legend className="t-head">
               {g.title}
             </legend>
             <p className="t-small ink-3 mt-0.5">{g.hint || (g.multi ? 'Pick any.' : 'Pick one.')}</p>

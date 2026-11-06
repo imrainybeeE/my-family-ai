@@ -43,7 +43,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     root.dataset.theme = isDark ? 'dark' : 'light';
     document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', isDark ? '#0e1612' : '#f2f4ef');
+      ?.setAttribute('content', isDark ? '#131b2c' : '#e4ecf5');
   }, [isDark]);
 
   const setMode = (next: ThemeMode) => {

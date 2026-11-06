@@ -20,6 +20,12 @@ async function newPage() {
   const ctx = await browser.newContext({ viewport: { width: 393, height: 852 }, isMobile: true, hasTouch: true });
   await ctx.route('**/api/ai/**', async (route) => {
     const path = new URL(route.request().url()).pathname.replace('/api/ai/', '');
+    const lastQuestion = path === 'suggest' && JSON.parse(route.request().postData() || '{}').lastQuestion;
+    if (lastQuestion) {
+      // Follow-ups to the first question arrive late, after the second chat has started.
+      await new Promise((r) => setTimeout(r, lastQuestion.startsWith('What do we') ? 900 : 100));
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ suggestions: [`Follow-up to: ${lastQuestion}`] }) });
+    }
     if (path === 'chat') {
       return route.fulfill({ status: 200, contentType: 'text/event-stream', body: 'data: {"t":"Mock answer for Maya."}\n\ndata: {"done":true,"refused":false}\n\n' });
     }
@@ -59,6 +65,17 @@ await check('chat stays with the person who had it', async (page) => {
   assert.equal(await page.getByText('Mock answer for Maya.').count(), 0, 'Mum sees Maya’s chat');
   await switchTo(page, 'Maya');
   await page.getByText('Mock answer for Maya.').waitFor();
+});
+
+await check('a follow-up from an old chat never lands after New chat', async (page) => {
+  await page.goto(`${base}/?demo=1#ask`);
+  await page.getByRole('button', { name: 'What do we have in common?' }).click();
+  await page.getByText('Mock answer for Maya.').waitFor();
+  await page.getByRole('button', { name: 'New chat' }).click();
+  await page.getByRole('button', { name: 'Where are we different?' }).click();
+  await page.getByText('Follow-up to: Where are we different?').waitFor();
+  await page.waitForTimeout(1200);
+  assert.equal(await page.getByText('Follow-up to: What do we have in common?').count(), 0, 'old follow-up appeared in the new chat');
 });
 
 await check('sheets keep keyboard focus inside and make the app inert', async (page) => {

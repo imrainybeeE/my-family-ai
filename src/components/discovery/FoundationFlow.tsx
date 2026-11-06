@@ -220,14 +220,14 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
 
         {stage === 'ask' && (
           <motion.div key={`q${q.id}`} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.22 }} className="pt-1">
-            <section className={`stock ${SECTION_STOCK[q.section]} pr-32`}>
-              <span className="absolute right-2 top-1/2 -translate-y-1/2">
-                <StitchedFlower petals={petals} size={116} />
-              </span>
-              <p className="t-hand" style={{ fontSize: '0.9375rem' }}>
-                {SECTION_LABEL[q.section]}
-              </p>
-              <h3 ref={headingRef} tabIndex={-1} className="t-title mt-1.5 outline-none">
+            <section className={`stock ${SECTION_STOCK[q.section]}`} style={{ padding: 20 }}>
+              <div className="flex items-center justify-between gap-3 -mt-2 -mb-1">
+                <p className="t-hand">{SECTION_LABEL[q.section]}</p>
+                <span className="-my-1 -mr-2">
+                  <StitchedFlower petals={petals} size={72} />
+                </span>
+              </div>
+              <h3 ref={headingRef} tabIndex={-1} className="t-title outline-none" style={{ fontSize: '1.375rem', lineHeight: '27px' }}>
                 {q.question}
               </h3>
               <p className="t-small mt-2 opacity-80">
@@ -241,7 +241,7 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
               </p>
             )}
             <div
-              className="grid gap-2.5 mt-5"
+              className="grid gap-2 mt-4"
               role={q.isMultiSelect ? 'group' : 'radiogroup'}
               aria-label={q.question}
               onKeyDown={q.isMultiSelect ? undefined : (e) => onRovingKeyDown(e)}

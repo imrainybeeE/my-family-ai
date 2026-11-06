@@ -39,7 +39,18 @@ export function AskView() {
   const [busy, setBusy] = useState(false);
   const [followUps, setFollowUps] = useState<string[]>([]);
   const abortRef = useRef<AbortController | null>(null);
+  // Bumped by every send and New chat, so a reply or follow-up from an older chat is dropped.
+  const genRef = useRef(0);
   const endRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLFormElement>(null);
+  const [composerH, setComposerH] = useState(54);
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setComposerH(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const starters = useAiResource('starters', brief, (signal) => ai.suggest(brief, undefined, signal), messages.length === 0);
 
   useEffect(() => {
@@ -58,6 +69,7 @@ export function AskView() {
     async (text: string) => {
       const q = text.trim();
       if (!q || busy) return;
+      const gen = ++genRef.current;
       setInput('');
       setFollowUps([]);
       const history: Msg[] = [...messages.filter((m) => !m.error), { id: `u${Date.now()}`, role: 'user', content: q }];
@@ -82,15 +94,17 @@ export function AskView() {
           answer = 'I can’t help with that one. Try asking about your family’s answers, plans or things to do together.';
           setMessages((list) => list.map((m) => (m.id === replyId ? { ...m, content: answer } : m)));
         }
-        ai.suggest(brief, { question: q, answer })
-          .then((r) => setFollowUps(r.suggestions.slice(0, 3)))
-          .catch(() => setFollowUps([]));
+        ai.suggest(brief, { question: q, answer }, controller.signal)
+          .then((r) => gen === genRef.current && setFollowUps(r.suggestions.slice(0, 3)))
+          .catch(() => gen === genRef.current && setFollowUps([]));
       } catch (err) {
-        if ((err as Error)?.name === 'AbortError') return;
+        if ((err as Error)?.name === 'AbortError' || gen !== genRef.current) return;
         setMessages((list) => list.map((m) => (m.id === replyId ? { ...m, content: aiErrorMessage(err), error: true } : m)));
       } finally {
-        setBusy(false);
-        scrollDown();
+        if (gen === genRef.current) {
+          setBusy(false);
+          scrollDown();
+        }
       }
     },
     [brief, busy, messages]
@@ -110,7 +124,7 @@ export function AskView() {
   const suggestions = starters.data?.suggestions?.slice(0, 3) || [];
 
   return (
-    <div className="page" style={{ paddingBottom: 'calc(var(--tabbar-top) + var(--composer-h) + 28px + var(--safe-b))' }}>
+    <div className="page" style={{ paddingBottom: `calc(var(--tabbar-top) + ${composerH}px + 32px + var(--safe-b))` }}>
       <PageHeader title="Ask" onProfile={ui.openSettings} />
 
       {empty ? (
@@ -133,11 +147,15 @@ export function AskView() {
           </div>
 
           <h2 className="t-head mt-8 mb-3">Good questions to start with</h2>
-          <div className="grid gap-2">
-            {GUIDED.map((g) => (
-              <SuggestionButton key={g} text={g} onClick={() => send(g)} small />
+          <ul className="card overflow-hidden">
+            {GUIDED.map((g, i) => (
+              <li key={g} style={{ borderTop: i ? '1px solid var(--line)' : undefined }}>
+                <button type="button" onClick={() => send(g)} className="w-full text-left bg-transparent border-0 t-body px-4 py-3 min-h-[48px] active:bg-[var(--accent-soft)]">
+                  {g}
+                </button>
+              </li>
             ))}
-          </div>
+          </ul>
         </>
       ) : (
         <div className="grid gap-4" aria-live="polite">
@@ -146,6 +164,7 @@ export function AskView() {
               type="button"
               className="btn btn-quiet btn-sm"
               onClick={() => {
+                genRef.current += 1;
                 abortRef.current?.abort();
                 setMessages([]);
                 setFollowUps([]);
@@ -193,11 +212,12 @@ export function AskView() {
       )}
       <div ref={endRef} />
 
-      {/* A strip of page behind the composer and tab bar, so nothing shows between them. */}
-      <div aria-hidden className="fixed z-[19] inset-x-0 bottom-0 mx-auto max-w-[460px]" style={{ height: 'calc(var(--tabbar-top) + var(--composer-h) + 16px + var(--safe-b))', background: 'var(--page)' }} />
+      {/* Page behind the composer and tab bar, fading in above them, so nothing shows between them. */}
+      <div aria-hidden className="fixed z-[19] inset-x-0 bottom-0 mx-auto max-w-[460px] pointer-events-none" style={{ height: `calc(var(--tabbar-top) + ${composerH}px + 32px + var(--safe-b))`, background: 'linear-gradient(to bottom, color-mix(in srgb, var(--page) 0%, transparent), var(--page) 24px)' }} />
       <form
-        className="fixed z-20 left-1/2 -translate-x-1/2 w-[min(420px,calc(100%-32px))] flex items-end gap-2 p-1.5 pl-2 rounded-[28px]"
-        style={{ bottom: 'calc(var(--tabbar-top) + var(--safe-b))', minHeight: 'var(--composer-h)', background: 'color-mix(in srgb, var(--card) 96%, transparent)', backdropFilter: 'blur(28px) saturate(1.5)', WebkitBackdropFilter: 'blur(28px) saturate(1.5)', boxShadow: '0 0 0 0.5px var(--line-strong), var(--shadow-lift)' }}
+        ref={composerRef}
+        className="fixed z-20 left-1/2 -translate-x-1/2 w-[min(420px,calc(100%-32px))] flex items-end gap-2 p-[5px] pl-1 rounded-[14px]"
+        style={{ bottom: 'calc(var(--tabbar-top) + var(--safe-b))', minHeight: 54, background: 'color-mix(in srgb, var(--card) 96%, transparent)', backdropFilter: 'blur(28px) saturate(1.5)', WebkitBackdropFilter: 'blur(28px) saturate(1.5)', boxShadow: '0 0 0 0.5px var(--line-strong), var(--shadow-lift)' }}
         onSubmit={(e) => {
           e.preventDefault();
           send(input);
@@ -209,7 +229,7 @@ export function AskView() {
         <textarea
           id="ask-input"
           rows={1}
-          className="flex-1 bg-transparent border-0 resize-none px-3 py-3 t-body outline-none max-h-32"
+          className="flex-1 bg-transparent border-0 resize-none px-3 py-[10px] t-body outline-none max-h-32"
           style={{ fontSize: 17 }}
           value={input}
           placeholder="Ask about your family…"
@@ -225,7 +245,7 @@ export function AskView() {
             }
           }}
         />
-        <button type="submit" className="shrink-0 grid place-items-center border-0 rounded-full transition-opacity" style={{ height: 44, width: 44, background: 'var(--accent)', color: 'var(--on-accent)', opacity: busy || !input.trim() ? 0.35 : 1 }} disabled={busy || !input.trim()} aria-label="Send">
+        <button type="submit" className="shrink-0 grid place-items-center border-0 rounded-[10px] transition-opacity" style={{ height: 44, width: 44, background: 'var(--accent)', color: 'var(--on-accent)', opacity: busy || !input.trim() ? 0.35 : 1 }} disabled={busy || !input.trim()} aria-label="Send">
           <ArrowUp size={22} strokeWidth={2.8} />
         </button>
       </form>

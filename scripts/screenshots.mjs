@@ -63,7 +63,7 @@ for (const theme of ['light', 'dark']) {
   await shot(page, `${theme}-04-profile`);
 
   await open('together');
-  await page.getByText('You all enjoy').waitFor({ timeout: 60000 });
+  await page.getByText('Shared interests').waitFor({ timeout: 60000 });
   await shot(page, `${theme}-05-together`);
   const ideasY = await page.getByRole('heading', { name: 'Ideas to try' }).evaluate((el) => el.getBoundingClientRect().top + window.scrollY - 90);
   await scrollTo(ideasY);
