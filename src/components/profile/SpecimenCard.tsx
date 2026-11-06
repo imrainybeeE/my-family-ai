@@ -35,7 +35,6 @@ export function SpecimenCard({ name, top, second, bloom = false }: { name: strin
           <p className="t-small ink-2 mt-1">
             {f.flower} with a touch of {FLOWERS[second].flower.toLowerCase()}
           </p>
-          <p className="t-body mt-3">{f.tagline}</p>
         </div>
       </div>
     </div>

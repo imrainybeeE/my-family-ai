@@ -64,6 +64,15 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
     advanceTimer.current = null;
   };
   useEffect(() => cancelAdvance, [index, stage, open]);
+  // The finish run in flight: its reveal timer and bloom-note request. Closing, switching person or
+  // starting again ends it, so nothing from it lands on a newer run or another person.
+  const runRef = useRef<{ timer: number | null; abort: AbortController } | null>(null);
+  const endRun = () => {
+    if (runRef.current?.timer != null) window.clearTimeout(runRef.current.timer);
+    runRef.current?.abort.abort();
+    runRef.current = null;
+  };
+  useEffect(() => endRun, [open, draftKey]);
   useEffect(() => {
     if (stage !== 'ask') return;
     // Each question starts at the top of the sheet, whatever was scrolled before.
@@ -105,6 +114,10 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
   const name = activeMember ? memberName(activeMember) : 'You';
 
   const finish = async (final: Answers) => {
+    endRun();
+    const run = { timer: null as number | null, abort: new AbortController() };
+    runRef.current = run;
+    const live = () => runRef.current === run;
     setStage('blooming');
     setSaveError(null);
     const p = scoreDiscoveryProfile(final);
@@ -118,11 +131,13 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
         // ignore
       }
     } catch (err) {
+      if (!live()) return;
       setSaveError(err instanceof Error ? err.message : 'Couldn’t save your answers.');
       setStage('ask');
       return;
     }
-    window.setTimeout(() => setStage('reveal'), Math.max(0, 1700 - (Date.now() - started)));
+    if (!live()) return;
+    run.timer = window.setTimeout(() => live() && setStage('reveal'), Math.max(0, 1700 - (Date.now() - started)));
 
     // Ask the AI for a personal note about this bloom, then keep it with the answers.
     if (!activeMember) return;
@@ -134,13 +149,14 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
       activeMember.id
     );
     try {
-      const r = await ai.bloom(brief, name);
+      const r = await ai.bloom(brief, name, run.abort.signal);
+      if (!live()) return;
       const bloomNote: BloomNote = { ...r, forProfileAt: p.completedAt };
       setNote(bloomNote);
       setNoteState('idle');
       await updateMyAnswers({ bloomNote });
     } catch {
-      setNoteState('failed');
+      if (live()) setNoteState('failed');
     }
   };
 

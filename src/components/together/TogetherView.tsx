@@ -10,6 +10,7 @@ import { PageHeader } from '../layout/TabBar';
 import { Felt, FELT_FOR_STYLE, FlowerBadge } from '../art/Flower';
 import { Strand, useWidth } from '../art/Garland';
 import { SectionTitle, Thinking } from '../ui/bits';
+import { seatRing } from '../../utils/ring';
 
 /** One yarn colour per shared thing, used for its strand in the circle and its row below. */
 const YARNS = ['#e86f8f', '#648b79', '#5e93d1'];
@@ -34,6 +35,10 @@ export function TogetherView() {
   }, [insights.error, members, responses]);
   const data = insights.data || fallback;
   const who = (names: string[]) => names.map(byName).filter(Boolean) as FamilyPerson[];
+  const links = useMemo(
+    () => (data?.together || []).map((t) => t.members.map(byName).filter((p): p is FamilyPerson => Boolean(p)).map((p) => p.id)),
+    [data, byName]
+  );
 
   return (
     <div className="page">
@@ -54,7 +59,7 @@ export function TogetherView() {
         </section>
       ) : (
         <>
-          <FamilyCircle people={people} links={(data?.together || []).map((t) => who(t.members).map((p) => p.id))} onOpen={ui.openMember} />
+          <FamilyCircle people={people} links={links} onOpen={ui.openMember} />
 
           {!data ? (
             <div className="mt-4 grid gap-3" aria-busy>
@@ -118,7 +123,8 @@ export function TogetherView() {
  * Everyone's flower in a ring, with a strand of yarn between people who share something.
  * Each shared thing has its own yarn colour, matched by its row below.
  */
-function FamilyCircle({ people, links, onOpen }: { people: FamilyPerson[]; links: string[][]; onOpen: (id: string) => void }) {
+function FamilyCircle({ people: given, links, onOpen }: { people: FamilyPerson[]; links: string[][]; onOpen: (id: string) => void }) {
+  const people = useMemo(() => seatRing(given, links), [given, links]);
   const [ref, w] = useWidth<HTMLDivElement>();
   const n = Math.max(people.length, 1);
   const size = n > 6 ? 78 : n > 4 ? 90 : 104;
@@ -138,11 +144,32 @@ function FamilyCircle({ people, links, onOpen }: { people: FamilyPerson[]; links
     const off = (li - (lanes - 1) / 2) * 7;
     const lrx = rx + off;
     const lry = Math.max(ry, 24) + off;
+    // People outside this group must never look tied to it: the strand goes round the ring the way
+    // that passes none of them, or, when both ways would, crosses inside the ring in one curve.
+    const others = people.filter((p) => !ids.includes(p.id)).map((p) => order.get(p.id)!);
+    const passes = (ia: number, step: number, ib: number) => {
+      for (let i = (ia + step + n) % n; i !== ib; i = (i + step + n) % n) if (others.includes(i)) return true;
+      return false;
+    };
     for (let k = 0; k + 1 < chain.length; k++) {
-      const from = angleOf(order.get(chain[k])!);
-      let delta = angleOf(order.get(chain[k + 1])!) - from;
+      const ia = order.get(chain[k])!;
+      const ib = order.get(chain[k + 1])!;
+      const from = angleOf(ia);
+      let delta = angleOf(ib) - from;
       if (delta > Math.PI) delta -= 2 * Math.PI;
-      const steps = Math.max(8, Math.round((Math.abs(delta) / Math.PI) * 40));
+      const forward = delta >= 0;
+      const shortClear = !passes(ia, forward ? 1 : -1, ib);
+      const longClear = !passes(ia, forward ? -1 : 1, ib);
+      if (!shortClear && longClear) delta = forward ? delta - 2 * Math.PI : delta + 2 * Math.PI;
+      if (!shortClear && !longClear) {
+        const a = { x: cx + lrx * Math.cos(from), y: cy + lry * Math.sin(from) };
+        const b = { x: cx + lrx * Math.cos(angleOf(ib)), y: cy + lry * Math.sin(angleOf(ib)) };
+        const mx = cx + ((a.x + b.x) / 2 - cx) * 0.35;
+        const my = cy + ((a.y + b.y) / 2 - cy) * 0.35;
+        strands.push({ d: `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`, color: YARNS[li % YARNS.length], key: `${li}-${k}` });
+        continue;
+      }
+      const steps = Math.max(12, Math.round((Math.abs(delta) / Math.PI) * 48));
       const pts = Array.from({ length: steps + 1 }, (_, j) => {
         const t = from + (delta * j) / steps;
         return `${(cx + lrx * Math.cos(t)).toFixed(1)} ${(cy + lry * Math.sin(t)).toFixed(1)}`;

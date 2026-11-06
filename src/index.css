@@ -289,6 +289,18 @@
   box-shadow: none;
   background: var(--accent-soft);
 }
+/* A secondary choice inside a card: a tinted surface with a hairline, no depth. */
+.btn-soft {
+  --depth: 0px;
+  --btn-bg: var(--accent-soft);
+  --btn-fg: var(--accent-ink);
+  border: 1px solid color-mix(in srgb, var(--accent-ink) 18%, transparent);
+  border-radius: 12px;
+}
+.btn-soft:active:not(:disabled) {
+  transform: scale(0.98);
+  box-shadow: none;
+}
 .btn-sm {
   min-height: 44px;
   padding: 0 1rem;

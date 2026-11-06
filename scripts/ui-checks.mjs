@@ -16,7 +16,8 @@ const MOCKS = {
   roots: { reflection: 'Mock reflection.', followUp: null },
 };
 
-async function newPage() {
+/** Milliseconds to hold back each AI endpoint's reply, so a check can act while it is pending. */
+async function newPage(delays = {}) {
   const ctx = await browser.newContext({ viewport: { width: 393, height: 852 }, isMobile: true, hasTouch: true });
   await ctx.route('**/api/ai/**', async (route) => {
     const path = new URL(route.request().url()).pathname.replace('/api/ai/', '');
@@ -29,15 +30,16 @@ async function newPage() {
     if (path === 'chat') {
       return route.fulfill({ status: 200, contentType: 'text/event-stream', body: 'data: {"t":"Mock answer for Maya."}\n\ndata: {"done":true,"refused":false}\n\n' });
     }
-    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCKS[path] || {}) });
+    if (delays[path]) await new Promise((r) => setTimeout(r, delays[path]));
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCKS[path] || {}) }).catch(() => {});
   });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => results.push(`page error: ${e.message}`));
   return { ctx, page };
 }
 
-async function check(name, fn) {
-  const { ctx, page } = await newPage();
+async function check(name, fn, delays) {
+  const { ctx, page } = await newPage(delays);
   try {
     await fn(page);
     console.log(`ok   ${name}`);
@@ -77,6 +79,42 @@ await check('a follow-up from an old chat never lands after New chat', async (pa
   await page.waitForTimeout(1200);
   assert.equal(await page.getByText('Follow-up to: What do we have in common?').count(), 0, 'old follow-up appeared in the new chat');
 });
+
+await check(
+  'leaving a plan while the helper thinks drops its reply',
+  async (page) => {
+    await page.goto(`${base}/?demo=1#plan`);
+    await page.getByRole('button', { name: /^Eat/ }).first().click();
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('button', { name: 'Back to all plans' }).click();
+    await page.waitForTimeout(1400);
+    assert.equal(await page.getByRole('button', { name: 'Get three ideas' }).count(), 0, 'old plan reply reopened the questions');
+    await page.getByRole('button', { name: /^Watch/ }).first().waitFor();
+  },
+  { 'plan/ask': 900 }
+);
+
+await check(
+  'closing Deeper roots while it saves leaves nothing behind',
+  async (page) => {
+    await page.goto(`${base}/?demo=1#garden`);
+    await page.getByRole('button', { name: 'Continue', exact: true }).first().click();
+    const sheet = page.getByRole('dialog');
+    await sheet.getByRole('button', { name: /Keep going|Start/ }).click();
+    await sheet.locator('textarea').fill('Being asked about my day');
+    await sheet.getByRole('button', { name: 'Save', exact: true }).click();
+    await page.keyboard.press('Escape');
+    await sheet.waitFor({ state: 'detached' });
+    await page.waitForTimeout(1400);
+    await page.getByRole('button', { name: 'Continue', exact: true }).first().click();
+    await sheet.getByRole('button', { name: /Keep going|Start/ }).waitFor();
+    assert.equal(await sheet.getByText('Mock reflection.').count(), 0, 'a stale reflection appeared after reopening');
+    await sheet.getByRole('button', { name: /Keep going|Start/ }).click();
+    assert.equal(await sheet.getByText('Mock reflection.').count(), 0, 'a stale reflection appeared on the next question');
+    assert.notEqual(await sheet.locator('textarea').inputValue(), 'Being asked about my day', 'the last answer leaked into the next question');
+  },
+  { roots: 900 }
+);
 
 await check('sheets keep keyboard focus inside and make the app inert', async (page) => {
   await page.goto(`${base}/?demo=1#garden`);

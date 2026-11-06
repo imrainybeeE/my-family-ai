@@ -61,6 +61,7 @@ export function MemberSheet({ memberId, onClose }: { memberId: string | null; on
           {profile && (
             <Collapsible title={`About the ${DISCOVERY_STYLES_INFO[profile.primaryStyle].title.replace(/^The /, '')}`}>
               <div className="grid gap-3">
+                <p className="t-body">{FLOWERS[profile.primaryStyle].tagline}</p>
                 <p className="t-small ink-2">{DISCOVERY_STYLES_INFO[profile.primaryStyle].positiveDescription}</p>
                 <Fact label="Recharges with" value={DISCOVERY_STYLES_INFO[profile.primaryStyle].weekendRecharge} />
                 <Fact label="In the family" value={DISCOVERY_STYLES_INFO[profile.primaryStyle].familyInsight} />

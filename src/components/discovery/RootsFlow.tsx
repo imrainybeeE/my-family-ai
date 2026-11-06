@@ -42,7 +42,10 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
   }, [open, activeMember?.id]);
 
   useEffect(() => {
+    // A new person, question or opening ends whatever the last one was doing.
     reflectRef.current?.abort();
+    reflectRef.current = null;
+    setSaving(false);
     setText(savedRef.current[q.id]?.answer || '');
     setFollowText('');
     setReflection(null);
@@ -80,20 +83,22 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
   const submit = async () => {
     const answer = text.trim();
     if (!answer || saving) return;
+    // This run belongs to this person and question; if either changes, its results are dropped.
+    reflectRef.current?.abort();
+    const c = new AbortController();
+    reflectRef.current = c;
     setError(null);
     setSaving(true);
     const entry: AdvancedAnswer = { answer, answeredAt: new Date().toISOString() };
     try {
       await write(q.id, entry);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Couldn’t save that answer.');
+      if (!c.signal.aborted) setError(err instanceof Error ? err.message : 'Couldn’t save that answer.');
       return;
     } finally {
-      setSaving(false);
+      if (!c.signal.aborted) setSaving(false);
     }
-    reflectRef.current?.abort();
-    const c = new AbortController();
-    reflectRef.current = c;
+    if (c.signal.aborted) return;
     setStage('reflect');
     setReflecting(true);
     try {
@@ -114,16 +119,17 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
     const current = savedRef.current[q.id];
     if (!a || !reflection?.followUp || !current) return next();
     if (saving) return;
+    const c = reflectRef.current;
     setSaving(true);
     try {
       await write(q.id, { ...current, followUpQuestion: reflection.followUp, followUpAnswer: a });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Couldn’t save that answer.');
+      if (!c?.signal.aborted) setError(err instanceof Error ? err.message : 'Couldn’t save that answer.');
       return;
     } finally {
-      setSaving(false);
+      if (!c?.signal.aborted) setSaving(false);
     }
-    next();
+    if (!c?.signal.aborted) next();
   };
 
   const quickPicks = q.options || q.starters || [];
@@ -139,7 +145,7 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
         stage === 'ask' || stage === 'reflect' ? (
           <div className="flex-1 flex items-center gap-2">
             {stage === 'ask' && (
-              <button type="button" className="icon-btn" aria-label="Previous question" onClick={() => (index === 0 ? setStage('intro') : setIndex((i) => i - 1))}>
+              <button type="button" className="icon-btn" aria-label="Previous question" disabled={saving} onClick={() => (index === 0 ? setStage('intro') : setIndex((i) => i - 1))}>
                 <ChevronLeft size={22} strokeWidth={2.4} />
               </button>
             )}
@@ -150,7 +156,7 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
       footer={
         stage === 'ask' ? (
           <div className="grid grid-cols-[1fr_2fr] gap-2">
-            <button type="button" className="btn" onClick={next}>
+            <button type="button" className="btn" disabled={saving} onClick={next}>
               Skip
             </button>
             <button type="button" className="btn btn-primary" disabled={!text.trim() || saving} onClick={submit}>

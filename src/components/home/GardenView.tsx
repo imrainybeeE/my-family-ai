@@ -92,9 +92,9 @@ function NextStep() {
 }
 
 const OFFLINE_SPARKS: Spark[] = [
-  { question: 'What was the best moment of your week, and who was there?', why: '', members: [] },
-  { question: 'If we had a free Saturday with no plans, how would you spend it?', why: '', members: [] },
-  { question: 'What’s something you learned recently that surprised you?', why: '', members: [] },
+  { question: 'What was the best moment of your week?', why: '', members: [] },
+  { question: 'How would you spend a free Saturday?', why: '', members: [] },
+  { question: 'What surprised you this week?', why: '', members: [] },
 ];
 
 /** Tonight's question, on an index card taped to the page. */
@@ -131,7 +131,7 @@ function TableQuestion() {
         </button>
       </div>
       {data && !spark.loading ? (
-        <motion.p key={data.question} className="t-title mt-1" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
+        <motion.p key={data.question} className="t-title mt-1" style={{ fontSize: '1.375rem', lineHeight: '26px' }} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
           {data.question}
         </motion.p>
       ) : (

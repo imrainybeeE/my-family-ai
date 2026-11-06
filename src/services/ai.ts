@@ -85,7 +85,7 @@ export interface PlanIdeas {
 
 export const ai = {
   spark: (brief: FamilyBrief, recent: string[], signal?: AbortSignal) => post<Spark>('spark', { brief, recent }, signal),
-  bloom: (brief: FamilyBrief, member: string) => post<BloomNoteResult>('bloom', { brief, member }),
+  bloom: (brief: FamilyBrief, member: string, signal?: AbortSignal) => post<BloomNoteResult>('bloom', { brief, member }, signal),
   roots: (brief: FamilyBrief, member: string, question: string, answer: string, followUpAnswered: boolean, signal?: AbortSignal) =>
     post<RootsResult>('roots', { brief, member, question, answer, followUpAnswered }, signal),
   insights: (brief: FamilyBrief, signal?: AbortSignal) => post<Insights>('insights', { brief }, signal),

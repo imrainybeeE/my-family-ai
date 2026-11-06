@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sentenceCase, tidyChatLine } from './ai.ts';
+import { caseTastes, sentenceCase, tidyChatLine } from './ai.ts';
 
 const names = ['Maya', 'Mum', 'Dad', 'Nai Nai', 'Leo', 'The Tan family'];
 
@@ -26,4 +26,11 @@ test('tidies streamed chat lines: bold ideas in sentence case, British spelling'
   assert.equal(tidyChatLine('- **Curry & Rice** with Nai Nai\n', names), '- **Curry and rice** with Nai Nai\n');
   assert.equal(tidyChatLine('A **Movie Night** with your favorite snacks.', names), 'A **Film night** with your favourite snacks.');
   assert.equal(tidyChatLine('Try **Walks With Nai Nai** this Sunday.', names), 'Try **Walks with Nai Nai** this Sunday.');
+});
+
+test('writes taste labels as words inside sentences', () => {
+  const options = ['Asian Stir Fry & Noodles', 'Curry & Rice', 'Mystery & Whodunnit'];
+  assert.equal(caseTastes('Maya and Nai Nai picked Asian Stir Fry and Noodles.', options), 'Maya and Nai Nai picked Asian stir fry and noodles.');
+  assert.equal(caseTastes('Curry & Rice is Mum’s pick.', options), 'Curry and rice is Mum’s pick.');
+  assert.equal(caseTastes('- Mystery & Whodunnit for Nai Nai', options), '- Mystery and whodunnit for Nai Nai');
 });

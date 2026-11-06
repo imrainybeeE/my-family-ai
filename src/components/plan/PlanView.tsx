@@ -7,6 +7,7 @@ import { useUI } from '../../App';
 import { useFamily } from '../../hooks/useFamily';
 import { ai, aiErrorMessage, PlanAsk, PlanIdea, PlanIdeas } from '../../services/ai';
 import { calculateCommonGround } from '../../utils/tasteMatching';
+import { hashBrief } from '../../services/brief';
 import { generateFamilyProfileReport } from '../../utils/familyProfileAnalysis';
 import { PageHeader } from '../layout/TabBar';
 import { FlowerBadge } from '../art/Flower';
@@ -41,11 +42,16 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
   const [knownOpen, setKnownOpen] = useState(false);
   // One request at a time: starting another, or leaving, cancels the last and drops its reply.
   const requestRef = useRef<AbortController | null>(null);
+  // What a request was asked with. A reply is used only if nothing it depended on has changed since.
+  const inputKey = `${hashBrief(brief)}|${task}|${whoIds.join(',')}`;
+  const inputRef = useRef(inputKey);
+  inputRef.current = inputKey;
   const begin = () => {
     requestRef.current?.abort();
     const c = new AbortController();
     requestRef.current = c;
-    return c;
+    const key = inputRef.current;
+    return { signal: c.signal, stale: () => c.signal.aborted || inputRef.current !== key };
   };
 
   useEffect(() => {
@@ -73,12 +79,12 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
     setError(null);
     try {
       const a = await ai.planAsk(brief, task, who, c.signal);
-      if (c.signal.aborted) return;
+      if (c.stale()) return;
       setAsk({ known: a.known.slice(0, 4), questions: a.questions.slice(0, 3) });
       setPicks({});
       setStage('questions');
     } catch (err) {
-      if (c.signal.aborted) return;
+      if (c.stale()) return;
       setError(aiErrorMessage(err));
       setAsk({ known: [], questions: [] });
       setStage('questions');
@@ -101,12 +107,13 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
     setChosen(null);
     try {
       const r = await ai.planIdeas(brief, task, who, answers, c.signal);
-      if (c.signal.aborted) return;
+      if (c.stale()) return;
       setResult({ ...r, ideas: r.ideas.slice(0, 3) });
     } catch (err) {
-      if (c.signal.aborted) return;
-      setError(aiErrorMessage(err));
-      setResult(offlineIdeas(task, members, responses));
+      if (c.stale()) return;
+      // Offline ideas come from the saved tastes of the people joining; they can't follow the practical answers.
+      setError(`${aiErrorMessage(err)}${answers.length ? ' These simpler ideas come from saved tastes only, not your answers above.' : ''}`);
+      setResult(offlineIdeas(task, members.filter((m) => whoIds.includes(m.id)), responses));
     }
     setStage('ideas');
   };
@@ -272,7 +279,7 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
 
           {stage === 'ideas' && result && (
             <div className="grid gap-3">
-              {error && <p className="t-small" style={{ color: 'var(--danger)' }}>{error} Here are some simpler ideas.</p>}
+              {error && <p className="t-small" style={{ color: 'var(--danger)' }}>{error}</p>}
               {result.ideas.map((idea, i) => (
                 <IdeaCard key={i} idea={idea} index={i} chosen={chosen} byName={byName} onChoose={() => setChosen((c) => (c === i ? null : i))} />
               ))}
@@ -312,8 +319,7 @@ function IdeaCard({ idea, index, chosen, byName, onChoose }: { idea: PlanIdea; i
     <motion.article
       layout
       className="card overflow-hidden"
-      animate={{ scale: isChosen ? 1.02 : 1, opacity: chosen !== null && !isChosen ? 0.5 : 1 }}
-      style={{ outline: isChosen ? '3px solid var(--accent)' : 'none', outlineOffset: 3 }}
+      style={{ outline: isChosen ? '2px solid var(--accent)' : 'none', outlineOffset: 2 }}
       aria-current={isChosen || undefined}
     >
       <div className={`px-5 pt-4 pb-4 ${IDEA_STOCK[index % 3]}`}>
@@ -363,7 +369,7 @@ function IdeaCard({ idea, index, chosen, byName, onChoose }: { idea: PlanIdea; i
             </span>
           </p>
         )}
-        <button type="button" className={`btn btn-sm btn-block mt-3 ${isChosen ? 'btn-primary' : ''}`} aria-pressed={isChosen} onClick={onChoose}>
+        <button type="button" className={`btn btn-sm btn-block mt-3 ${isChosen ? 'btn-primary' : 'btn-soft'}`} aria-pressed={isChosen} onClick={onChoose}>
           {isChosen ? (
             <>
               <Check size={18} strokeWidth={2.6} /> Chosen

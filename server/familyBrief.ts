@@ -1,6 +1,8 @@
 // The family brief is the only family data the AI ever sees. The client builds it from the
 // household's saved answers; this module validates it and renders it as prompt text.
 
+import { sharedPickLines } from './claims.ts';
+
 export interface BriefQA {
   q: string;
   a: string[];
@@ -118,6 +120,10 @@ export function renderBrief(brief: FamilyBrief): string {
   lines.push('');
   lines.push('Family facts (computed by the app; use these for any counts or lists of who has answered):');
   for (const fact of familyFacts(brief)) lines.push(`- ${fact}`);
+  const shared = sharedPickLines(brief);
+  lines.push('');
+  lines.push('Shared taste picks (computed by the app; when you say people share a taste, name exactly these people):');
+  for (const line of shared.length ? shared : ['none yet']) lines.push(`- ${line}`);
   for (const m of brief.members) {
     lines.push('');
     lines.push(`## ${m.name} (role in the family: ${m.role})`);
