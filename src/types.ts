@@ -29,9 +29,6 @@ export interface DiscoveryStyleInfo {
   id: DiscoveryStyleId;
   title: string;
   badge: string;
-  color: string;
-  accentBg: string;
-  borderColor: string;
   positiveDescription: string;
   weekendRecharge: string;
   familyInsight: string;
@@ -44,6 +41,23 @@ export interface DiscoveryProfile {
   completedAt: string;
 }
 
+/** One answer in the Advanced discovery layer, with the optional AI follow-up. */
+export interface AdvancedAnswer {
+  answer: string;
+  followUpQuestion?: string;
+  followUpAnswer?: string;
+  reflection?: string;
+  answeredAt: string;
+}
+
+/** The AI-written note shown on a member's bloom (Foundation result). */
+export interface BloomNote {
+  headline: string;
+  note: string;
+  tryThis: string;
+  forProfileAt: string;
+}
+
 export interface MemberTasteAnswers {
   favoriteCuisines?: string[];
   foodDislikes?: string[];
@@ -54,6 +68,9 @@ export interface MemberTasteAnswers {
   snackPreference?: string;
   foundationAnswers?: Record<string, string | string[]>;
   discoveryProfile?: DiscoveryProfile;
+  advancedAnswers?: Record<string, AdvancedAnswer>;
+  advancedCompletedAt?: string;
+  bloomNote?: BloomNote;
 }
 
 export interface MemberResponse {
@@ -69,7 +86,9 @@ export interface UserSession {
   updatedAt: string;
 }
 
-export type TabType = 'home' | 'discover' | 'family' | 'ask-ai' | 'settings';
+export type TabType = 'garden' | 'together' | 'plan' | 'ask';
+
+export type PlanTask = 'eat' | 'do' | 'watch' | 'travel';
 
 export interface CommonGroundData {
   answeredCount: number;

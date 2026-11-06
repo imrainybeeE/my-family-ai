@@ -1,0 +1,161 @@
+import React, { createContext, useCallback, useContext, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { Check, Copy } from 'lucide-react';
+
+/* ---------- Toast: a paper slip that drops in from the top ---------- */
+const ToastContext = createContext<(message: string) => void>(() => {});
+
+export function ToastProvider({ children }: { children: React.ReactNode }) {
+  const [message, setMessage] = useState<{ id: number; text: string } | null>(null);
+  const show = useCallback((text: string) => {
+    const id = Date.now();
+    setMessage({ id, text });
+    window.setTimeout(() => setMessage((m) => (m?.id === id ? null : m)), 2600);
+  }, []);
+  return (
+    <ToastContext.Provider value={show}>
+      {children}
+      <div className="fixed inset-x-0 top-[calc(10px+var(--safe-t))] z-[60] flex justify-center pointer-events-none" aria-live="polite">
+        <AnimatePresence>
+          {message && (
+            <motion.div
+              key={message.id}
+              initial={{ y: -40, opacity: 0, rotate: -2 }}
+              animate={{ y: 0, opacity: 1, rotate: -1 }}
+              exit={{ y: -30, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+              className="card px-4 py-3 t-label flex items-center gap-2"
+              style={{ boxShadow: 'var(--shadow-float)' }}
+            >
+              <span className="inline-grid place-items-center w-6 h-6 rounded-full" style={{ background: 'var(--leaf)', color: 'var(--on-leaf)' }}>
+                <Check size={15} strokeWidth={3} />
+              </span>
+              {message.text}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </ToastContext.Provider>
+  );
+}
+
+export const useToast = () => useContext(ToastContext);
+
+/* ---------- AiText: renders the helper's light markdown (paragraphs, - bullets, **bold**) ---------- */
+function inline(text: string): React.ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+    part.startsWith('**') && part.endsWith('**') ? <strong key={i}>{part.slice(2, -2)}</strong> : part
+  );
+}
+
+export function AiText({ text, className = '' }: { text: string; className?: string }) {
+  const blocks: React.ReactNode[] = [];
+  let list: string[] = [];
+  const flush = () => {
+    if (list.length) {
+      blocks.push(
+        <ul key={`u${blocks.length}`}>
+          {list.map((li, i) => (
+            <li key={i}>{inline(li)}</li>
+          ))}
+        </ul>
+      );
+      list = [];
+    }
+  };
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (/^([-*•]|\d+\.)\s+/.test(line)) {
+      list.push(line.replace(/^([-*•]|\d+\.)\s+/, ''));
+      continue;
+    }
+    flush();
+    if (line) blocks.push(<p key={`p${blocks.length}`}>{inline(line.replace(/^#+\s*/, ''))}</p>);
+  }
+  flush();
+  return <div className={`prose-ai ${className}`}>{blocks}</div>;
+}
+
+/* ---------- CopyButton ---------- */
+export function CopyButton({ value, label = 'Copy', className = 'btn btn-sm' }: { value: string; label?: string; className?: string }) {
+  const toast = useToast();
+  return (
+    <button
+      type="button"
+      className={className}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          toast('Copied');
+        } catch {
+          toast(value);
+        }
+      }}
+    >
+      <Copy size={17} strokeWidth={2.4} />
+      {label}
+    </button>
+  );
+}
+
+/* ---------- Thinking dots for AI waits ---------- */
+export function Thinking({ label = 'Thinking' }: { label?: string }) {
+  return (
+    <span className="inline-flex items-center gap-2 ink-2 t-small" role="status">
+      <span className="inline-flex gap-1" aria-hidden>
+        {[0, 1, 2].map((i) => (
+          <motion.span
+            key={i}
+            className="w-2 h-2 rounded-full"
+            style={{ background: 'var(--leaf)' }}
+            animate={{ y: [0, -5, 0], opacity: [0.4, 1, 0.4] }}
+            transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.15 }}
+          />
+        ))}
+      </span>
+      {label}
+    </span>
+  );
+}
+
+/* ---------- Segmented control ---------- */
+export function Segmented<T extends string>({
+  value,
+  options,
+  onChange,
+  label,
+}: {
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (v: T) => void;
+  label: string;
+}) {
+  return (
+    <div className="segmented" role="radiogroup" aria-label={label}>
+      {options.map((o) => (
+        <button key={o.value} type="button" role="radio" aria-checked={value === o.value} onClick={() => onChange(o.value)}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ---------- Small "who" stack of flower badges ---------- */
+export function SectionTitle({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
+  return (
+    <div className="flex items-end justify-between gap-3 mt-8 mb-3 px-1">
+      <h2 className="t-head">{children}</h2>
+      {action}
+    </div>
+  );
+}
+
+/* ---------- Round seed check used by radio/checkbox rows ---------- */
+export function SeedMark({ on }: { on: boolean }) {
+  return (
+    <span className="seed" aria-hidden>
+      {on && <Check size={16} strokeWidth={3.2} />}
+    </span>
+  );
+}

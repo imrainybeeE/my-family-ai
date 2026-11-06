@@ -44,9 +44,6 @@ export const DISCOVERY_STYLES_INFO: Record<DiscoveryStyleId, DiscoveryStyleInfo>
     id: 'Explorer',
     title: 'The Explorer',
     badge: 'Compass & Trail',
-    color: 'text-emerald-700',
-    accentBg: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-    borderColor: 'border-emerald-200',
     positiveDescription:
       'Curious, spontaneous, and energized by unfamiliar places, new sights, and fresh experiences.',
     weekendRecharge:
@@ -58,9 +55,6 @@ export const DISCOVERY_STYLES_INFO: Record<DiscoveryStyleId, DiscoveryStyleInfo>
     id: 'Creator',
     title: 'The Creator',
     badge: 'Palette & Spark',
-    color: 'text-amber-700',
-    accentBg: 'bg-amber-50 text-amber-800 border-amber-200',
-    borderColor: 'border-amber-200',
     positiveDescription:
       'Imaginative, expressive, and inspired to bring new ideas, art, flavors, and creative twists into the home.',
     weekendRecharge:
@@ -72,9 +66,6 @@ export const DISCOVERY_STYLES_INFO: Record<DiscoveryStyleId, DiscoveryStyleInfo>
     id: 'Connector',
     title: 'The Connector',
     badge: 'Heart & Hearth',
-    color: 'text-rose-700',
-    accentBg: 'bg-rose-50 text-rose-800 border-rose-200',
-    borderColor: 'border-rose-200',
     positiveDescription:
       'Warm, empathetic, and attentive to how everyone is feeling; you thrive when the household is laughing together.',
     weekendRecharge:
@@ -86,9 +77,6 @@ export const DISCOVERY_STYLES_INFO: Record<DiscoveryStyleId, DiscoveryStyleInfo>
     id: 'Achiever',
     title: 'The Achiever',
     badge: 'Summit & Pace',
-    color: 'text-indigo-700',
-    accentBg: 'bg-indigo-50 text-indigo-800 border-indigo-200',
-    borderColor: 'border-indigo-200',
     positiveDescription:
       'Motivated, purposeful, and energized by setting goals, mastering skills, and celebrating tangible progress.',
     weekendRecharge:
@@ -100,9 +88,6 @@ export const DISCOVERY_STYLES_INFO: Record<DiscoveryStyleId, DiscoveryStyleInfo>
     id: 'Chiller',
     title: 'The Chiller',
     badge: 'Hammock & Breeze',
-    color: 'text-sky-700',
-    accentBg: 'bg-sky-50 text-sky-800 border-sky-200',
-    borderColor: 'border-sky-200',
     positiveDescription:
       'Easygoing, grounded, and a comforting steady presence who protects peace and reminds everyone to breathe.',
     weekendRecharge:
@@ -114,9 +99,6 @@ export const DISCOVERY_STYLES_INFO: Record<DiscoveryStyleId, DiscoveryStyleInfo>
     id: 'Thinker',
     title: 'The Thinker',
     badge: 'Lantern & Mind',
-    color: 'text-violet-700',
-    accentBg: 'bg-violet-50 text-violet-800 border-violet-200',
-    borderColor: 'border-violet-200',
     positiveDescription:
       'Observant, thoughtful, and endlessly fascinated by how things work, enjoying deep reflections and clever solutions.',
     weekendRecharge:
