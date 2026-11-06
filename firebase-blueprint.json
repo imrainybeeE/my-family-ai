@@ -1,0 +1,135 @@
+{
+  "entities": {
+    "Household": {
+      "title": "Household",
+      "description": "Represents a family household identified by a unique Family Code AX-XXX-####",
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^AX-[A-Z]{3}-[0-9]{4}$",
+          "maxLength": 11,
+          "description": "Unique Family Code formatted as AX-[3 letters]-[4 digits]"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 60,
+          "description": "Household display name, e.g. The Taylor Family"
+        },
+        "createdBy": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "Firebase Auth UID of the creator"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when household was created"
+        },
+        "memberCount": {
+          "type": "number",
+          "description": "Current count of family members"
+        }
+      },
+      "required": ["code", "createdBy"]
+    },
+    "HouseholdMember": {
+      "title": "HouseholdMember",
+      "description": "A profile member inside a household with safe non-PII details (role and optional nickname only)",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Unique member identifier"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["Me", "Mum", "Dad", "Brother", "Sister", "Grandparent", "Other"],
+          "description": "Family role selection"
+        },
+        "nickname": {
+          "type": "string",
+          "maxLength": 30,
+          "description": "Optional friendly nickname without full name"
+        },
+        "avatarColor": {
+          "type": "string",
+          "maxLength": 30,
+          "description": "Theme color code for the member avatar badge"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when member was added"
+        }
+      },
+      "required": ["id", "role"]
+    },
+    "MemberResponse": {
+      "title": "MemberResponse",
+      "description": "Stores each person's responses separately under the household (empty in stage 1)",
+      "type": "object",
+      "properties": {
+        "memberId": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "ID of the household member"
+        },
+        "answers": {
+          "type": "object",
+          "description": "Stored member survey answers and preferences, initialized empty in stage 1"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp of last response update"
+        }
+      },
+      "required": ["memberId"]
+    },
+    "UserSession": {
+      "title": "UserSession",
+      "description": "Tracks the active household and selected member for an anonymous user device",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "Auth UID of the device user"
+        },
+        "householdCode": {
+          "type": "string",
+          "pattern": "^AX-[A-Z]{3}-[0-9]{4}$",
+          "maxLength": 11,
+          "description": "Current connected household code"
+        },
+        "memberId": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Selected active member profile ID"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp of session update"
+        }
+      },
+      "required": ["userId", "householdCode", "memberId"]
+    }
+  },
+  "firestore": {
+    "/households/{householdId}": {
+      "schema": "Household",
+      "description": "Stores household document with ID equal to the unique Family Code (e.g. AX-PAN-4827)"
+    },
+    "/households/{householdId}/members/{memberId}": {
+      "schema": "HouseholdMember",
+      "description": "Subcollection of members within a household"
+    },
+    "/households/{householdId}/responses/{memberId}": {
+      "schema": "MemberResponse",
+      "description": "Subcollection of response documents per member under the household"
+    },
+    "/userSessions/{userId}": {
+      "schema": "UserSession",
+      "description": "Stores active device session and profile selection per anonymous user UID"
+    }
+  }
+}

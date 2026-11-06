@@ -1,0 +1,6 @@
+{
+  "name": "My Family AI",
+  "description": "A school AI project app that helps household members understand each other and find things to enjoy together.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

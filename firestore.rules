@@ -1,0 +1,124 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidHouseholdId(id) {
+      return id is string && id.size() == 11 && id.matches('^AX-[A-Z]{3}-[0-9]{4}$');
+    }
+
+    function isValidHousehold(data) {
+      return data.keys().hasAll(['code', 'createdBy']) &&
+        data.keys().hasOnly(['code', 'createdBy', 'name', 'createdAt', 'memberCount']) &&
+        data.code is string &&
+        data.code.size() == 11 &&
+        data.code.matches('^AX-[A-Z]{3}-[0-9]{4}$') &&
+        data.createdBy is string &&
+        isValidId(data.createdBy) &&
+        (!('name' in data) || (data.name is string && data.name.size() <= 60)) &&
+        (!('memberCount' in data) || (data.memberCount is number));
+    }
+
+    function isValidMember(data) {
+      return data.keys().hasAll(['id', 'role']) &&
+        data.keys().hasOnly(['id', 'role', 'nickname', 'avatarColor', 'createdAt', 'deviceId']) &&
+        data.id is string &&
+        data.id.size() <= 64 &&
+        data.role in ['Me', 'Mum', 'Dad', 'Brother', 'Sister', 'Grandparent', 'Other'] &&
+        (!('nickname' in data) || (data.nickname is string && data.nickname.size() <= 30)) &&
+        (!('avatarColor' in data) || (data.avatarColor is string && data.avatarColor.size() <= 30)) &&
+        (!('deviceId' in data) || (data.deviceId is string && data.deviceId.size() <= 128));
+    }
+
+    function isValidResponse(data) {
+      return data.keys().hasAll(['memberId']) &&
+        data.keys().hasOnly(['memberId', 'answers', 'updatedAt']) &&
+        data.memberId is string &&
+        data.memberId.size() <= 64 &&
+        (!('answers' in data) || (data.answers is map));
+    }
+
+    function isValidUserSession(data) {
+      return data.keys().hasAll(['userId', 'householdCode', 'memberId']) &&
+        data.keys().hasOnly(['userId', 'householdCode', 'memberId', 'updatedAt']) &&
+        data.userId is string &&
+        isValidId(data.userId) &&
+        data.householdCode is string &&
+        data.householdCode.matches('^AX-[A-Z]{3}-[0-9]{4}$') &&
+        data.memberId is string &&
+        data.memberId.size() <= 64;
+    }
+
+    match /test/{docId} {
+      allow get: if true;
+    }
+
+    match /households/{householdId} {
+      allow get: if isValidHouseholdId(householdId);
+      allow list: if false;
+      allow create: if isValidHouseholdId(householdId) &&
+        incoming().code == householdId &&
+        isValidHousehold(incoming());
+      allow update: if isValidHouseholdId(householdId) &&
+        isValidHousehold(incoming()) &&
+        incoming().code == existing().code &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'memberCount']);
+
+      match /members/{memberId} {
+        allow read: if isValidHouseholdId(householdId);
+        allow create: if isValidHouseholdId(householdId) &&
+          isValidId(memberId) &&
+          isValidMember(incoming()) &&
+          incoming().id == memberId;
+        allow update: if isValidHouseholdId(householdId) &&
+          isValidId(memberId) &&
+          isValidMember(incoming()) &&
+          incoming().id == existing().id &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['role', 'nickname', 'avatarColor', 'deviceId']);
+        allow delete: if isValidHouseholdId(householdId) &&
+          isValidId(memberId);
+      }
+
+      match /responses/{memberId} {
+        allow read: if isValidHouseholdId(householdId);
+        allow create: if isValidHouseholdId(householdId) &&
+          isValidId(memberId) &&
+          isValidResponse(incoming()) &&
+          incoming().memberId == memberId;
+        allow update: if isValidHouseholdId(householdId) &&
+          isValidId(memberId) &&
+          isValidResponse(incoming()) &&
+          incoming().memberId == existing().memberId &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['answers', 'updatedAt']);
+        allow delete: if isValidHouseholdId(householdId) &&
+          isValidId(memberId);
+      }
+    }
+
+    match /userSessions/{userId} {
+      allow get: if isValidId(userId);
+      allow list: if false;
+      allow create, update: if isValidId(userId) &&
+        incoming().userId == userId &&
+        isValidUserSession(incoming());
+      allow delete: if isValidId(userId);
+    }
+  }
+}
