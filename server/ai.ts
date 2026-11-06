@@ -1,30 +1,31 @@
 import express from 'express';
 import type { Request, Response } from 'express';
-import Anthropic from '@anthropic-ai/sdk';
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
+import { ApiError, FinishReason, GoogleGenAI, ThinkingLevel } from '@google/genai';
+import type { Content } from '@google/genai';
 import { z } from 'zod';
 import { parseBrief, renderBrief } from './familyBrief.ts';
 import type { FamilyBrief } from './familyBrief.ts';
 
-// Every AI feature runs on Claude Haiku 5.5 at medium effort.
-const MODEL = 'claude-haiku-5-5';
-const EFFORT = 'medium' as const;
+// Every AI feature runs on Gemini Flash with low thinking: fast and light on tokens. When
+// Google reports the model busy, slow or out of quota, the request moves to Flash-Lite.
+const MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+const FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || 'gemini-3.5-flash-lite';
+const MODELS = [...new Set([MODEL, FALLBACK_MODEL])];
+/** Errors that mean "try the other model" rather than "this request is wrong". */
+const retryable = (err: unknown) => err instanceof ApiError && [429, 500, 503, 504].includes(err.status);
+const THINKING = ThinkingLevel.LOW;
+const TIMEOUT_MS = 45_000;
 
-let client: Anthropic | null = null;
-function getClient(): Anthropic | null {
+let client: GoogleGenAI | null = null;
+function getClient(): GoogleGenAI | null {
   if (client) return client;
-  if (!process.env.ANTHROPIC_API_KEY) return null;
-  const workspace = process.env.ANTHROPIC_WORKSPACE_ID;
-  client = new Anthropic({
-    timeout: 45_000,
-    maxRetries: 1,
-    ...(workspace ? { defaultHeaders: { 'anthropic-workspace-id': workspace } } : {}),
-  });
+  if (!process.env.GEMINI_API_KEY) return null;
+  client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, httpOptions: { timeout: TIMEOUT_MS } });
   return client;
 }
 
 export function aiConfigured(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY);
+  return Boolean(process.env.GEMINI_API_KEY);
 }
 
 const RULES = `You are the family helper inside "My Family AI", a student-built app made for a school project at Axcel International School. Families use it together on their phones to discover what each person enjoys and to find things to do together. Everyone in the family can see what everyone answered.
@@ -41,18 +42,10 @@ How you work:
 7. Stay positive, practical and kind, suitable for children and grandparents alike.
 8. Don't state real-world facts you can't check (opening hours, prices, availability, weather, travel rules). Present places and plans as ideas to check.
 9. If something suggests a person might be unsafe or very upset, respond gently and encourage them to talk with a trusted adult.
-10. Write for a small phone screen: plain words, short sentences, every title in sentence case (never Title Case), no filler.`;
+10. Write for a small phone screen: plain words, short sentences, no filler. Start every sentence and title with a capital letter and capitalise people's names (Mum, Nai Nai); otherwise write titles in sentence case, never Title Case.`;
 
-function system(brief: FamilyBrief, task: string): Anthropic.TextBlockParam[] {
-  return [
-    { type: 'text', text: RULES },
-    {
-      type: 'text',
-      text: `<family_answers>\n${renderBrief(brief)}\n</family_answers>`,
-      cache_control: { type: 'ephemeral' },
-    },
-    { type: 'text', text: task },
-  ];
+function system(brief: FamilyBrief, task: string): string {
+  return `${RULES}\n\n<family_answers>\n${renderBrief(brief)}\n</family_answers>\n\n${task}`;
 }
 
 // --- Simple per-IP rate limit so a shared link can't burn the key ---------------------------
@@ -72,7 +65,7 @@ function rateLimited(req: Request): boolean {
   return entry.count > LIMIT;
 }
 
-type Guarded = { brief: FamilyBrief; ai: Anthropic };
+type Guarded = { brief: FamilyBrief; ai: GoogleGenAI };
 function guard(req: Request, res: Response): Guarded | null {
   if (rateLimited(req)) {
     res.status(429).json({ error: 'rate_limited' });
@@ -92,9 +85,9 @@ function guard(req: Request, res: Response): Guarded | null {
 }
 
 function sendError(res: Response, err: unknown) {
-  if (err instanceof Anthropic.RateLimitError) return res.status(429).json({ error: 'rate_limited' });
-  if (err instanceof Anthropic.APIError) {
-    console.warn('Claude API error', err.status, err.message);
+  if (err instanceof ApiError && retryable(err)) return res.status(429).json({ error: 'rate_limited' });
+  if (err instanceof ApiError) {
+    console.warn('Gemini API error', err.status, err.message.slice(0, 200));
     return res.status(502).json({ error: 'ai_error' });
   }
   console.warn('AI route error', err);
@@ -123,39 +116,73 @@ function keepKnownMembers<T>(value: T, brief: FamilyBrief): T {
   return walk(value) as T;
 }
 
+/** With AI_LOG_USAGE set, prints each call's token use, to keep an eye on cost. */
+function logUsage(model: string | undefined, u: { promptTokenCount?: number; thoughtsTokenCount?: number; candidatesTokenCount?: number } | undefined) {
+  if (process.env.AI_LOG_USAGE && u) console.info(`[ai] ${model} in=${u.promptTokenCount ?? 0} think=${u.thoughtsTokenCount ?? 0} out=${u.candidatesTokenCount ?? 0}`);
+}
+
+/** Runs a call on the main model, moving to the fallback model when Google is busy or out of quota. */
+async function withFallback<R>(call: (model: string) => Promise<R>): Promise<R> {
+  let last: unknown;
+  for (const model of MODELS) {
+    try {
+      return await call(model);
+    } catch (err) {
+      if (!retryable(err)) throw err;
+      last = err;
+      console.warn(`Gemini ${model} unavailable (${(err as ApiError).status}), trying the next model`);
+    }
+  }
+  throw last;
+}
+
+/** True when Gemini stopped because of its safety filters rather than finishing. */
+function declined(reason: FinishReason | undefined, blocked: unknown): boolean {
+  return Boolean(blocked) || reason === FinishReason.SAFETY || reason === FinishReason.PROHIBITED_CONTENT || reason === FinishReason.BLOCKLIST;
+}
+
 /**
- * Runs one structured request and replies with the parsed object. The SDK checks the reply
- * against the schema (including length limits); one invalid reply gets a single retry.
+ * Runs one structured request and replies with the parsed object. Gemini is held to the
+ * schema's JSON shape, and the reply is checked against the schema (including length
+ * limits); an invalid reply gets one retry that says what was wrong.
  */
-async function structured<T extends z.ZodType>(
-  res: Response,
-  ai: Anthropic,
-  brief: FamilyBrief,
-  task: string,
-  user: string,
-  schema: T,
-  maxTokens = 8000
-) {
+async function structured<T extends z.ZodType>(res: Response, ai: GoogleGenAI, brief: FamilyBrief, task: string, user: string, schema: T) {
+  const jsonSchema = z.toJSONSchema(schema, { target: 'draft-2020-12' });
+  let feedback = '';
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const msg = await ai.messages.parse({
-        model: MODEL,
-        max_tokens: maxTokens,
-        output_config: { effort: EFFORT, format: zodOutputFormat(schema) },
-        system: system(brief, task),
-        messages: [
-          {
-            role: 'user',
-            content: attempt === 0 ? user : `${user}\n\nYour last reply broke a length or format limit. Keep every field short and within its limit.`,
+      const reply = await withFallback((model) =>
+        ai.models.generateContent({
+          model,
+          contents: feedback ? `${user}\n\nYour last reply broke these limits: ${feedback}. Keep every field short and within its limit.` : user,
+          config: {
+            systemInstruction: system(brief, task),
+            responseMimeType: 'application/json',
+            responseJsonSchema: jsonSchema,
+            thinkingConfig: { thinkingLevel: THINKING },
           },
-        ],
-      });
-      if (msg.stop_reason === 'refusal') return res.status(502).json({ error: 'ai_declined' });
-      if (msg.parsed_output) return res.json(keepKnownMembers(msg.parsed_output, brief));
-      console.warn('Claude reply had no parsed output', { stop: msg.stop_reason, attempt });
+        })
+      );
+      logUsage(reply.modelVersion, reply.usageMetadata);
+      const reason = reply.candidates?.[0]?.finishReason;
+      if (declined(reason, reply.promptFeedback?.blockReason)) return res.status(502).json({ error: 'ai_declined' });
+      let raw: unknown = null;
+      try {
+        raw = JSON.parse(reply.text || '');
+      } catch {
+        feedback = 'the reply was not valid JSON';
+        console.warn('Gemini reply was not JSON', { attempt, reason });
+        continue;
+      }
+      const parsed = schema.safeParse(raw);
+      if (parsed.success) return res.json(keepKnownMembers(parsed.data, brief));
+      feedback = parsed.error.issues
+        .slice(0, 4)
+        .map((i) => `${i.path.join('.') || 'reply'}: ${i.message}`)
+        .join('; ');
+      console.warn('Gemini reply failed validation', { attempt, feedback: feedback.slice(0, 200) });
     } catch (err) {
-      if (err instanceof Anthropic.APIError) return sendError(res, err);
-      console.warn('Claude reply failed validation', { attempt, message: (err as Error)?.message?.slice(0, 200) });
+      return sendError(res, err);
     }
   }
   return res.status(502).json({ error: 'ai_invalid' });
@@ -222,13 +249,13 @@ aiRouter.get('/status', (_req, res) => {
 aiRouter.post('/chat', async (req, res) => {
   const g = guard(req, res);
   if (!g) return;
-  const history: Anthropic.MessageParam[] = (Array.isArray(req.body?.messages) ? req.body.messages : [])
+  const history: Content[] = (Array.isArray(req.body?.messages) ? req.body.messages : [])
     .slice(-14)
     .map((m: any) => ({
-      role: m?.role === 'assistant' ? 'assistant' : 'user',
-      content: text(m?.content, 2000),
+      role: m?.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: text(m?.content, 2000) }],
     }))
-    .filter((m: Anthropic.MessageParam) => m.content);
+    .filter((m: Content) => m.parts?.[0]?.text);
   while (history.length && history[0].role !== 'user') history.shift();
   if (!history.length || history[history.length - 1].role !== 'user') {
     res.status(400).json({ error: 'missing_message' });
@@ -242,22 +269,39 @@ aiRouter.post('/chat', async (req, res) => {
   res.flushHeaders();
   const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 
-  const task = `You're chatting in the app's Ask tab with ${g.brief.asker}. Hard limit: 70 words in total. Open with the answer in one short sentence, then at most three "- " bullets of under 12 words each, or one more short sentence instead of bullets. Use **bold** only for the name of an idea. No headings, tables or emojis. Speak to ${g.brief.asker} directly and call family members by the names shown.`;
+  const task = `You're chatting in the app's Ask tab with ${g.brief.asker}. Hard limit: 70 words in total. Open with the answer in one short sentence, then at most three "- " bullets of under 12 words each, or one more short sentence instead of bullets. Use **bold** only for the name of an idea. No headings, tables or emojis. Speak to ${g.brief.asker} directly and call family members by the names shown. Name concrete things from their answers (foods, places, activities) rather than style labels.`;
 
-  const stream = g.ai.messages.stream({
-    model: MODEL,
-    max_tokens: 6000,
-    output_config: { effort: EFFORT },
-    system: system(g.brief, task),
-    messages: history,
-  });
-  res.on('close', () => stream.abort());
-  stream.on('text', (delta) => send({ t: delta }));
-  try {
-    const final = await stream.finalMessage();
-    send({ done: true, refused: final.stop_reason === 'refusal' });
-  } catch (err) {
-    if (!res.writableEnded) send({ error: err instanceof Anthropic.RateLimitError ? 'rate_limited' : 'ai_error' });
+  const abort = new AbortController();
+  res.on('close', () => abort.abort());
+  let sent = false;
+  let refused = false;
+  for (const model of MODELS) {
+    try {
+      const stream = await g.ai.models.generateContentStream({
+        model,
+        contents: history,
+        config: { systemInstruction: system(g.brief, task), thinkingConfig: { thinkingLevel: THINKING }, abortSignal: abort.signal },
+      });
+      for await (const chunk of stream) {
+        if (chunk.text) {
+          sent = true;
+          send({ t: chunk.text });
+        }
+        if (declined(chunk.candidates?.[0]?.finishReason, chunk.promptFeedback?.blockReason)) refused = true;
+      }
+      send({ done: true, refused });
+      break;
+    } catch (err) {
+      if (abort.signal.aborted) return;
+      // A busy model can fail before the first word; only then is it safe to start over on the next one.
+      if (!sent && retryable(err) && model !== MODELS[MODELS.length - 1]) {
+        console.warn(`Gemini ${model} unavailable (${(err as ApiError).status}), trying the next model`);
+        continue;
+      }
+      console.warn('Chat failed', err instanceof ApiError ? err.status : (err as Error)?.message?.slice(0, 200));
+      if (!res.writableEnded) send({ error: err instanceof ApiError && retryable(err) ? 'rate_limited' : 'ai_error' });
+      break;
+    }
   }
   res.end();
 });
@@ -308,7 +352,7 @@ aiRouter.post('/bloom', async (req, res) => {
     g.ai,
     g.brief,
     `${m.name} just finished the Foundation discovery. Their top style is ${m.topStyle} and their second style is ${m.secondStyle}. Write a short, warm note to them about their result.
-- note: 2 sentences, under 25 words, speaking to them as "you". Mention two or three specific things they picked (paraphrased) and show how both their top and second style appear in those picks.
+- note: 2 sentences, under 25 words, never naming the styles, speaking to them as "you". Mention two or three specific things they picked (paraphrased) and show how both their top and second style appear in those picks.
 - tryThis: one small, concrete thing to do with someone in the family, under 12 words, naming that person if it fits their answers. Start with a verb and don't mention when (the app already labels it "Try this week").
 Never mention percentages, scores, or the other four styles.`,
     `Write the note for ${m.name}.`,

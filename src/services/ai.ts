@@ -150,7 +150,7 @@ export function aiErrorMessage(err: unknown): string {
     case 'offline':
       return "You're offline. Check your connection and try again.";
     case 'unavailable':
-      return 'The AI helper isn’t switched on for this app yet. Ask whoever set it up to add the Claude API key.';
+      return 'The AI helper isn’t switched on for this app yet. Ask whoever set it up to add the Gemini API key.';
     case 'busy':
       return 'The AI helper is busy right now. Try again in a minute.';
     default:

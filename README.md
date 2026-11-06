@@ -18,14 +18,14 @@ A student-built family discovery app for Axcel International School. Everyone in
 Prerequisites: Node.js 22 or later.
 
 1. `npm install`
-2. Create `.env.local` with `ANTHROPIC_API_KEY` (and `ANTHROPIC_WORKSPACE_ID` if your key is organisation-level). See `.env.example`.
+2. Create `.env.local` with `GEMINI_API_KEY`. See `.env.example`.
 3. `npm run dev` and open http://localhost:3000
 
 Without a key the app still works; AI features show a clear message and fall back to simpler built-in summaries.
 
 ## AI
 
-All AI runs on the server (`server/ai.ts`) with Claude Haiku 5.5 at medium effort. The browser sends a "family brief" built from saved answers (`src/services/brief.ts`); the server validates it, wraps it as data, and applies the project's AI rules: use only saved answers, separate facts from ideas, say when the answers don't cover something, never diagnose, rank or criticise, and treat answers as shared family discovery. Requests are rate-limited per IP.
+All AI runs on the server (`server/ai.ts`) with Gemini 3.5 Flash at low thinking (falling back to Flash-Lite when Google is busy), using JSON-schema output that the server checks before replying. The browser sends a "family brief" built from saved answers (`src/services/brief.ts`); the server validates it, wraps it as data, and applies the project's AI rules: use only saved answers, separate facts from ideas, say when the answers don't cover something, never diagnose, rank or criticise, and treat answers as shared family discovery. Requests are rate-limited per IP.
 
 ## Checks
 

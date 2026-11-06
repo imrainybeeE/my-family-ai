@@ -134,7 +134,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
             <li>It never asks for emails, passwords, addresses or bank details. Use nicknames, not full names.</li>
             <li>Answers are shared with everyone in your family. They’re for discovering each other, not for keeping secrets.</li>
             <li>The six styles are a fun discovery profile from this app’s questions, not a psychological assessment.</li>
-            <li>The AI helper (Claude, made by Anthropic) only sees your family’s saved answers. It can make mistakes, so don’t rely on it for medical, psychological, money or safety advice.</li>
+            <li>The AI helper (Gemini, made by Google) only sees your family’s saved answers. It can make mistakes, so don’t rely on it for medical, psychological, money or safety advice.</li>
           </ul>
         </section>
 
