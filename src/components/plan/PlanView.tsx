@@ -197,8 +197,7 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
                   </h2>
                   {q.multi && <p className="t-small ink-3">Pick any</p>}
                   <div
-                    className={q.options.length <= 3 ? 'grid gap-2 mt-3' : 'flex flex-wrap gap-2 mt-3'}
-                    style={q.options.length <= 3 ? { gridTemplateColumns: `repeat(${evenColumns(q.options)}, minmax(0, 1fr))` } : undefined}
+                    className={paired(q.options) ? 'grid grid-cols-2 gap-2 mt-3' : 'flex flex-wrap gap-2 mt-3'}
                     role={q.multi ? 'group' : 'radiogroup'}
                     aria-label={q.question}
                     onKeyDown={q.multi ? undefined : (e) => onRovingKeyDown(e)}
@@ -209,7 +208,8 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
                         <button
                           key={o}
                           type="button"
-                          className={q.options.length <= 3 ? 'chip justify-center text-center' : 'chip'}
+                          className={paired(q.options) ? 'chip justify-center text-center' : 'chip'}
+                          style={paired(q.options) && q.options.length % 2 === 1 && oi === q.options.length - 1 ? { gridColumn: 'span 2' } : undefined}
                           role={q.multi ? undefined : 'radio'}
                           aria-checked={q.multi ? undefined : on}
                           tabIndex={q.multi ? undefined : rovingTabIndex(oi, q.options.indexOf(picks[q.id]?.[0] ?? ''))}
@@ -246,15 +246,17 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
                 <IdeaCard key={i} idea={idea} index={i} chosen={chosen} byName={byName} />
               ))}
               <p className="t-small ink-3">Ideas by AI. Check times and prices first.</p>
-              <div className="grid grid-cols-2 gap-2 mt-1">
+              <div className="grid gap-1 mt-1">
                 <PickForUs count={result.ideas.length} onPick={setChosen} />
-                <button type="button" className="btn" onClick={() => setStage('questions')}>
-                  Change answers
-                </button>
+                <div className="grid grid-cols-2">
+                  <button type="button" className="btn btn-quiet btn-sm" onClick={() => setStage('questions')}>
+                    Change answers
+                  </button>
+                  <button type="button" className="btn btn-quiet btn-sm" onClick={reset}>
+                    Something else
+                  </button>
+                </div>
               </div>
-              <button type="button" className="btn btn-quiet" onClick={reset}>
-                Plan something else
-              </button>
             </div>
           )}
         </motion.div>
@@ -265,9 +267,9 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
 
 const IDEA_STOCK = ['stock-butter', 'stock-pink', 'stock-sky'];
 
-/** Up to three short options sit side by side at equal widths; longer ones stack. */
-function evenColumns(options: string[]) {
-  return options.every((o) => o.length <= 10) ? options.length : 1;
+/** Two to four short options sit in an even two-column grid; anything else wraps as chips. */
+function paired(options: string[]) {
+  return options.length >= 2 && options.length <= 4 && options.every((o) => o.length <= 18);
 }
 
 /** One idea: the title and one line up front; the reasoning one tap away. */
@@ -296,11 +298,11 @@ function IdeaCard({ idea, index, chosen, byName }: { idea: PlanIdea; index: numb
         </div>
         {isChosen && <p className="t-hand mt-1">This one!</p>}
       </div>
-      <div className="px-5 pt-3 pb-4">
+      <div className="px-5 pt-4 pb-3">
         <p className="t-body">{idea.summary}</p>
         <button
           type="button"
-          className="t-label mt-2 bg-transparent border-0 p-0 min-h-[44px] flex items-center gap-1"
+          className="t-label mt-1 -mb-1 bg-transparent border-0 p-0 min-h-[44px] flex items-center gap-1"
           style={{ color: 'var(--accent-ink)' }}
           aria-expanded={open}
           onClick={() => setOpen((o) => !o)}
@@ -341,7 +343,7 @@ function PickForUs({ count, onPick }: { count: number; onPick: (i: number) => vo
   return (
     <button
       type="button"
-      className="btn"
+      className="btn btn-primary"
       disabled={spinning || count === 0}
       onClick={() => {
         setSpinning(true);

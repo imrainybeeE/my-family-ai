@@ -37,7 +37,8 @@ for group, names in GROUPS.items():
     # Half-size of a square centred on the frame that holds every piece in the group.
     half = max(max(abs(b[0] - c), abs(b[2] - c), abs(b[1] - c), abs(b[3] - c)) for b in boxes) + 6
     if len(names) == 1:
-        half = (half - 6) / FOOTPRINT
+        # The kite's thin outline reads small, so it gets a larger share of its square.
+        half = (half - 6) / (0.92 if names[0] == 'do' else FOOTPRINT)
     half = min(half, c)
     crop = f'{int(2 * half)}x{int(2 * half)}+{int(c - half)}+{int(c - half)}'
     for n in names:

@@ -132,9 +132,20 @@ function FamilyCircle({ people, links, onOpen }: { people: FamilyPerson[]; links
       return [p.id, { x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) }] as const;
     })
   );
+  const order = new Map(people.map((p, i) => [p.id, i]));
+  // Where a strand meets each flower: the middle of the bloom, which sits high on the lavender sprig.
+  const anchor = (id: string) => {
+    const at = pos.get(id)!;
+    const person = people[order.get(id)!];
+    return person.style === 'Chiller' ? { x: at.x, y: at.y - size * 0.2 } : at;
+  };
   const strands: { d: string; color: string; key: string }[] = [];
   links.forEach((ids, li) => {
-    const pts = ids.map((id) => pos.get(id)).filter(Boolean) as { x: number; y: number }[];
+    // Chain people in their order around the ring, so strands follow the circle instead of crossing.
+    const pts = ids
+      .filter((id) => pos.has(id))
+      .sort((a, b) => order.get(a)! - order.get(b)!)
+      .map(anchor);
     for (let i = 0; i + 1 < pts.length; i++) {
       const a = pts[i];
       const b = pts[i + 1];
@@ -184,8 +195,8 @@ function Row({ first, people, title, body, yarn, children }: { first: boolean; p
         ))}
       </span>
       <div className="min-w-0 flex-1">
-        <h3 className="font-bold flex items-center gap-2" style={{ fontSize: '1.0625rem', lineHeight: 1.3 }}>
-          {yarn && <span aria-hidden className="shrink-0 rounded-full" style={{ width: 14, height: 4, background: yarn }} />}
+        <h3 className="font-bold flex items-start gap-2" style={{ fontSize: '1.0625rem', lineHeight: 1.3 }}>
+          {yarn && <span aria-hidden className="shrink-0 rounded-full mt-[0.55em]" style={{ width: 14, height: 4, background: yarn }} />}
           {title}
         </h3>
         <p className="t-small ink-2 mt-1">{body}</p>

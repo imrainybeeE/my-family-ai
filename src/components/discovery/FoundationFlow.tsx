@@ -276,8 +276,7 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
               )}
               {note && (
                 <>
-                  <h3 className="t-head">{note.headline}</h3>
-                  <p className="t-body ink-2 mt-2">{note.note}</p>
+                  <p className="t-body">{note.note}</p>
                   <p className="t-small mt-3 stock stock-butter" style={{ padding: '10px 12px', boxShadow: 'none' }}>
                     <span className="font-bold">Try this week: </span>
                     {note.tryThis}

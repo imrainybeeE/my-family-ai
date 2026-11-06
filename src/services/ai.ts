@@ -41,7 +41,6 @@ export interface Spark {
 }
 
 export interface BloomNoteResult {
-  headline: string;
   note: string;
   tryThis: string;
 }

@@ -167,9 +167,9 @@ const people = z.array(z.string()).max(8);
 
 const SparkSchema = z.object({ question: line(110), why: line(80), members: people });
 
-const BloomSchema = z.object({ headline: line(50), note: line(200), tryThis: line(100) });
+const BloomSchema = z.object({ note: line(160), tryThis: line(100) });
 
-const RootsSchema = z.object({ reflection: line(130), followUp: line(110).nullable() });
+const RootsSchema = z.object({ reflection: line(90), followUp: line(110).nullable() });
 
 const InsightsSchema = z.object({
   headline: line(60),
@@ -308,9 +308,8 @@ aiRouter.post('/bloom', async (req, res) => {
     g.ai,
     g.brief,
     `${m.name} just finished the Foundation discovery. Their top style is ${m.topStyle} and their second style is ${m.secondStyle}. Write a short, warm note to them about their result.
-- headline: 3–6 words, playful, about how they bloom. Don't name the styles.
-- note: 2 sentences, under 30 words, speaking to them as "you". Mention two or three specific things they picked (paraphrased) and show how both their top and second style appear in those picks.
-- tryThis: one small, concrete thing they could do with someone in the family this week, under 14 words, naming that person if it fits their answers.
+- note: 2 sentences, under 25 words, speaking to them as "you". Mention two or three specific things they picked (paraphrased) and show how both their top and second style appear in those picks.
+- tryThis: one small, concrete thing to do with someone in the family, under 12 words, naming that person if it fits their answers. Start with a verb and don't mention when (the app already labels it "Try this week").
 Never mention percentages, scores, or the other four styles.`,
     `Write the note for ${m.name}.`,
     BloomSchema,

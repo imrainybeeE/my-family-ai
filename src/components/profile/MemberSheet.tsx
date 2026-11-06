@@ -45,8 +45,7 @@ export function MemberSheet({ memberId, onClose }: { memberId: string | null; on
 
           {answers.bloomNote && profile && (
             <section className="card p-5" aria-label={`A note for ${name}`}>
-              <h3 className="t-head">{answers.bloomNote.headline}</h3>
-              <p className="t-body ink-2 mt-1.5">{answers.bloomNote.note}</p>
+              <p className="t-body">{answers.bloomNote.note}</p>
               <p className="t-small mt-3 stock stock-butter" style={{ padding: '10px 12px', boxShadow: 'none' }}>
                 <span className="font-bold">Try this week: </span>
                 {answers.bloomNote.tryThis}

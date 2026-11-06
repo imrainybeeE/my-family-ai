@@ -110,13 +110,13 @@ export function AskView() {
   const suggestions = starters.data?.suggestions?.slice(0, 3) || [];
 
   return (
-    <div className="page" style={{ paddingBottom: 'calc(188px + var(--safe-b))' }}>
+    <div className="page" style={{ paddingBottom: 'calc(var(--tabbar-top) + var(--composer-h) + 28px + var(--safe-b))' }}>
       <PageHeader title="Ask" onProfile={ui.openSettings} />
 
       {empty ? (
         <>
-          <section className="flex items-center gap-2 -ml-3 -mt-1">
-            <Felt name="yarnball" size={112} />
+          <section className="flex items-center gap-2 -ml-2">
+            <Felt name="yarnball" size={88} />
             <p className="t-body ink-2 flex-1 -ml-2">Answers come only from what your family saved.</p>
           </section>
 
@@ -194,10 +194,10 @@ export function AskView() {
       <div ref={endRef} />
 
       {/* A strip of page behind the composer and tab bar, so nothing shows between them. */}
-      <div aria-hidden className="fixed z-[19] inset-x-0 bottom-0 mx-auto max-w-[460px]" style={{ height: 'calc(170px + var(--safe-b))', background: 'var(--page)', boxShadow: '0 -1px 0 var(--line)' }} />
+      <div aria-hidden className="fixed z-[19] inset-x-0 bottom-0 mx-auto max-w-[460px]" style={{ height: 'calc(var(--tabbar-top) + var(--composer-h) / 2 + var(--safe-b))', background: 'var(--page)' }} />
       <form
         className="fixed z-20 left-1/2 -translate-x-1/2 w-[min(420px,calc(100%-32px))] flex items-end gap-2 p-1.5 pl-2 rounded-[28px]"
-        style={{ bottom: 'calc(96px + var(--safe-b))', background: 'color-mix(in srgb, var(--card) 96%, transparent)', backdropFilter: 'blur(28px) saturate(1.5)', WebkitBackdropFilter: 'blur(28px) saturate(1.5)', boxShadow: '0 0 0 0.5px var(--line-strong), var(--shadow-lift)' }}
+        style={{ bottom: 'calc(var(--tabbar-top) + var(--safe-b))', minHeight: 'var(--composer-h)', background: 'color-mix(in srgb, var(--card) 96%, transparent)', backdropFilter: 'blur(28px) saturate(1.5)', WebkitBackdropFilter: 'blur(28px) saturate(1.5)', boxShadow: '0 0 0 0.5px var(--line-strong), var(--shadow-lift)' }}
         onSubmit={(e) => {
           e.preventDefault();
           send(input);

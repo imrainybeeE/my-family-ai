@@ -52,7 +52,8 @@ export interface AdvancedAnswer {
 
 /** The AI-written note shown on a member's bloom (Foundation result). */
 export interface BloomNote {
-  headline: string;
+  /** Written by earlier versions; no longer shown. */
+  headline?: string;
   note: string;
   tryThis: string;
   forProfileAt: string;

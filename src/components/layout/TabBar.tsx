@@ -47,9 +47,13 @@ export function PageHeader({
   return (
     <header className="flex items-start justify-between gap-3 pb-3">
       <div className="min-w-0">
-        {isDemo && demoNote && <p className="t-hand ink-3 mb-1" style={{ fontSize: '0.875rem' }}>Demo family, nothing is saved</p>}
         <h1 className="t-display">{title}</h1>
         {subtitle && <p className="t-small ink-2 mt-1.5">{subtitle}</p>}
+        {isDemo && demoNote && (
+          <p className="t-hand ink-3 mt-1" style={{ fontSize: '0.875rem' }}>
+            Demo family, nothing is saved
+          </p>
+        )}
       </div>
       <button
         type="button"

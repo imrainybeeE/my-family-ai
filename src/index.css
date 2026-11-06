@@ -58,6 +58,9 @@
   --r-ctl: 14px;
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
+  /* The floating dock: the composer sits on top of the tab bar. */
+  --tabbar-top: 92px;
+  --composer-h: 58px;
 }
 
 .dark {
@@ -81,10 +84,10 @@
   --yarn: #f08aa6;
   --yarn-deep: #c95d7c;
 
-  --stock-pink: color-mix(in srgb, #f08aa6 20%, var(--card));
+  --stock-pink: color-mix(in srgb, #f08aa6 14%, var(--card));
   --stock-pink-ink: #ffd9e4;
-  /* Yellow over navy turns olive, so at night butter stock is plain paper with golden ink. */
-  --stock-butter: var(--card-2);
+  /* Yellow over navy turns olive, so the night butter is only a hint of gold over paper. */
+  --stock-butter: color-mix(in srgb, #f4c542 10%, var(--card-2));
   --stock-butter-ink: #fbe7ae;
   --stock-mint: color-mix(in srgb, #7fc49a 18%, var(--card));
   --stock-mint-ink: #cdf0da;
@@ -142,12 +145,12 @@
   ::selection {
     background: var(--accent-soft);
   }
-  /* No single word left alone on the last line. */
-  h1,
-  h2,
-  h3 {
+  /* No single word left alone on the last line; only page titles are balanced. */
+  h1 {
     text-wrap: balance;
   }
+  h2,
+  h3,
   p,
   li {
     text-wrap: pretty;

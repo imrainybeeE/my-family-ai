@@ -123,7 +123,7 @@ export function Sheet({ open, onClose, title, hideTitle, full, children, footer,
               onPointerDown={full ? undefined : (e) => drag.start(e)}
             >
               {leading}
-              <h2 id={titleId} className={hideTitle ? 'sr-only' : 't-head flex-1 pl-1 truncate'}>
+              <h2 id={titleId} className={hideTitle ? 'sr-only' : 't-head flex-1 truncate'}>
                 {title}
               </h2>
               <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
