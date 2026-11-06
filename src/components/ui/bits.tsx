@@ -28,9 +28,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               exit={{ y: -30, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 400, damping: 28 }}
               className="card px-4 py-3 t-label flex items-center gap-2"
-              style={{ boxShadow: 'var(--shadow-float)' }}
+              style={{ boxShadow: 'var(--shadow-lift)' }}
             >
-              <span className="inline-grid place-items-center w-6 h-6 rounded-full" style={{ background: 'var(--leaf)', color: 'var(--on-leaf)' }}>
+              <span className="inline-grid place-items-center w-6 h-6 rounded-full" style={{ background: 'var(--accent)', color: 'var(--on-accent)' }}>
                 <Check size={15} strokeWidth={3} />
               </span>
               {message.text}
@@ -112,7 +112,7 @@ export function Thinking({ label = 'Thinking' }: { label?: string }) {
           <motion.span
             key={i}
             className="w-2 h-2 rounded-full"
-            style={{ background: 'var(--leaf)' }}
+            style={{ background: 'var(--accent)' }}
             animate={{ y: [0, -5, 0], opacity: [0.4, 1, 0.4] }}
             transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.15 }}
           />

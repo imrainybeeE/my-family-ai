@@ -25,74 +25,55 @@ export function MemberSheet({ memberId, onClose }: { memberId: string | null; on
   return (
     <Sheet open={Boolean(member)} onClose={onClose} title={isYou ? `${name} (you)` : name}>
       {member && (
-        <div className="grid gap-5 pb-4">
+        <div className="grid gap-4 pb-4">
           {profile ? (
             <SpecimenCard name={name} top={profile.primaryStyle} second={profile.secondaryStyle} />
           ) : (
-            <div className="panel panel-sun flex items-center gap-4">
-              <Sprout size={80} />
-              <div>
-                <p className="t-head">{isYou ? 'You haven’t bloomed yet' : `${name} hasn’t bloomed yet`}</p>
-                <p className="t-small mt-1">{isYou ? '18 quick picks and you’ll find your flower.' : 'Their flower appears once they answer the Foundation questions.'}</p>
-                {isYou && (
-                  <button type="button" className="btn btn-ink btn-sm mt-3" onClick={ui.openFoundation}>
-                    Find your flower
-                  </button>
-                )}
+            <div className="card flex items-center gap-3 py-4 pl-2 pr-4">
+              <Sprout size={84} />
+              <div className="flex-1">
+                <p className="t-head">{isYou ? 'No flower yet' : `${name} hasn’t bloomed`}</p>
+                <p className="t-small ink-2 mt-0.5">{isYou ? '18 quick picks' : 'Their flower appears when they finish'}</p>
               </div>
+              {isYou && (
+                <button type="button" className="btn btn-primary btn-sm" onClick={ui.openFoundation}>
+                  Start
+                </button>
+              )}
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-2" aria-label="Discovery progress">
-            <Status done={Boolean(profile)} label="Foundation" detail={profile ? 'Complete' : 'Not started'} />
-            <Status done={adv.complete} label="Advanced" detail={adv.complete ? 'Complete' : adv.done ? `${adv.done} of ${adv.total} answered` : 'Not started'} />
-          </div>
-
           {answers.bloomNote && profile && (
             <section className="card p-5">
-              <p className="t-label" style={{ color: 'var(--leaf-ink)' }}>
-                A note from the AI helper
-              </p>
+              <p className="t-hand ink-2">A note for {name}</p>
               <h3 className="t-head mt-1">{answers.bloomNote.headline}</h3>
-              <p className="t-body ink-2 mt-2">{answers.bloomNote.note}</p>
-              <p className="t-small mt-3 rounded-xl px-3 py-2" style={{ background: 'var(--sun-bg)', color: 'var(--sun-ink)' }}>
+              <p className="t-body ink-2 mt-1.5">{answers.bloomNote.note}</p>
+              <p className="t-small mt-3 stock stock-butter" style={{ padding: '10px 12px', boxShadow: 'none' }}>
                 <span className="font-bold">Try this week: </span>
                 {answers.bloomNote.tryThis}
               </p>
             </section>
           )}
 
+          <ul className="card px-4" aria-label="Discovery progress">
+            <Status first done={Boolean(profile)} label="Foundation" detail={profile ? 'Done' : 'Not started'} />
+            <Status done={adv.complete} label="Deeper roots" detail={adv.complete ? 'Done' : adv.done ? `${adv.done} of ${adv.total}` : 'Not started'} />
+          </ul>
+
           {profile && (
-            <section className="grid gap-3">
-              {[profile.primaryStyle, profile.secondaryStyle].map((s, i) => (
-                <div key={s} className="card p-4">
-                  <p className="t-label ink-2">{i === 0 ? 'Top style' : 'Second style'}</p>
-                  <h3 className="t-head mt-0.5">
-                    {DISCOVERY_STYLES_INFO[s].title}, the {FLOWERS[s].flower.toLowerCase()}
-                  </h3>
-                  <p className="t-small ink-2 mt-1.5">{DISCOVERY_STYLES_INFO[s].positiveDescription}</p>
-                  {i === 0 && (
-                    <>
-                      <p className="t-small mt-2">
-                        <span className="font-bold">Recharges with: </span>
-                        <span className="ink-2">{DISCOVERY_STYLES_INFO[s].weekendRecharge}</span>
-                      </p>
-                      <p className="t-small mt-1.5">
-                        <span className="font-bold">In the family: </span>
-                        <span className="ink-2">{DISCOVERY_STYLES_INFO[s].familyInsight}</span>
-                      </p>
-                    </>
-                  )}
-                </div>
-              ))}
-            </section>
+            <Collapsible title={`About the ${DISCOVERY_STYLES_INFO[profile.primaryStyle].title.replace(/^The /, '')}`}>
+              <div className="grid gap-3">
+                <p className="t-small ink-2">{DISCOVERY_STYLES_INFO[profile.primaryStyle].positiveDescription}</p>
+                <Fact label="Recharges with" value={DISCOVERY_STYLES_INFO[profile.primaryStyle].weekendRecharge} />
+                <Fact label="In the family" value={DISCOVERY_STYLES_INFO[profile.primaryStyle].familyInsight} />
+                <Fact label={`A touch of ${FLOWERS[profile.secondaryStyle].flower}`} value={DISCOVERY_STYLES_INFO[profile.secondaryStyle].positiveDescription} />
+              </div>
+            </Collapsible>
           )}
 
           {individual && (individual.topTasteCuisines.length > 0 || individual.topMovieGenres.length > 0 || individual.weekendActivities.length > 0) && (
             <section className="card p-4">
-              <h3 className="t-head" style={{ fontSize: '1.0625rem' }}>
-                Tastes
-              </h3>
+              <h3 className="t-head">Tastes</h3>
               <TasteRow label="Loves eating" values={individual.topTasteCuisines} />
               <TasteRow label="Would rather skip" values={individual.dietaryDislikes} />
               <TasteRow label="Watches" values={individual.topMovieGenres} />
@@ -114,7 +95,7 @@ export function MemberSheet({ memberId, onClose }: { memberId: string | null; on
           )}
 
           {adv.done > 0 && (
-            <Collapsible title={`${isYou ? 'Your' : `${name}’s`} Advanced answers`}>
+            <Collapsible title={`${isYou ? 'Your' : `${name}’s`} deeper answers`}>
               <ul className="grid gap-3">
                 {ADVANCED_QUESTIONS.filter((q) => answers.advancedAnswers?.[q.id]).map((q) => {
                   const a = answers.advancedAnswers![q.id];
@@ -135,10 +116,10 @@ export function MemberSheet({ memberId, onClose }: { memberId: string | null; on
           )}
 
           {isYou && (
-            <div className="grid gap-2">
+            <div className="grid gap-2 mt-1">
               {profile && (
                 <button type="button" className="btn btn-primary btn-block" onClick={ui.openRoots}>
-                  {adv.complete ? 'Review Advanced answers' : adv.done ? 'Continue Advanced discovery' : 'Start Advanced discovery'}
+                  {adv.complete ? 'Review deeper answers' : adv.done ? 'Continue deeper roots' : 'Grow deeper roots'}
                 </button>
               )}
               <button type="button" className="btn btn-block" onClick={ui.openTastes}>
@@ -146,33 +127,40 @@ export function MemberSheet({ memberId, onClose }: { memberId: string | null; on
               </button>
               {profile && (
                 <button type="button" className="btn btn-quiet btn-block" onClick={ui.openFoundation}>
-                  Retake the Foundation questions
+                  Retake Foundation
                 </button>
               )}
             </div>
           )}
+
+          {profile && <p className="t-small ink-3 text-center px-4">A fun profile from this app’s questions, not a psychological test.</p>}
         </div>
       )}
     </Sheet>
   );
 }
 
-function Status({ done, label, detail }: { done: boolean; label: string; detail: string }) {
+function Status({ first, done, label, detail }: { first?: boolean; done: boolean; label: string; detail: string }) {
   return (
-    <div className="card p-3.5 flex items-center gap-3">
+    <li className="flex items-center gap-3 py-3.5" style={{ borderTop: first ? 0 : '1px solid var(--line)' }}>
       <span
-        className="w-8 h-8 rounded-full grid place-items-center shrink-0"
-        style={{ background: done ? 'var(--leaf)' : 'var(--paper-sunk)', color: done ? 'var(--on-leaf)' : 'var(--ink-3)', border: done ? 0 : '2px dashed var(--line-strong)' }}
+        className="w-7 h-7 rounded-full grid place-items-center shrink-0"
+        style={{ background: done ? 'var(--accent)' : 'transparent', color: 'var(--on-accent)', border: done ? 0 : '1.5px dashed var(--line-strong)' }}
         aria-hidden
       >
-        {done && <Check size={17} strokeWidth={3} />}
+        {done && <Check size={15} strokeWidth={3} />}
       </span>
-      <span className="min-w-0">
-        <span className="block t-label">{label}</span>
-        <span className="block t-small ink-2" style={{ fontSize: '0.8125rem' }}>
-          {detail}
-        </span>
-      </span>
+      <span className="flex-1 font-semibold">{label}</span>
+      <span className="t-small ink-2">{detail}</span>
+    </li>
+  );
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="t-label">{label}</p>
+      <p className="t-small ink-2 mt-0.5">{value}</p>
     </div>
   );
 }
@@ -184,7 +172,7 @@ function TasteRow({ label, values }: { label: string; values: string[] }) {
       <p className="t-small ink-3">{label}</p>
       <div className="flex flex-wrap gap-1.5 mt-1">
         {values.map((v) => (
-          <span key={v} className="t-small px-2.5 py-1 rounded-lg font-semibold" style={{ background: 'var(--paper-sunk)' }}>
+          <span key={v} className="t-small px-2.5 py-1 rounded-lg font-semibold" style={{ background: 'var(--card-2)' }}>
             {v}
           </span>
         ))}
@@ -198,9 +186,7 @@ function Collapsible({ title, children }: { title: string; children: React.React
   return (
     <section className="card">
       <button type="button" className="w-full flex items-center justify-between gap-3 p-4 bg-transparent border-0 text-left" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        <span className="t-head" style={{ fontSize: '1.0625rem' }}>
-          {title}
-        </span>
+        <span className="t-head">{title}</span>
         <ChevronDown size={20} strokeWidth={2.4} style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 200ms' }} />
       </button>
       {open && <div className="px-4 pb-4">{children}</div>}

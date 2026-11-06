@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ChevronDown, ChevronLeft, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { onRovingKeyDown, rovingTabIndex } from '../ui/roving';
 import { useHousehold } from '../../context/HouseholdContext';
 import { useUI } from '../../App';
@@ -9,18 +9,17 @@ import { ai, aiErrorMessage, PlanAsk, PlanIdea, PlanIdeas } from '../../services
 import { calculateCommonGround } from '../../utils/tasteMatching';
 import { generateFamilyProfileReport } from '../../utils/familyProfileAnalysis';
 import { PageHeader } from '../layout/TabBar';
-import { PlanTiles } from '../home/GardenView';
 import { FlowerBadge } from '../art/Flower';
 import { DoArt, EatArt, TravelArt, WatchArt } from '../art/Icons';
 import { SectionTitle, Thinking } from '../ui/bits';
 import { Coin } from './Coin';
 import { PlanTask } from '../../types';
 
-const TASK: Record<PlanTask, { title: string; Art: typeof EatArt }> = {
-  eat: { title: 'What should we eat?', Art: EatArt },
-  do: { title: 'What should we do?', Art: DoArt },
-  watch: { title: 'What should we watch?', Art: WatchArt },
-  travel: { title: 'Where should we travel?', Art: TravelArt },
+const TASK: Record<PlanTask, { label: string; hint: string; title: string; Art: typeof EatArt }> = {
+  eat: { label: 'Eat', hint: 'Dinner tonight', title: 'What should we eat?', Art: EatArt },
+  do: { label: 'Do', hint: 'A day or an evening', title: 'What should we do?', Art: DoArt },
+  watch: { label: 'Watch', hint: 'Film night', title: 'What should we watch?', Art: WatchArt },
+  travel: { label: 'Travel', hint: 'A trip away', title: 'Where should we go?', Art: TravelArt },
 };
 
 type Stage = 'who' | 'asking' | 'questions' | 'thinking' | 'ideas';
@@ -97,18 +96,31 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
   if (!task) {
     return (
       <div className="page">
-        <PageHeader title="Plan" subtitle="Ideas that fit everyone, using what your family already told the app." onProfile={ui.openSettings} />
-        <PlanTiles onPick={(t) => setTask(t)} />
+        <PageHeader title="Plan" onProfile={ui.openSettings} />
+        <div className="grid grid-cols-2 gap-3">
+          {(Object.keys(TASK) as PlanTask[]).map((t) => {
+            const { label, hint, Art } = TASK[t];
+            return (
+              <button key={t} type="button" onClick={() => setTask(t)} className="card border-0 text-left px-4 pt-2 pb-4 flex flex-col transition-transform active:scale-[0.97]">
+                <span className="-ml-2">
+                  <Art size={104} />
+                </span>
+                <span className="t-head">{label}</span>
+                <span className="t-small ink-2">{hint}</span>
+              </button>
+            );
+          })}
+        </div>
         {!myAnswers.favoriteCuisines?.length && (
-          <button type="button" className="card w-full text-left p-4 mt-3 border-0 flex items-center gap-3 active:scale-[0.98] transition-transform" onClick={ui.openTastes}>
-            <Sparkles size={22} style={{ color: 'var(--leaf)' }} />
+          <button type="button" className="card w-full text-left py-3.5 px-4 mt-3 border-0 flex items-center gap-3 active:scale-[0.98] transition-transform" onClick={ui.openTastes}>
             <span className="flex-1">
               <span className="block font-semibold">Add your tastes</span>
-              <span className="block t-small ink-2">Favourite food, films and weekends make the ideas fit you better.</span>
+              <span className="block t-small ink-2">Food, films and weekends</span>
             </span>
+            <ChevronRight size={20} strokeWidth={2.2} className="ink-3" />
           </button>
         )}
-        <SectionTitle>Stuck between two?</SectionTitle>
+        <SectionTitle>Can’t decide?</SectionTitle>
         <Coin />
       </div>
     );
@@ -118,21 +130,21 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
 
   return (
     <div className="page">
-      <header className="flex items-center gap-3 px-1 pb-4">
-        <button type="button" className="icon-btn" onClick={reset} aria-label="Back to all plans">
+      <header className="flex items-center gap-2 pb-3">
+        <button type="button" className="icon-btn shrink-0" onClick={reset} aria-label="Back to all plans">
           <ChevronLeft size={22} strokeWidth={2.4} />
         </button>
         <h1 className="t-title flex-1">{title}</h1>
-        <span className="sticker" style={{ background: '#fff7e0', width: 56, height: 56, transform: 'rotate(4deg)' }}>
-          <Art size={42} />
+        <span className="-my-4 -mr-2 shrink-0">
+          <Art size={84} />
         </span>
       </header>
 
       <AnimatePresence mode="wait">
         <motion.div key={stage} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
           {stage === 'who' && (
-            <section className="panel panel-card">
-              <h2 className="t-head">Who’s joining?</h2>
+            <section className="card p-5">
+              <h2 className="t-head">Who’s coming?</h2>
               <div className="flex flex-wrap gap-2 mt-3" role="group" aria-label="Who’s joining">
                 {people.map((p) => {
                   const on = whoIds.includes(p.id);
@@ -157,8 +169,8 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
           )}
 
           {(stage === 'asking' || stage === 'thinking') && (
-            <section className="panel panel-card grid gap-3" aria-busy>
-              <Thinking label={stage === 'asking' ? 'Checking what we already know' : `Finding three ideas for ${who.length === people.length ? 'everyone' : who.join(', ')}`} />
+            <section className="card p-5 grid gap-3" aria-busy>
+              <Thinking label={stage === 'asking' ? 'Checking what we know' : 'Finding three ideas'} />
               <div className="skeleton h-5 w-full" />
               <div className="skeleton h-5 w-5/6" />
               <div className="skeleton h-5 w-2/3" />
@@ -169,9 +181,9 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
             <div className="grid gap-4">
               {error && <p className="t-small px-1" style={{ color: 'var(--danger)' }}>{error}</p>}
               {ask.known.length > 0 && (
-                <section className="panel panel-sky">
-                  <h2 className="t-label opacity-80">What the app already knows</h2>
-                  <ul className="prose-ai t-small mt-2">
+                <section className="stock stock-sky">
+                  <h2 className="t-hand" style={{ fontSize: '0.9375rem' }}>We already know</h2>
+                  <ul className="prose-ai t-small mt-1">
                     {ask.known.map((k, i) => (
                       <li key={i}>{k}</li>
                     ))}
@@ -179,11 +191,11 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
                 </section>
               )}
               {ask.questions.map((q) => (
-                <section key={q.id} className="panel panel-card">
+                <section key={q.id} className="card p-5">
                   <h2 className="t-head" style={{ fontSize: '1.125rem' }}>
                     {q.question}
                   </h2>
-                  {q.multi && <p className="t-small ink-3">Pick any that apply.</p>}
+                  {q.multi && <p className="t-small ink-3">Pick any</p>}
                   <div
                     className="flex flex-wrap gap-2 mt-3"
                     role={q.multi ? 'group' : 'radiogroup'}
@@ -217,11 +229,11 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
                 </section>
               ))}
               <label className="grid gap-2 px-1">
-                <span className="t-label">Anything else? (optional)</span>
+                <span className="t-label">Anything else?</span>
                 <input className="field" value={extra} onChange={(e) => setExtra(e.target.value)} placeholder={task === 'eat' ? 'Nai Nai’s birthday, something soft…' : 'It might rain, we have a toddler…'} />
               </label>
               <button type="button" className="btn btn-primary btn-block" onClick={getIdeas}>
-                <Sparkles size={19} strokeWidth={2.4} /> Get three ideas
+                Get three ideas
               </button>
             </div>
           )}
@@ -232,8 +244,7 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
               {result.ideas.map((idea, i) => (
                 <IdeaCard key={i} idea={idea} index={i} chosen={chosen} byName={byName} />
               ))}
-              <p className="t-small ink-2 px-1">{result.note}</p>
-              <p className="t-small ink-3 px-1">AI ideas based on your answers. Check opening times, prices and bookings yourself before you go.</p>
+              <p className="t-small ink-3 px-1">{result.note} Ideas by AI: check times and prices before you go.</p>
               <div className="grid grid-cols-2 gap-2 mt-1">
                 <PickForUs count={result.ideas.length} onPick={setChosen} />
                 <button type="button" className="btn" onClick={() => setStage('questions')}>
@@ -251,8 +262,7 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
   );
 }
 
-const IDEA_TINTS = ['var(--sun-bg)', 'var(--petal-bg)', 'var(--sky-bg)'];
-const IDEA_INKS = ['var(--sun-ink)', 'var(--petal-ink)', 'var(--sky-ink)'];
+const IDEA_STOCK = ['stock-butter', 'stock-pink', 'stock-sky'];
 
 /** One idea: the title and one line up front; the reasoning one tap away. */
 function IdeaCard({ idea, index, chosen, byName }: { idea: PlanIdea; index: number; chosen: number | null; byName: ReturnType<typeof useFamily>['byName'] }) {
@@ -264,10 +274,10 @@ function IdeaCard({ idea, index, chosen, byName }: { idea: PlanIdea; index: numb
       layout
       className="card overflow-hidden"
       animate={{ scale: isChosen ? 1.02 : 1, opacity: chosen !== null && !isChosen ? 0.5 : 1 }}
-      style={{ outline: isChosen ? '3px solid var(--leaf)' : 'none', outlineOffset: 2 }}
+      style={{ outline: isChosen ? '3px solid var(--accent)' : 'none', outlineOffset: 3 }}
       aria-current={isChosen || undefined}
     >
-      <div className="px-5 pt-4 pb-4" style={{ background: IDEA_TINTS[index % 3], color: IDEA_INKS[index % 3] }}>
+      <div className={`px-5 pt-4 pb-4 ${IDEA_STOCK[index % 3]}`}>
         <div className="flex items-start justify-between gap-3">
           <h3 className="t-head">{idea.title}</h3>
           {people.length > 0 && (
@@ -278,14 +288,14 @@ function IdeaCard({ idea, index, chosen, byName }: { idea: PlanIdea; index: numb
             </span>
           )}
         </div>
-        {isChosen && <p className="t-label mt-1">The garden picked this one</p>}
+        {isChosen && <p className="t-hand mt-1">This one!</p>}
       </div>
       <div className="px-5 pt-3 pb-4">
         <p className="t-body">{idea.summary}</p>
         <button
           type="button"
           className="t-label mt-2 bg-transparent border-0 p-0 min-h-[44px] flex items-center gap-1"
-          style={{ color: 'var(--leaf-ink)' }}
+          style={{ color: 'var(--accent-ink)' }}
           aria-expanded={open}
           onClick={() => setOpen((o) => !o)}
         >
@@ -305,7 +315,7 @@ function IdeaCard({ idea, index, chosen, byName }: { idea: PlanIdea; index: numb
         )}
         {idea.check && (
           <p className="t-small mt-2 flex gap-2 items-start ink-2">
-            <span aria-hidden className="mt-1.5 w-2.5 h-2.5 rounded-full shrink-0" style={{ background: '#ffd23f', boxShadow: '0 0 0 1.5px var(--art-ink)' }} />
+            <span aria-hidden className="mt-2 shrink-0 rounded-full" style={{ width: 12, height: 4, background: 'var(--yarn)', transform: 'rotate(-20deg)' }} />
             <span>
               <span className="font-bold" style={{ color: 'var(--ink)' }}>
                 Check first:{' '}
@@ -325,7 +335,7 @@ function PickForUs({ count, onPick }: { count: number; onPick: (i: number) => vo
   return (
     <button
       type="button"
-      className="btn btn-sun"
+      className="btn"
       disabled={spinning || count === 0}
       onClick={() => {
         setSpinning(true);

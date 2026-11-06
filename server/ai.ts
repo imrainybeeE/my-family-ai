@@ -164,22 +164,22 @@ async function structured<T extends z.ZodType>(
 const line = (max: number) => z.string().min(1).max(max);
 const people = z.array(z.string()).max(8);
 
-const SparkSchema = z.object({ question: line(170), why: line(130), members: people });
+const SparkSchema = z.object({ question: line(110), why: line(80), members: people });
 
-const BloomSchema = z.object({ headline: line(60), note: line(400), tryThis: line(150) });
+const BloomSchema = z.object({ headline: line(50), note: line(260), tryThis: line(110) });
 
-const RootsSchema = z.object({ reflection: line(190), followUp: line(130).nullable() });
+const RootsSchema = z.object({ reflection: line(130), followUp: line(110).nullable() });
 
 const InsightsSchema = z.object({
-  headline: line(130),
-  together: z.array(z.object({ title: line(50), detail: line(170), members: people })).min(1).max(4),
-  differences: z.array(z.object({ title: line(50), detail: line(170), bridge: line(150), members: people })).max(3),
-  ideas: z.array(z.object({ title: line(50), why: line(170), tip: line(150), members: people })).min(1).max(3),
+  headline: line(90),
+  together: z.array(z.object({ title: line(44), detail: line(110), members: people })).min(1).max(3),
+  differences: z.array(z.object({ title: line(44), detail: line(110), bridge: line(90), members: people })).max(2),
+  ideas: z.array(z.object({ title: line(44), why: line(100), tip: line(90), members: people })).min(1).max(3),
   missing: line(220).nullable(),
 });
 
 const PlanAskSchema = z.object({
-  known: z.array(line(150)).max(4),
+  known: z.array(line(90)).max(3),
   questions: z
     .array(z.object({ id: line(40), question: line(80), options: z.array(line(36)).min(2).max(5), multi: z.boolean() }))
     .max(3),
@@ -190,16 +190,16 @@ const PlanIdeasSchema = z.object({
     .array(
       z.object({
         title: line(48),
-        summary: line(160),
-        why: line(230),
+        summary: line(110),
+        why: line(140),
         members: people,
-        tradeoff: line(150),
+        tradeoff: line(100),
         check: line(150).nullable(),
       })
     )
     .min(3)
     .max(3),
-  note: line(220),
+  note: line(110),
 });
 
 const SuggestSchema = z.object({ suggestions: z.array(line(80)).min(1).max(4) });
@@ -242,7 +242,7 @@ aiRouter.post('/chat', async (req, res) => {
   res.flushHeaders();
   const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 
-  const task = `You're chatting in the app's Ask tab with ${g.brief.asker}. Write for a phone screen: usually 50–140 words, short paragraphs, and "- " bullets when listing. Use **bold** only for the name of an idea. No headings, tables or emojis. Speak to ${g.brief.asker} directly and call family members by the names shown.`;
+  const task = `You're chatting in the app's Ask tab with ${g.brief.asker}. Write for a phone screen: usually 30–80 words, one or two short paragraphs, or up to four "- " bullets when listing. Use **bold** only for the name of an idea. No headings, tables or emojis. Speak to ${g.brief.asker} directly and call family members by the names shown.`;
 
   const stream = g.ai.messages.stream({
     model: MODEL,
@@ -288,7 +288,7 @@ aiRouter.post('/spark', async (req, res) => {
     res,
     g.ai,
     g.brief,
-    `Write one dinner-table conversation question for tonight that fits this family. Ground it in something from their answers: a shared interest, a difference worth exploring, or a tradition someone mentioned. It must be easy for kids and adults to answer, open-ended and warm, and never about worries or sensitive topics. Keep the question under 22 words. "why" is one sentence under 16 words naming whose answers inspired it. "members" lists those people's names.${recent.length ? `\nDon't repeat or closely echo these recent questions:\n- ${recent.join('\n- ')}` : ''}`,
+    `Write one dinner-table conversation question for tonight that fits this family. Ground it in something from their answers: a shared interest, a difference worth exploring, or a tradition someone mentioned. It must be easy for kids and adults to answer, open-ended and warm, and never about worries or sensitive topics. Keep the question under 14 words, in plain words a seven-year-old knows. "why" is under 10 words naming whose answers inspired it. "members" lists those people's names.${recent.length ? `\nDon't repeat or closely echo these recent questions:\n- ${recent.join('\n- ')}` : ''}`,
     'Write tonight\'s question.',
     SparkSchema,
   );
@@ -308,9 +308,9 @@ aiRouter.post('/bloom', async (req, res) => {
     g.ai,
     g.brief,
     `${m.name} just finished the Foundation discovery. Their top style is ${m.topStyle} and their second style is ${m.secondStyle}. Write a short, warm note to them about their result.
-- headline: 3–7 words, playful, about how they bloom. Don't name the styles.
-- note: 2–3 sentences, under 60 words, speaking to them as "you". Mention two or three specific things they picked (paraphrased) and show how both their top and second style appear in those picks.
-- tryThis: one small, concrete thing they could do with someone in the family this week, under 20 words, naming that person if it fits their answers.
+- headline: 3–6 words, playful, about how they bloom. Don't name the styles.
+- note: 2 sentences, under 38 words, speaking to them as "you". Mention two or three specific things they picked (paraphrased) and show how both their top and second style appear in those picks.
+- tryThis: one small, concrete thing they could do with someone in the family this week, under 14 words, naming that person if it fits their answers.
 Never mention percentages, scores, or the other four styles.`,
     `Write the note for ${m.name}.`,
     BloomSchema,
@@ -333,7 +333,7 @@ aiRouter.post('/roots', async (req, res) => {
     g.ai,
     g.brief,
     `${member} is answering the Advanced discovery questions, a deeper and optional layer after the Foundation discovery.
-- reflection: one warm sentence under 25 words showing you heard what they said. Don't judge the answer, don't analyse them, and don't repeat their words back verbatim.
+- reflection: one warm sentence under 16 words showing you heard what they said. Don't judge the answer, don't analyse them, and don't repeat their words back verbatim.
 - followUp: at most one short follow-up question (under 16 words), only when the answer is very short or vague and one more detail would help the family plan together or understand them. Otherwise null. Never follow up on worries, stress, health, or anything they seemed hesitant about.${followUpAnswered ? ' They have already answered a follow-up for this question, so followUp must be null.' : ''}`,
     `Question: "${question}"\n${member}'s answer: "${answer}"`,
     RootsSchema,
@@ -348,10 +348,10 @@ aiRouter.post('/insights', async (req, res) => {
     g.ai,
     g.brief,
     `Write the family profile for the app's Together screen, using only the saved answers.
-- headline: one sentence under 16 words celebrating something true about this family as a whole.
-- together: 2–4 things several people enjoy or value. title under 6 words; detail is one sentence under 22 words naming who and what in their answers. members: the names involved.
-- differences: 1–3 interesting differences, described neutrally. detail is one sentence under 22 words naming who prefers what; bridge is one sentence under 18 words with a practical, positive way to enjoy or use that difference.
-- ideas: exactly 3 things to try together, each grounded in answers. title under 6 words; why is one sentence under 20 words; tip is one practical sentence under 20 words. members: who it suits.
+- headline: one sentence under 11 words celebrating something true about this family as a whole.
+- together: 2–3 things several people enjoy or value. title under 5 words; detail is under 14 words naming who and what. members: the names involved.
+- differences: 1–2 interesting differences, described neutrally. detail is under 14 words naming who prefers what; bridge is under 12 words with a practical, positive way to enjoy that difference.
+- ideas: exactly 3 things to try together, each grounded in answers. title under 5 words; why is under 12 words; tip is one practical sentence under 12 words. members: who it suits.
 Use the family facts for any numbers. Write for a phone screen: short, concrete, warm.
 - missing: if some people haven't answered the Foundation discovery yet, one friendly sentence naming them and saying the profile grows when they do; otherwise null.
 If only one person has answered, stay honest: describe what that person brings and what the family could discover next, and say so in missing.`,
@@ -375,7 +375,7 @@ aiRouter.post('/plan/ask', async (req, res) => {
     g.brief,
     `The family wants help with "${taskTitle}". People joining: ${who.join(', ')}.
 First work out what the saved answers already say that matters for this, for these people (food likes and dislikes, energy, interests, travel style, screen tastes, how they recharge, traditions).
-- known: 2–4 short sentences (under 16 words each) of what you already know, naming who. If the answers say little, say so honestly in one sentence.
+- known: 1–3 short lines (under 12 words each) of what you already know, naming who. If the answers say little, say so honestly in one sentence.
 - questions: only practical information that is still missing and would change the recommendation, such as budget, time available, how far they'll go, number of days, timing, or home versus out. At most 3; fewer is better; none if you already have enough. Never ask about something the answers cover. Each question is under 9 words with 2–5 answer options of 1–4 words. multi is true only when several options can apply together. id is a short slug.`,
     'Work out what you know and what you still need.',
     PlanAskSchema,
@@ -406,14 +406,14 @@ aiRouter.post('/plan/ideas', async (req, res) => {
     g.brief,
     `The family wants help with "${taskTitle}". People joining: ${who.join(', ')}.
 Give exactly 3 options that fit these people, using their saved answers and practical answers. Make the three clearly different (for example at home versus out, or quick versus a bigger effort).
-- title: under 6 words.
-- summary: one sentence under 22 words describing the idea.
-- why: one sentence under 30 words on why it fits, naming people and what in their answers points to it.
+- title: under 5 words.
+- summary: one sentence under 14 words describing the idea.
+- why: one sentence under 18 words on why it fits, naming people and what in their answers points to it.
 - members: the names it especially suits.
-- tradeoff: one short, honest sentence under 18 words on what you give up compared with the other options.
+- tradeoff: one short, honest sentence under 12 words on what you give up compared with the other options.
 - check: for plans that depend on the outside world (a restaurant, venue, trip, booking or film rating), one short sentence on what to check first. For things done at home with what you have, null.
 These are AI ideas: never claim something exists, is open, is available or costs a certain amount. ${watchNote}
-- note: one sentence on how you balanced different preferences, described neutrally.`,
+- note: one sentence under 14 words on how you balanced different preferences, described neutrally.`,
     `Practical answers:\n${practical || '- none given'}`,
     PlanIdeasSchema,
   );

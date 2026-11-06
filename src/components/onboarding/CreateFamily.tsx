@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ChevronLeft, Plus, Shuffle, Trash2 } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
-import { SeedPacket } from './SeedPacket';
+import { CodeCard } from './CodeCard';
 import { useHousehold } from '../../context/HouseholdContext';
 import {
   ALLOWED_ROLES,
@@ -185,15 +185,15 @@ export function CreateFamily({ open, onClose }: { open: boolean; onClose: () => 
                     <Shuffle size={19} strokeWidth={2.4} />
                   </button>
                 </div>
-                <p className="t-small ink-2">Pick three letters you’ll remember. Everyone types this code to join.</p>
+                <p className="t-small ink-2">Three letters you’ll remember. Everyone types this code to join.</p>
               </fieldset>
-              <SeedPacket code={code} name={name.trim() || undefined} styles={[undefined, undefined, undefined]} />
+              <CodeCard code={code} />
             </div>
           )}
 
           {step === 1 && (
             <div className="grid gap-3 pt-2">
-              <p className="t-small ink-2">Add everyone who’ll use the app. Nicknames are enough. Please don’t use full names.</p>
+              <p className="t-small ink-2">Nicknames only, please.</p>
               {people.map((p, i) => (
                 <div key={p.key} className="card p-3 grid grid-cols-[1fr_auto] gap-2 items-center">
                   <select
@@ -241,7 +241,7 @@ export function CreateFamily({ open, onClose }: { open: boolean; onClose: () => 
 
           {step === 2 && (
             <div className="grid gap-3 pt-2" role="radiogroup" aria-label="Which one are you?" onKeyDown={(e) => onRovingKeyDown(e)}>
-              <p className="t-small ink-2">This phone will answer as you. Anyone can switch later in settings.</p>
+              <p className="t-small ink-2">You can switch later in Settings.</p>
               {people.map((p, i) => (
                 <button key={p.key} type="button" role="radio" aria-checked={me === i} tabIndex={rovingTabIndex(i, me)} className="option" onClick={() => setMe(i)}>
                   <Sprout size={36} />
@@ -253,7 +253,7 @@ export function CreateFamily({ open, onClose }: { open: boolean; onClose: () => 
                 </button>
               ))}
               <div className="mt-2">
-                <SeedPacket code={code} name={name.trim() || undefined} styles={people.map(() => undefined)} />
+                <CodeCard code={code} />
               </div>
             </div>
           )}

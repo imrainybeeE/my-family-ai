@@ -51,7 +51,7 @@ for (const theme of ['light', 'dark']) {
   await shot(page, `${theme}-01-welcome`);
 
   await open('garden');
-  await page.getByText('Tonight’s table question').waitFor();
+  await page.getByText('Tonight at the table').waitFor();
   await idle(page);
   await shot(page, `${theme}-02-garden`);
   await scrollTo(760);
@@ -59,7 +59,7 @@ for (const theme of ['light', 'dark']) {
 
   await scrollTo(0);
   await page.getByRole('button', { name: /^Maya \(you\)/ }).click();
-  await page.getByText('Maya’s specimen').waitFor();
+  await page.getByRole('dialog').getByText('with a touch of').waitFor();
   await shot(page, `${theme}-04-profile`);
 
   await open('together');
@@ -106,7 +106,7 @@ for (const theme of ['light', 'dark']) {
         await dialog.getByRole('radio').nth([1, 1, 0, 1, 0, 1, 1, 5, 1, 1, 0, 1, 1, 5, 1, 1, 1, 1][i]).click();
       }
     }
-    await page.getByText('Leo’s specimen').waitFor({ timeout: 15000 });
+    await page.getByRole('dialog').getByText('with a touch of').waitFor({ timeout: 15000 });
     await page.getByText('Try this week').waitFor({ timeout: 60000 }).catch(() => {});
     await shot(page, `${theme}-11-bloom-reveal`);
 
@@ -114,13 +114,13 @@ for (const theme of ['light', 'dark']) {
     await page.getByRole('button', { name: 'Grow deeper roots' }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Start', exact: true }).click();
     await page.getByRole('dialog').locator('textarea').fill('When someone remembers the little things');
-    await page.getByRole('button', { name: 'Save answer' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await page.getByRole('button', { name: /Next question|Save and continue/ }).waitFor({ timeout: 60000 });
     await shot(page, `${theme}-12-roots-reflection`);
   }
 
   await open('ask');
-  await page.getByText('Guided questions').waitFor();
+  await page.getByText('Good questions to start with').waitFor();
   await idle(page, 30000);
   await shot(page, `${theme}-13-ask`);
   await page.getByRole('button', { name: 'What do we have in common?' }).click();

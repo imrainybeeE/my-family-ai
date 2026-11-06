@@ -103,7 +103,7 @@ export function JoinFamily({ open, onClose }: { open: boolean; onClose: () => vo
     >
       {!found ? (
         <div className="grid gap-3 pt-2 pb-2">
-          <p className="t-small ink-2">Ask whoever started your family for the code on their seed packet.</p>
+          <p className="t-small ink-2">Ask the person who started your family for the code.</p>
           <div className="flex items-center gap-2">
             <span className="t-head ink-2" aria-hidden>
               AX
@@ -158,7 +158,7 @@ export function JoinFamily({ open, onClose }: { open: boolean; onClose: () => vo
             </button>
           ))}
           <button type="button" role="radio" aria-checked={adding} tabIndex={adding ? 0 : -1} className="option" onClick={() => setAdding(true)}>
-            <span className="w-9 h-9 grid place-items-center rounded-full t-head" style={{ background: 'var(--leaf-soft)', color: 'var(--leaf-ink)' }}>
+            <span className="w-9 h-9 grid place-items-center rounded-full t-head" style={{ background: 'var(--accent-soft)', color: 'var(--accent-ink)' }}>
               +
             </span>
             <span className="flex-1 font-semibold">I’m not on the list</span>

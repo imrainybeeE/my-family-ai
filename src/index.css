@@ -8,114 +8,99 @@
 }
 
 /* ------------------------------------------------------------------------------------------
-   Tokens. Paper garden by day, night garden by night. Flower colours are the same in both;
-   only the paper, ink and panel tints change.
+   Tokens. A family scrapbook: sky-blue cardstock pages, white paper, coloured card stock,
+   washi tape and yarn. The felt art is rendered, so it reads the same on both pages; only
+   paper, ink and card stock change at night.
    ------------------------------------------------------------------------------------------ */
 :root {
   color-scheme: light;
-  --paper: #f2f4ef;
-  --paper-sunk: #e7ebe3;
+  --page: #e4ecf5;
+  --page-sunk: #d8e2ee;
   --card: #ffffff;
-  --card-raised: #ffffff;
-  --ink: #1d2b22;
-  --ink-2: #4b5a50;
-  --ink-3: #6f7d73;
-  --line: #d8ded4;
-  --line-strong: #c2cbbe;
-  --art-ink: #1d2b22;
+  --card-2: #f3f6fb;
+  --ink: #1e2a44;
+  --ink-2: #55617a;
+  --ink-3: #79849b;
+  --line: #d6deea;
+  --line-strong: #bcc8d9;
 
-  --leaf: #2e6b4a;
-  --leaf-press: #1d4c33;
-  --leaf-soft: #dcebe0;
-  --leaf-ink: #1f5136;
-  --on-leaf: #ffffff;
+  --accent: #24345e;
+  --accent-press: #121c38;
+  --accent-soft: #dfe6f5;
+  --accent-ink: #24345e;
+  --on-accent: #ffffff;
 
-  --hero: #2e6b4a;
-  --hill-1: #3f8a5f;
-  --hill-2: #57a774;
-  --hill-3: #7cc48f;
-  --hero-ink: #ffffff;
-  --hero-ink-2: #d4ecdc;
-  --orb: #ffe27a;
+  --yarn: #e86f8f;
+  --yarn-deep: #b9476a;
 
-  --sun-bg: #ffd23f;
-  --sun-ink: #2f2600;
-  --petal-bg: #ffc9dc;
-  --petal-ink: #4a1027;
-  --sky-bg: #c4e5f6;
-  --sky-ink: #0f3348;
-  --lilac-bg: #dcd1ff;
-  --lilac-ink: #2a1b66;
-  --mint-bg: #cfeedd;
-  --mint-ink: #123d27;
-  --poppy-bg: #ffd9cf;
-  --poppy-ink: #4d1408;
+  --stock-pink: #f8d7e2;
+  --stock-pink-ink: #5a1f36;
+  --stock-butter: #fbe9b7;
+  --stock-butter-ink: #4a3605;
+  --stock-mint: #d5ecdc;
+  --stock-mint-ink: #173d26;
+  --stock-lilac: #e5ddfa;
+  --stock-lilac-ink: #2f2066;
+  --stock-sky: #cfe1f5;
+  --stock-sky-ink: #12324f;
+  --stock-coral: #fbd8cc;
+  --stock-coral-ink: #561e0d;
 
-  --wood: #f1e2c2;
-  --wood-ink: #3b2a12;
   --danger: #b4291f;
   --danger-soft: #fbe3e0;
-  --focus: #2e6b4a;
+  --focus: #24345e;
 
-  --shadow-card: 0 1px 1px rgba(29, 43, 34, 0.05), 0 2px 4px rgba(29, 43, 34, 0.04), 0 18px 32px -22px rgba(29, 43, 34, 0.45);
-  --shadow-float: 0 2px 6px rgba(29, 43, 34, 0.08), 0 22px 44px -18px rgba(29, 43, 34, 0.45);
-  --grain-opacity: 0.4;
+  --shadow-paper: 0 1px 1px rgba(30, 42, 68, 0.06), 0 1px 3px rgba(30, 42, 68, 0.05), 0 14px 26px -18px rgba(30, 42, 68, 0.42);
+  --shadow-lift: 0 2px 4px rgba(30, 42, 68, 0.08), 0 24px 44px -20px rgba(30, 42, 68, 0.5);
+  --grain: 0.55;
 
-  --r-xl: 30px;
-  --r-l: 24px;
-  --r-m: 18px;
-  --r-s: 14px;
+  --r-paper: 12px;
+  --r-ctl: 14px;
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
 }
 
 .dark {
   color-scheme: dark;
-  --paper: #0e1612;
-  --paper-sunk: #0a110d;
-  --card: #17221c;
-  --card-raised: #1d2a23;
-  --ink: #edf3ec;
-  --ink-2: #b7c5bb;
-  --ink-3: #8c9b91;
-  --line: #2a3830;
-  --line-strong: #3a4a40;
+  --page: #131b2c;
+  --page-sunk: #0d1422;
+  --card: #1c263b;
+  --card-2: #232e47;
+  --ink: #eef2fa;
+  --ink-2: #aab5cb;
+  --ink-3: #808ba4;
+  --line: #2b3650;
+  --line-strong: #3d4a68;
 
-  --leaf: #79d6a0;
-  --leaf-press: #3f9a68;
-  --leaf-soft: #1c3a2a;
-  --leaf-ink: #9be6b9;
-  --on-leaf: #0b1a12;
+  --accent: #e6ecf8;
+  --accent-press: #aebbd6;
+  --accent-soft: #2a3653;
+  --accent-ink: #cfdaf2;
+  --on-accent: #151d33;
 
-  --hero: #11281c;
-  --hill-1: #183a28;
-  --hill-2: #1f4c34;
-  --hill-3: #285f42;
-  --hero-ink: #f2f8f2;
-  --hero-ink-2: #a9c9b5;
-  --orb: #f3efd8;
+  --yarn: #f08aa6;
+  --yarn-deep: #c95d7c;
 
-  --sun-bg: #3a3112;
-  --sun-ink: #ffe48f;
-  --petal-bg: #3d2230;
-  --petal-ink: #ffd2e2;
-  --sky-bg: #16303f;
-  --sky-ink: #cdebfb;
-  --lilac-bg: #27223f;
-  --lilac-ink: #e2d9ff;
-  --mint-bg: #16352a;
-  --mint-ink: #c8f0da;
-  --poppy-bg: #3d211b;
-  --poppy-ink: #ffd5ca;
+  --stock-pink: #3b2232;
+  --stock-pink-ink: #ffd3e1;
+  --stock-butter: #383016;
+  --stock-butter-ink: #fbe6a8;
+  --stock-mint: #17352a;
+  --stock-mint-ink: #c6eed6;
+  --stock-lilac: #282345;
+  --stock-lilac-ink: #e2d9ff;
+  --stock-sky: #172c45;
+  --stock-sky-ink: #cfe4fa;
+  --stock-coral: #3d2219;
+  --stock-coral-ink: #ffd6c8;
 
-  --wood: #e9d6ae;
   --danger: #ff8a7d;
   --danger-soft: #3a1a17;
-  --focus: #79d6a0;
+  --focus: #e6ecf8;
 
-  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 18px 32px -22px rgba(0, 0, 0, 0.8);
-  --shadow-float: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 22px 44px -18px rgba(0, 0, 0, 0.85);
-  --grain-opacity: 0.25;
+  --shadow-paper: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 14px 26px -18px rgba(0, 0, 0, 0.8);
+  --shadow-lift: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 24px 44px -20px rgba(0, 0, 0, 0.85);
+  --grain: 0.3;
 }
 
 /* ------------------------------------------------------------------------------------------
@@ -124,11 +109,11 @@
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
-    background: var(--paper-sunk);
+    background: var(--page-sunk);
   }
   body {
     margin: 0;
-    background: var(--paper-sunk);
+    background: var(--page-sunk);
     color: var(--ink);
     font-family: var(--font-sans);
     font-optical-sizing: auto;
@@ -144,23 +129,29 @@
   button:disabled {
     cursor: default;
   }
+  img {
+    -webkit-user-drag: none;
+    user-select: none;
+  }
   :focus-visible {
     outline: 3px solid var(--focus);
     outline-offset: 3px;
     border-radius: 10px;
   }
   ::selection {
-    background: var(--leaf-soft);
+    background: var(--accent-soft);
   }
 }
 
-/* The app column: a phone-width sheet of paper, centred on larger screens. */
+/* Component classes sit in the components layer so Tailwind utilities can still adjust them. */
+@layer components {
+/* The app column: one cardstock page, centred on larger screens. */
 .app-column {
   position: relative;
   max-width: 460px;
   min-height: 100dvh;
   margin: 0 auto;
-  background: var(--paper);
+  background: var(--page);
   isolation: isolate;
 }
 @media (min-width: 520px) {
@@ -168,36 +159,37 @@
     box-shadow: 0 0 0 1px var(--line), 0 30px 80px -40px rgba(0, 0, 0, 0.35);
   }
 }
+/* Cardstock fibre. */
 .app-column::before {
   content: '';
   position: absolute;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  opacity: var(--grain-opacity);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.11 0 0 0 0 0.17 0 0 0 0 0.13 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: var(--grain);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .12 0 0 0 0 .16 0 0 0 0 .27 0 0 0 .08 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 /* ------------------------------------------------------------------------------------------
-   Type scale (major third from 16px)
+   Type
    ------------------------------------------------------------------------------------------ */
 .t-display {
   font-size: 2.125rem;
   line-height: 1.02;
   font-weight: 800;
-  letter-spacing: -0.028em;
+  letter-spacing: -0.03em;
   font-variation-settings: 'opsz' 96;
 }
 .t-title {
-  font-size: 1.625rem;
-  line-height: 1.1;
+  font-size: 1.5rem;
+  line-height: 1.14;
   font-weight: 750;
   letter-spacing: -0.02em;
   font-variation-settings: 'opsz' 72;
 }
 .t-head {
-  font-size: 1.25rem;
-  line-height: 1.2;
+  font-size: 1.1875rem;
+  line-height: 1.22;
   font-weight: 700;
   letter-spacing: -0.012em;
   font-variation-settings: 'opsz' 40;
@@ -209,13 +201,12 @@
 }
 .t-small {
   font-size: 0.9375rem;
-  line-height: 1.45;
+  line-height: 1.42;
 }
 .t-label {
   font-size: 0.875rem;
   line-height: 1.3;
   font-weight: 650;
-  letter-spacing: 0.005em;
 }
 .t-hand {
   font-family: var(--font-hand);
@@ -229,10 +220,10 @@
 }
 
 /* ------------------------------------------------------------------------------------------
-   Buttons: enamel-coated paper that presses down.
+   Buttons. Rounded rectangles with a little thickness, like a mounted card; they press in.
    ------------------------------------------------------------------------------------------ */
 .btn {
-  --depth: 4px;
+  --depth: 3px;
   --btn-bg: var(--card);
   --btn-fg: var(--ink);
   --btn-edge: var(--line-strong);
@@ -244,71 +235,58 @@
   min-height: 52px;
   padding: 0 1.25rem;
   border: 0;
-  border-radius: var(--r-m);
+  border-radius: var(--r-ctl);
   background: var(--btn-bg);
   color: var(--btn-fg);
-  font-weight: 680;
+  font-weight: 650;
   font-size: 1.0625rem;
   letter-spacing: -0.005em;
-  box-shadow: 0 var(--depth) 0 var(--btn-edge), 0 calc(var(--depth) + 8px) 16px -10px rgba(16, 32, 22, 0.5);
+  box-shadow: 0 var(--depth) 0 var(--btn-edge);
   transform: translateY(0);
   transition: transform 120ms cubic-bezier(0.3, 0.7, 0.4, 1), box-shadow 120ms cubic-bezier(0.3, 0.7, 0.4, 1), opacity 160ms;
   user-select: none;
   -webkit-user-select: none;
 }
-.btn::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.35);
-  pointer-events: none;
-}
 .btn:active:not(:disabled) {
   transform: translateY(calc(var(--depth) - 1px));
-  box-shadow: 0 1px 0 var(--btn-edge), 0 4px 8px -6px rgba(16, 32, 22, 0.5);
+  box-shadow: 0 1px 0 var(--btn-edge);
 }
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
 }
 .btn-primary {
-  --btn-bg: var(--leaf);
-  --btn-fg: var(--on-leaf);
-  --btn-edge: var(--leaf-press);
+  --btn-bg: var(--accent);
+  --btn-fg: var(--on-accent);
+  --btn-edge: var(--accent-press);
 }
-.btn-ink {
-  --btn-bg: var(--ink);
-  --btn-fg: var(--paper);
-  --btn-edge: #000;
-}
-.dark .btn-ink {
-  --btn-edge: #9aa79f;
-}
-.btn-sun {
-  --btn-bg: #ffd23f;
-  --btn-fg: #2f2600;
-  --btn-edge: #c99400;
+/* The one stitched control: the main action on a screen. */
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 10px;
+  border: 1.5px dashed color-mix(in srgb, var(--on-accent) 34%, transparent);
+  pointer-events: none;
 }
 .btn-quiet {
   --depth: 0px;
   background: transparent;
   box-shadow: none;
-  color: var(--leaf-ink);
-}
-.btn-quiet::after {
-  display: none;
+  color: var(--accent-ink);
 }
 .btn-quiet:active:not(:disabled) {
   transform: scale(0.97);
   box-shadow: none;
-  background: var(--leaf-soft);
+  background: var(--accent-soft);
 }
 .btn-sm {
-  --depth: 3px;
   min-height: 44px;
   padding: 0 1rem;
   font-size: 0.9375rem;
-  border-radius: var(--r-s);
+}
+.btn-sm.btn-primary::after {
+  inset: 4px;
+  border-radius: 10px;
 }
 .btn-block {
   width: 100%;
@@ -318,7 +296,7 @@
   place-items: center;
   width: 44px;
   height: 44px;
-  border-radius: 14px;
+  border-radius: var(--r-ctl);
   border: 0;
   background: var(--card);
   color: var(--ink);
@@ -331,93 +309,112 @@
 }
 
 /* ------------------------------------------------------------------------------------------
-   Surfaces
+   Paper
    ------------------------------------------------------------------------------------------ */
 .card {
   position: relative;
   background: var(--card);
-  border-radius: var(--r-l);
-  box-shadow: var(--shadow-card);
+  border-radius: var(--r-paper);
+  box-shadow: var(--shadow-paper);
 }
-.panel {
+/* Coloured card stock, used for one feature card at a time. */
+.stock {
   position: relative;
-  overflow: hidden;
-  border-radius: var(--r-xl);
+  border-radius: var(--r-paper);
   padding: 1.25rem;
+  box-shadow: var(--shadow-paper);
 }
-.panel-sun {
-  background: var(--sun-bg);
-  color: var(--sun-ink);
+.stock-pink {
+  background: var(--stock-pink);
+  color: var(--stock-pink-ink);
 }
-.panel-petal {
-  background: var(--petal-bg);
-  color: var(--petal-ink);
+.stock-butter {
+  background: var(--stock-butter);
+  color: var(--stock-butter-ink);
 }
-.panel-sky {
-  background: var(--sky-bg);
-  color: var(--sky-ink);
+.stock-mint {
+  background: var(--stock-mint);
+  color: var(--stock-mint-ink);
 }
-.panel-lilac {
-  background: var(--lilac-bg);
-  color: var(--lilac-ink);
+.stock-lilac {
+  background: var(--stock-lilac);
+  color: var(--stock-lilac-ink);
 }
-.sticker {
-  display: inline-grid;
-  place-items: center;
-  border-radius: 20px;
-  border: 3px solid #ffffff;
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.08), 0 8px 16px -10px rgba(0, 0, 0, 0.5);
+.stock-sky {
+  background: var(--stock-sky);
+  color: var(--stock-sky-ink);
 }
-.dark .sticker {
-  border-color: #f4f7f2;
+.stock-coral {
+  background: var(--stock-coral);
+  color: var(--stock-coral-ink);
 }
-.panel-mint {
-  background: var(--mint-bg);
-  color: var(--mint-ink);
-}
-.panel-poppy {
-  background: var(--poppy-bg);
-  color: var(--poppy-ink);
-}
-.panel-leaf {
-  background: var(--hero);
-  color: var(--hero-ink);
-}
-.panel-card {
-  background: var(--card);
-  color: var(--ink);
-  box-shadow: var(--shadow-card);
+/* A running stitch sewn just inside the edge. */
+.stitched::after {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border-radius: calc(var(--r-paper) - 5px);
+  border: 1.5px dashed color-mix(in srgb, currentColor 28%, transparent);
+  pointer-events: none;
 }
 
-/* Washi tape strip that "holds" a paper card in place. */
+/* Washi tape: a translucent paper strip with torn ends. Colour comes from --tape. */
 .tape {
+  --tape: rgba(232, 111, 143, 0.5);
   position: absolute;
-  width: 74px;
+  z-index: 2;
+  width: 76px;
   height: 22px;
-  background: rgba(255, 210, 63, 0.55);
-  mix-blend-mode: multiply;
-  border-left: 2px dotted rgba(255, 255, 255, 0.45);
-  border-right: 2px dotted rgba(255, 255, 255, 0.45);
+  background: var(--tape);
+  clip-path: polygon(0 10%, 5% 0, 10% 12%, 15% 0, 85% 0, 90% 12%, 95% 0, 100% 10%, 100% 90%, 95% 100%, 90% 88%, 85% 100%, 15% 100%, 10% 88%, 5% 100%, 0 90%);
+  pointer-events: none;
+}
+.tape-sky {
+  --tape: rgba(120, 166, 222, 0.45);
+}
+.tape-butter {
+  --tape: rgba(244, 197, 66, 0.5);
+}
+.tape-mint {
+  --tape: rgba(111, 174, 123, 0.42);
 }
 .dark .tape {
-  mix-blend-mode: normal;
-  background: rgba(255, 210, 63, 0.32);
+  --tape: rgba(244, 160, 186, 0.72);
+}
+.dark .tape-sky {
+  --tape: rgba(150, 190, 236, 0.66);
+}
+.dark .tape-butter {
+  --tape: rgba(246, 210, 110, 0.7);
+}
+.dark .tape-mint {
+  --tape: rgba(140, 200, 152, 0.62);
 }
 
-/* Wooden plant marker with a handwritten name. */
-.marker {
+/* A paper name tag in handwriting. */
+.tag {
   display: inline-block;
-  padding: 2px 9px 1px;
-  background: var(--wood);
-  color: var(--wood-ink);
-  border: 2px solid var(--art-ink);
-  border-radius: 6px;
+  padding: 3px 10px 2px;
+  background: #ffffff;
+  color: #1e2a44;
+  border-radius: 3px;
   font-family: var(--font-hand);
   font-weight: 600;
   font-size: 0.875rem;
   line-height: 1.25;
   white-space: nowrap;
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.22);
+  box-shadow: 0 1px 2px rgba(30, 42, 68, 0.18), 0 4px 8px -4px rgba(30, 42, 68, 0.3);
+}
+.dark .tag {
+  background: #f4f6fb;
+}
+
+/* Rendered felt pieces carry their own soft shadow. */
+.felt {
+  display: block;
+  flex: none;
+  max-width: none;
+  pointer-events: none;
 }
 
 /* ------------------------------------------------------------------------------------------
@@ -426,25 +423,25 @@
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.45rem;
   min-height: 44px;
   padding: 0 0.95rem;
-  border-radius: var(--r-s);
-  border: 2px solid var(--line);
+  border-radius: var(--r-ctl);
+  border: 1.5px solid var(--line);
   background: var(--card);
   color: var(--ink);
   font-weight: 600;
   font-size: 0.9375rem;
-  transition: transform 120ms, background-color 160ms, border-color 160ms;
+  transition: transform 120ms, background-color 160ms, border-color 160ms, color 160ms;
 }
 .chip:active {
   transform: scale(0.97);
 }
 .chip[aria-pressed='true'],
 .chip[aria-checked='true'] {
-  border-color: var(--leaf);
-  background: var(--leaf-soft);
-  color: var(--leaf-ink);
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .option {
@@ -455,10 +452,10 @@
   min-height: 60px;
   padding: 0.8rem 1rem;
   text-align: left;
-  border-radius: var(--r-m);
-  border: 2px solid transparent;
+  border-radius: var(--r-ctl);
+  border: 1.5px solid transparent;
   background: var(--card);
-  box-shadow: 0 2px 0 var(--line);
+  box-shadow: var(--shadow-paper);
   font-size: 1rem;
   line-height: 1.35;
   font-weight: 500;
@@ -468,33 +465,34 @@
   transform: scale(0.985);
 }
 .option[aria-checked='true'] {
-  border-color: var(--leaf);
-  background: var(--leaf-soft);
-  box-shadow: 0 2px 0 var(--leaf-press);
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
+/* The check is a sewing button: four holes, then a cross of thread when picked. */
 .option .seed {
   flex: none;
+  position: relative;
   display: grid;
   place-items: center;
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  border: 2px solid var(--line-strong);
-  background: var(--paper);
-  color: var(--on-leaf);
+  border: 1.5px solid var(--line-strong);
+  background: var(--card-2);
+  color: var(--on-accent);
   transition: background-color 160ms, border-color 160ms;
 }
 .option[aria-checked='true'] .seed {
-  background: var(--leaf);
-  border-color: var(--leaf);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .field {
   width: 100%;
   min-height: 54px;
   padding: 0.85rem 1rem;
-  border-radius: var(--r-s);
-  border: 2px solid var(--line);
+  border-radius: var(--r-ctl);
+  border: 1.5px solid var(--line);
   background: var(--card);
   color: var(--ink);
   font-size: 1.0625rem;
@@ -506,8 +504,8 @@
 }
 .field:focus {
   outline: none;
-  border-color: var(--leaf);
-  box-shadow: 0 0 0 4px var(--leaf-soft);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
 }
 textarea.field {
   resize: none;
@@ -519,14 +517,13 @@ textarea.field {
   grid-auto-columns: 1fr;
   gap: 4px;
   padding: 4px;
-  border-radius: var(--r-m);
-  background: var(--paper-sunk);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08);
+  border-radius: var(--r-ctl);
+  background: var(--page-sunk);
 }
 .segmented button {
   min-height: 44px;
   border: 0;
-  border-radius: 13px;
+  border-radius: 11px;
   background: transparent;
   font-weight: 650;
   font-size: 0.9375rem;
@@ -535,27 +532,27 @@ textarea.field {
 .segmented button[aria-checked='true'] {
   background: var(--card);
   color: var(--ink);
-  box-shadow: 0 1px 0 var(--line-strong), 0 6px 12px -8px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 1px 0 var(--line-strong), 0 6px 12px -8px rgba(0, 0, 0, 0.35);
 }
 
 /* ------------------------------------------------------------------------------------------
-   Tab bar
+   Tab bar: a floating strip of paper.
    ------------------------------------------------------------------------------------------ */
 .tabbar {
   position: fixed;
   z-index: 30;
   left: 50%;
   bottom: calc(12px + var(--safe-b));
-  width: min(428px, calc(100% - 24px));
+  width: min(420px, calc(100% - 32px));
   transform: translateX(-50%);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   padding: 6px;
-  border-radius: 26px;
-  background: color-mix(in srgb, var(--card) 88%, transparent);
-  backdrop-filter: blur(18px) saturate(1.4);
-  -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  box-shadow: 0 0 0 1px var(--line), var(--shadow-float);
+  border-radius: 28px;
+  background: color-mix(in srgb, var(--card) 86%, transparent);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  box-shadow: 0 0 0 0.5px var(--line-strong), var(--shadow-lift);
 }
 .tabbar button {
   position: relative;
@@ -563,29 +560,27 @@ textarea.field {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  min-height: 56px;
+  gap: 3px;
+  min-height: 54px;
   border: 0;
   background: transparent;
   color: var(--ink-3);
-  font-size: 0.75rem;
+  font-size: 0.71875rem;
   font-weight: 650;
-  letter-spacing: 0.01em;
 }
 .tabbar button[aria-selected='true'] {
-  color: var(--ink);
+  color: var(--accent-ink);
 }
 .tabbar .tab-well {
   position: absolute;
   inset: 0;
-  border-radius: 20px;
-  background: var(--paper-sunk);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-radius: 22px;
+  background: var(--accent-soft);
   z-index: -1;
 }
 
 .page {
-  padding: calc(14px + var(--safe-t)) 16px calc(120px + var(--safe-b));
+  padding: calc(18px + var(--safe-t)) 20px calc(120px + var(--safe-b));
 }
 
 /* ------------------------------------------------------------------------------------------
@@ -595,7 +590,7 @@ textarea.field {
   position: fixed;
   inset: 0;
   z-index: 40;
-  background: rgba(9, 18, 13, 0.42);
+  background: rgba(13, 20, 34, 0.42);
 }
 .sheet {
   position: fixed;
@@ -606,8 +601,8 @@ textarea.field {
   max-height: calc(100dvh - 24px - var(--safe-t));
   display: flex;
   flex-direction: column;
-  background: var(--paper);
-  border-radius: 30px 30px 0 0;
+  background: var(--page);
+  border-radius: 28px 28px 0 0;
   box-shadow: 0 -20px 60px -20px rgba(0, 0, 0, 0.45);
   overflow: hidden;
 }
@@ -621,7 +616,7 @@ textarea.field {
   .sheet-full {
     top: 16px;
     height: calc(100dvh - 16px);
-    border-radius: 30px 30px 0 0;
+    border-radius: 28px 28px 0 0;
   }
 }
 .sheet-grab {
@@ -650,18 +645,19 @@ textarea.field {
 .prose-ai li {
   position: relative;
   padding-left: 1.1em;
-  margin-top: 0.3em;
+  margin-top: 0.35em;
 }
+/* Bullets are little stitches. */
 .prose-ai li::before {
   content: '';
   position: absolute;
-  left: 0.15em;
-  top: 0.62em;
-  width: 7px;
-  height: 7px;
-  border-radius: 50% 50% 50% 0;
-  background: var(--leaf);
-  transform: rotate(-45deg);
+  left: 0.1em;
+  top: 0.68em;
+  width: 9px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--yarn);
+  transform: rotate(-20deg);
 }
 .prose-ai strong {
   font-weight: 700;
@@ -675,13 +671,15 @@ textarea.field {
 }
 
 .skeleton {
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, currentColor 10%, transparent), transparent) 0 0 / 200% 100%, color-mix(in srgb, currentColor 8%, transparent);
+  background: color-mix(in srgb, currentColor 9%, transparent);
   border-radius: 8px;
-  animation: shimmer 1.4s infinite linear;
+  animation: breathe 1.4s infinite ease-in-out;
 }
-@keyframes shimmer {
-  to {
-    background-position: -200% 0;
+}
+
+@keyframes breathe {
+  50% {
+    opacity: 0.45;
   }
 }
 

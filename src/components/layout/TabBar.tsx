@@ -42,23 +42,19 @@ export function PageHeader({
 }) {
   const { activeMember, myAnswers, isDemo } = useHousehold();
   return (
-    <header className="flex items-start justify-between gap-3 px-1 pb-4">
+    <header className="flex items-start justify-between gap-3 pb-3">
       <div className="min-w-0">
-        {isDemo && (
-          <p className="t-label mb-1" style={{ color: 'var(--leaf-ink)' }}>
-            Demo family. Changes aren’t saved.
-          </p>
-        )}
+        {isDemo && <p className="t-hand ink-3 mb-1" style={{ fontSize: '0.875rem' }}>Demo family, nothing is saved</p>}
         <h1 className="t-display">{title}</h1>
         {subtitle && <p className="t-small ink-2 mt-1.5">{subtitle}</p>}
       </div>
       <button
         type="button"
         onClick={onProfile}
-        className="shrink-0 mt-1 rounded-full border-0 bg-transparent p-0 transition-transform active:scale-95"
+        className="shrink-0 rounded-full border-0 bg-transparent p-0 transition-transform active:scale-95"
         aria-label={`Settings and profile for ${activeMember?.nickname || activeMember?.role || 'you'}`}
       >
-        <FlowerBadge style={myAnswers.discoveryProfile?.primaryStyle} size={48} />
+        <FlowerBadge style={myAnswers.discoveryProfile?.primaryStyle} size={44} />
       </button>
     </header>
   );

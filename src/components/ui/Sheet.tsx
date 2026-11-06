@@ -132,7 +132,7 @@ export function Sheet({ open, onClose, title, hideTitle, full, children, footer,
             </div>
             <div className="sheet-body flex-1">{children}</div>
             {footer && (
-              <div className="px-5 pt-3 pb-[calc(16px+var(--safe-b))] border-t" style={{ borderColor: 'var(--line)', background: 'var(--paper)' }}>
+              <div className="px-5 pt-3 pb-[calc(16px+var(--safe-b))] border-t" style={{ borderColor: 'var(--line)', background: 'var(--page)' }}>
                 {footer}
               </div>
             )}

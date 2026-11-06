@@ -4,7 +4,7 @@ import { ChevronLeft } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
 import { Thinking } from '../ui/bits';
 import { onRovingKeyDown, rovingTabIndex } from '../ui/roving';
-import { Flower } from '../art/Flower';
+import { Felt } from '../art/Flower';
 import { useHousehold } from '../../context/HouseholdContext';
 import { ADVANCED_QUESTIONS } from '../../data/advancedQuestions';
 import { ai } from '../../services/ai';
@@ -103,7 +103,7 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
       open={open}
       onClose={onClose}
       full
-      title={stage === 'done' ? 'Deeper roots' : 'Advanced discovery'}
+      title="Deeper roots"
       leading={
         stage === 'ask' ? (
           <button type="button" className="icon-btn" aria-label="Previous question" onClick={() => (index === 0 ? setStage('intro') : setIndex((i) => i - 1))}>
@@ -114,26 +114,17 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
     >
       <AnimatePresence mode="wait" initial={false}>
         {stage === 'intro' && (
-          <motion.div key="intro" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid gap-5 pt-2">
-            <div className="panel panel-lilac">
-              <div className="absolute -right-2 -bottom-3" aria-hidden>
-                <RootsArt size={120} />
-              </div>
-              <div className="pr-24">
-                <h3 className="t-title">Grow deeper roots</h3>
-                <p className="t-small mt-2">Twelve bigger questions about feeling appreciated, support, decisions and your perfect family day.</p>
-              </div>
+          <motion.div key="intro" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid gap-8 pt-2">
+            <div className="flex flex-col items-center text-center pt-4">
+              <Felt name="yarnball" size={200} />
+              <h3 className="t-display -mt-2">{ADVANCED_QUESTIONS.length} bigger questions</h3>
+              <p className="t-body ink-2 mt-2 max-w-[19rem]">Type your own answer or tap a pick. Skip anything you like.</p>
+              {answeredCount > 0 && (
+                <p className="t-label mt-3" style={{ color: 'var(--accent-ink)' }}>
+                  {answeredCount} of {ADVANCED_QUESTIONS.length} answered
+                </p>
+              )}
             </div>
-            <ul className="prose-ai t-body ink-2 px-1">
-              <li>Answer in your own words, or tap a quick pick.</li>
-              <li>Skip anything you’d rather not answer. There’s no score.</li>
-              <li>Sometimes the AI helper asks one short follow-up when a detail would help your family plan.</li>
-              <li>Your family can see these answers, and the AI helper uses them for ideas.</li>
-            </ul>
-            <p className="t-label px-1" style={{ color: 'var(--leaf-ink)' }}>
-              {myAnswers.advancedCompletedAt ? 'Advanced complete. ' : ''}
-              {answeredCount} of {ADVANCED_QUESTIONS.length} answered
-            </p>
             <button type="button" className="btn btn-primary btn-block" onClick={() => setStage('ask')}>
               {answeredCount ? 'Keep going' : 'Start'}
             </button>
@@ -142,15 +133,17 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
 
         {stage === 'ask' && (
           <motion.div key={`q${q.id}`} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.22 }} className="grid gap-4 pt-1">
-            <div>
-              <p className="t-label" style={{ color: 'var(--leaf-ink)' }}>
-                {q.theme}
-              </p>
-              <p className="t-small ink-3 mt-0.5">
-                Question {index + 1} of {ADVANCED_QUESTIONS.length}
-              </p>
-              <h3 className="t-title mt-3">{q.question}</h3>
-            </div>
+            <section className="stock stock-lilac">
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="t-hand" style={{ fontSize: '0.9375rem' }}>
+                  {q.theme}
+                </p>
+                <p className="t-small opacity-70 tabular-nums">
+                  {index + 1} of {ADVANCED_QUESTIONS.length}
+                </p>
+              </div>
+              <h3 className="t-title mt-1.5">{q.question}</h3>
+            </section>
             {quickPicks.length > 0 && (
               <div
                 className="flex flex-wrap gap-2"
@@ -177,8 +170,8 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
               </div>
             )}
             <label className="grid gap-2">
-              <span className="t-label ink-2">{q.options ? 'Or say it your way' : 'Your answer'}</span>
-              <textarea className="field" rows={4} maxLength={600} value={text} onChange={(e) => setText(e.target.value)} placeholder="Type as much or as little as you like" />
+              <span className="t-label ink-2">{q.options ? 'Or in your words' : 'Your answer'}</span>
+              <textarea className="field" rows={4} maxLength={600} value={text} onChange={(e) => setText(e.target.value)} placeholder="As much or as little as you like" />
             </label>
             {error && (
               <p role="alert" className="t-small" style={{ color: 'var(--danger)' }}>
@@ -190,7 +183,7 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
                 Skip
               </button>
               <button type="button" className="btn btn-primary" disabled={!text.trim()} onClick={submit}>
-                Save answer
+                Save
               </button>
             </div>
           </motion.div>
@@ -203,10 +196,10 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
               <p className="t-body font-semibold mt-1">{text.trim()}</p>
             </div>
             <div className="flex gap-2.5 items-start">
-              <span className="shrink-0 w-9 h-9 rounded-full grid place-items-center" style={{ background: 'var(--lilac-bg)' }} aria-hidden>
-                <Flower style="Thinker" size={28} />
+              <span className="shrink-0 w-9 h-9 grid place-items-center -mt-0.5" aria-hidden>
+                <Felt name="yarnball" size={52} />
               </span>
-              <div className="card px-4 py-3.5 flex-1" style={{ borderRadius: '6px 22px 22px 22px' }} aria-live="polite">
+              <div className="card px-4 py-3.5 flex-1" style={{ borderRadius: '6px 20px 20px 20px' }} aria-live="polite">
                 {reflecting ? (
                   <Thinking label="Listening" />
                 ) : (
@@ -238,36 +231,15 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
 
         {stage === 'done' && (
           <motion.div key="done" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid gap-5 pt-6 text-center justify-items-center">
-            <RootsArt size={180} />
-            <h3 className="t-title">Advanced complete</h3>
-            <p className="t-body ink-2 max-w-[22rem]">
-              Your roots are in. The AI helper can now use these answers for ideas and plans. You can change any answer later from your profile.
-            </p>
-            <button type="button" className="btn btn-primary btn-block" onClick={onClose}>
-              Back to the garden
+            <Felt name="yarnball" size={200} />
+            <h3 className="t-display -mt-2">All done</h3>
+            <p className="t-body ink-2 max-w-[19rem]">Plans and ideas will use these now. Change any answer from your profile.</p>
+            <button type="button" className="btn btn-primary btn-block mt-4" onClick={onClose}>
+              Done
             </button>
           </motion.div>
         )}
       </AnimatePresence>
     </Sheet>
-  );
-}
-
-function RootsArt({ size = 120 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 120 120" aria-hidden style={{ overflow: 'visible' }}>
-      <rect x="0" y="70" width="120" height="50" rx="10" fill="#6d4c3d" opacity=".85" />
-      <g stroke="#f1e2c2" strokeWidth="2.4" fill="none" strokeLinecap="round">
-        <path d="M60 72 C 58 84, 50 92, 40 104 M60 72 C 62 86, 72 94, 84 108 M60 72 C 60 88, 58 100, 60 116 M48 92 C 40 92, 32 96, 24 94 M74 94 C 84 92, 92 96, 100 92" />
-      </g>
-      <g transform="translate(22 -8) scale(.76)">
-        <path d="M50 100 C 52 90, 48 80, 50 62" stroke="#2f7a4f" strokeWidth="4" fill="none" strokeLinecap="round" />
-        <path d="M50 84 C 62 74, 74 78, 80 70 C 70 88, 60 90, 50 88 Z" fill="#7cc48f" stroke="var(--art-ink)" strokeWidth="2" strokeLinejoin="round" />
-        {[0, 51, 103, 154, 206, 257, 309].map((r) => (
-          <ellipse key={r} cx="50" cy="28" rx="7" ry="15" fill="#bba8f5" stroke="var(--art-ink)" strokeWidth="2" transform={`rotate(${r} 50 44)`} />
-        ))}
-        <circle cx="50" cy="44" r="9" fill="#ffd23f" stroke="var(--art-ink)" strokeWidth="2.2" />
-      </g>
-    </svg>
   );
 }

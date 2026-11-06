@@ -7,7 +7,7 @@ import { useAiResource } from '../../hooks/useFamily';
 import { ai, aiErrorMessage, ChatTurn, streamChat } from '../../services/ai';
 import { PageHeader } from '../layout/TabBar';
 import { AiText, Thinking } from '../ui/bits';
-import { Flower } from '../art/Flower';
+import { Felt } from '../art/Flower';
 
 /** The six guided questions from the project brief, always available. */
 const GUIDED = [
@@ -111,21 +111,16 @@ export function AskView() {
 
   return (
     <div className="page" style={{ paddingBottom: 'calc(200px + var(--safe-b))' }}>
-      <PageHeader title="Ask" subtitle="A helper that only knows what your family answered in this app." onProfile={ui.openSettings} />
+      <PageHeader title="Ask" onProfile={ui.openSettings} />
 
       {empty ? (
         <>
-          <section className="panel panel-lilac">
-            <div className="absolute -right-4 -bottom-6" aria-hidden>
-              <Flower style="Thinker" size={110} stem={20} />
-            </div>
-            <div className="pr-24">
-              <h2 className="t-title">Ask anything about your family</h2>
-              <p className="t-small mt-2">It answers from everyone’s saved answers. When the answers don’t say, it tells you, and suggests a question to ask each other.</p>
-            </div>
+          <section className="flex items-center gap-2 -ml-3 -mt-1">
+            <Felt name="yarnball" size={112} />
+            <p className="t-body ink-2 flex-1 -ml-2">It only knows what your family saved here, and says so when it can’t tell.</p>
           </section>
 
-          <h2 className="t-label ink-2 mt-6 mb-2 px-1">Suggested for {brief.asker}</h2>
+          <h2 className="t-head mt-4 mb-3">For {brief.asker}</h2>
           <div className="grid gap-2">
             {starters.loading && !suggestions.length && (
               <div className="card p-4">
@@ -137,7 +132,7 @@ export function AskView() {
             ))}
           </div>
 
-          <h2 className="t-label ink-2 mt-6 mb-2 px-1">Guided questions</h2>
+          <h2 className="t-head mt-8 mb-3">Good questions to start with</h2>
           <div className="flex flex-wrap gap-2">
             {GUIDED.map((g) => (
               <button key={g} type="button" className="chip text-left" style={{ minHeight: 44, paddingTop: 8, paddingBottom: 8 }} onClick={() => send(g)}>
@@ -166,13 +161,13 @@ export function AskView() {
             {messages.map((m) => (
               <motion.div key={m.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={m.role === 'user' ? 'flex justify-end' : 'flex gap-2.5 items-start'}>
                 {m.role === 'user' ? (
-                  <p className="t-body px-4 py-3 max-w-[82%]" style={{ background: 'var(--leaf)', color: 'var(--on-leaf)', borderRadius: '22px 22px 6px 22px', boxShadow: '0 3px 0 var(--leaf-press)' }}>
+                  <p className="t-body px-4 py-3 max-w-[82%]" style={{ background: 'var(--accent)', color: 'var(--on-accent)', borderRadius: '20px 20px 6px 20px' }}>
                     {m.content}
                   </p>
                 ) : (
                   <>
                     <HelperAvatar />
-                    <div className="card px-4 py-3.5 flex-1 min-w-0" style={{ borderRadius: '6px 22px 22px 22px' }}>
+                    <div className="card px-4 py-3.5 flex-1 min-w-0" style={{ borderRadius: '6px 20px 20px 20px' }}>
                       {m.content ? (
                         <AiText text={m.content} className="t-body" />
                       ) : (
@@ -201,8 +196,8 @@ export function AskView() {
       <div ref={endRef} />
 
       <form
-        className="fixed z-20 left-1/2 -translate-x-1/2 w-[min(428px,calc(100%-24px))] flex items-end gap-2 p-2 rounded-[24px]"
-        style={{ bottom: 'calc(96px + var(--safe-b))', background: 'color-mix(in srgb, var(--card) 92%, transparent)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', boxShadow: '0 0 0 1px var(--line), var(--shadow-float)' }}
+        className="fixed z-20 left-1/2 -translate-x-1/2 w-[min(420px,calc(100%-32px))] flex items-end gap-2 p-1.5 pl-2 rounded-[28px]"
+        style={{ bottom: 'calc(96px + var(--safe-b))', background: 'color-mix(in srgb, var(--card) 90%, transparent)', backdropFilter: 'blur(20px) saturate(1.5)', WebkitBackdropFilter: 'blur(20px) saturate(1.5)', boxShadow: '0 0 0 0.5px var(--line-strong), var(--shadow-lift)' }}
         onSubmit={(e) => {
           e.preventDefault();
           send(input);
@@ -230,7 +225,7 @@ export function AskView() {
             }
           }}
         />
-        <button type="submit" className="btn btn-primary shrink-0" style={{ minHeight: 48, width: 48, padding: 0, borderRadius: 16 }} disabled={busy || !input.trim()} aria-label="Send">
+        <button type="submit" className="shrink-0 grid place-items-center border-0 rounded-full transition-opacity" style={{ height: 44, width: 44, background: 'var(--accent)', color: 'var(--on-accent)', opacity: busy || !input.trim() ? 0.35 : 1 }} disabled={busy || !input.trim()} aria-label="Send">
           <ArrowUp size={22} strokeWidth={2.8} />
         </button>
       </form>
@@ -244,9 +239,9 @@ function SuggestionButton({ text, onClick, small }: { text: string; onClick: () 
       type="button"
       onClick={onClick}
       className="card text-left border-0 flex items-center gap-3 transition-transform active:scale-[0.98]"
-      style={{ padding: small ? '10px 14px' : '14px 16px', borderRadius: 18 }}
+      style={{ padding: small ? '10px 14px' : '14px 16px' }}
     >
-      <span aria-hidden className="shrink-0 w-2.5 h-2.5 rounded-full" style={{ background: 'var(--leaf)' }} />
+      <span aria-hidden className="shrink-0 rounded-full" style={{ width: 12, height: 4, background: 'var(--yarn)', transform: 'rotate(-20deg)' }} />
       <span className={small ? 't-small font-semibold' : 'font-semibold'}>{text}</span>
     </button>
   );
@@ -254,8 +249,8 @@ function SuggestionButton({ text, onClick, small }: { text: string; onClick: () 
 
 function HelperAvatar() {
   return (
-    <span className="shrink-0 w-9 h-9 rounded-full grid place-items-center mt-0.5" style={{ background: 'var(--lilac-bg)' }} aria-hidden>
-      <Flower style="Thinker" size={28} />
+    <span className="shrink-0 w-9 h-9 grid place-items-center -mt-0.5" aria-hidden>
+      <Felt name="yarnball" size={52} />
     </span>
   );
 }

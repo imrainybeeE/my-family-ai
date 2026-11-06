@@ -7,10 +7,12 @@ import { FamilyPerson, useAiResource, useFamily } from '../../hooks/useFamily';
 import { ai, aiErrorMessage, Insights } from '../../services/ai';
 import { generateFamilyProfileReport } from '../../utils/familyProfileAnalysis';
 import { PageHeader } from '../layout/TabBar';
-import { Flower, FlowerBadge, Sprout } from '../art/Flower';
+import { Felt, FELT_FOR_STYLE, FlowerBadge } from '../art/Flower';
+import { Strand, useWidth } from '../art/Garland';
 import { SectionTitle, Thinking } from '../ui/bits';
-import { FLOWERS, STYLE_ORDER } from '../../data/flowers';
-import { advancedProgress } from '../../utils/member';
+
+/** One yarn colour per shared thing, used for its strand in the circle and its row below. */
+const YARNS = ['#e86f8f', '#e0a526', '#5e93d1'];
 
 export function TogetherView() {
   const { brief, members, responses, myAnswers } = useHousehold();
@@ -23,10 +25,10 @@ export function TogetherView() {
     if (!insights.error) return null;
     const r = generateFamilyProfileReport(members, responses);
     return {
-      headline: 'Here’s what your answers have in common so far.',
-      together: r.thingsWeEnjoyTogether.map((t) => ({ title: t.title, detail: t.detail, members: t.membersInvolved })),
-      differences: r.interestingDifferences.map((d) => ({ title: d.title, detail: d.detail, bridge: d.positiveBridge, members: d.membersInvolved })),
-      ideas: r.ideasWorthTrying.map((i) => ({ title: i.title, why: i.whyItFits, tip: i.funTip, members: [] })),
+      headline: 'What your answers share so far.',
+      together: r.thingsWeEnjoyTogether.slice(0, 3).map((t) => ({ title: t.title, detail: t.detail, members: t.membersInvolved })),
+      differences: r.interestingDifferences.slice(0, 2).map((d) => ({ title: d.title, detail: d.detail, bridge: d.positiveBridge, members: d.membersInvolved })),
+      ideas: r.ideasWorthTrying.slice(0, 3).map((i) => ({ title: i.title, why: i.whyItFits, tip: i.funTip, members: [] })),
       missing: null,
     };
   }, [insights.error, members, responses]);
@@ -35,44 +37,40 @@ export function TogetherView() {
 
   return (
     <div className="page">
-      <PageHeader title="Together" subtitle="What your family shares, from everyone’s answers." onProfile={ui.openSettings} />
+      <PageHeader title="Together" onProfile={ui.openSettings} />
 
       {!enabled ? (
-        <section className="panel panel-sun">
-          <div className="absolute -right-2 -bottom-3" aria-hidden>
-            <Sprout size={110} />
+        <section className="card flex items-center gap-3 py-4 pl-2 pr-4">
+          <Felt name="bud" size={84} />
+          <div className="flex-1">
+            <h2 className="t-head">Nothing to share yet</h2>
+            <p className="t-small ink-2 mt-0.5">This fills in once someone finds their flower.</p>
           </div>
-          <div className="pr-24">
-            <h2 className="t-title">Your garden needs its first flower</h2>
-            <p className="t-small mt-2">Once someone finishes the Foundation questions, this page fills with what you share and ideas to try together.</p>
-            {!myAnswers.discoveryProfile && (
-              <button type="button" className="btn btn-ink mt-4" onClick={ui.openFoundation}>
-                Find your flower
-              </button>
-            )}
-          </div>
+          {!myAnswers.discoveryProfile && (
+            <button type="button" className="btn btn-primary btn-sm" onClick={ui.openFoundation}>
+              Start
+            </button>
+          )}
         </section>
       ) : (
         <>
-          <Bouquet people={bloomed} />
+          <FamilyCircle people={people} links={(data?.together || []).map((t) => who(t.members).map((p) => p.id))} onOpen={ui.openMember} />
 
           {!data ? (
-            <div className="mt-6 grid gap-3 px-1" aria-busy>
+            <div className="mt-4 grid gap-3" aria-busy>
               <Thinking label="Reading everyone’s answers" />
               <div className="skeleton h-7 w-full" />
               <div className="skeleton h-7 w-3/4" />
             </div>
           ) : (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <p className="t-title mt-7 px-1" style={{ fontSize: '1.625rem' }}>
-                {data.headline}
-              </p>
-              {Boolean(insights.error) && <p className="t-small ink-2 mt-2 px-1">{aiErrorMessage(insights.error)} Showing a simpler summary for now.</p>}
+              <p className="t-title mt-2">{data.headline}</p>
+              {Boolean(insights.error) && <p className="t-small ink-2 mt-2">{aiErrorMessage(insights.error)}</p>}
 
               <SectionTitle>You all enjoy</SectionTitle>
               <ul className="card px-4" aria-label="Things you enjoy together">
                 {data.together.map((t, i) => (
-                  <Row key={i} first={i === 0} people={who(t.members)} title={t.title} body={t.detail} />
+                  <Row key={i} first={i === 0} yarn={YARNS[i % YARNS.length]} people={who(t.members)} title={t.title} body={t.detail} />
                 ))}
               </ul>
 
@@ -82,9 +80,8 @@ export function TogetherView() {
                   <ul className="card px-4" aria-label="Where you differ">
                     {data.differences.map((d, i) => (
                       <Row key={i} first={i === 0} people={who(d.members)} title={d.title} body={d.detail}>
-                        <p className="t-hand mt-2 flex gap-2 items-start" style={{ color: 'var(--leaf-ink)', fontSize: '0.9375rem', lineHeight: 1.35 }}>
-                          <LeafMark />
-                          <span>{d.bridge}</span>
+                        <p className="t-hand mt-2" style={{ color: 'var(--accent-ink)', fontSize: '0.9375rem', lineHeight: 1.35 }}>
+                          {d.bridge}
                         </p>
                       </Row>
                     ))}
@@ -93,45 +90,100 @@ export function TogetherView() {
               )}
 
               <SectionTitle>Ideas to try</SectionTitle>
-              <div className="-mx-4 px-4 flex gap-3 overflow-x-auto no-scrollbar pb-3" style={{ scrollSnapType: 'x mandatory', scrollPaddingInline: 16 }} aria-label="Ideas to try, scroll for more">
+              <div className="-mx-5 px-5 flex gap-3 overflow-x-auto no-scrollbar pt-3 pb-3" style={{ scrollSnapType: 'x mandatory', scrollPaddingInline: 20 }} aria-label="Ideas to try, scroll for more">
                 {data.ideas.map((idea, i) => (
-                  <Ticket key={i} index={i} title={idea.title} why={idea.why} tip={idea.tip} people={who(idea.members)} onPlan={() => ui.askAbout(`Help us plan this: ${idea.title}`)} />
+                  <Ticket key={i} index={i} title={idea.title} why={idea.why} people={who(idea.members)} onPlan={() => ui.askAbout(`Help us plan this: ${idea.title}`)} />
                 ))}
               </div>
 
-              {data.missing && <p className="t-small ink-2 mt-3 px-1">{data.missing}</p>}
-              <div className="flex items-center justify-between gap-3 mt-4 px-1">
-                <p className="t-small ink-3">Written by AI from your answers. Talk it over; it can get things wrong.</p>
-                <button type="button" className="icon-btn shrink-0" onClick={insights.refresh} disabled={insights.loading} aria-label="Write it again">
-                  <RefreshCw size={18} strokeWidth={2.4} />
+              {data.missing && <p className="t-small ink-2 mt-2">{data.missing}</p>}
+              <div className="flex items-center justify-between gap-3 mt-3">
+                <p className="t-small ink-3">Written by AI from your answers.</p>
+                <button type="button" className="btn btn-quiet btn-sm shrink-0" onClick={insights.refresh} disabled={insights.loading}>
+                  <RefreshCw size={16} strokeWidth={2.2} /> Rewrite
                 </button>
               </div>
             </motion.div>
           )}
         </>
       )}
-
-      <SectionTitle>Everyone</SectionTitle>
-      <div className="grid grid-cols-2 gap-x-3 gap-y-4">
-        {people.map((p, i) => (
-          <Polaroid key={p.id} person={p} tilt={i % 2 ? 1.6 : -1.4} advanced={advancedProgress(responses[p.id]).complete} onOpen={() => ui.openMember(p.id)} />
-        ))}
-      </div>
     </div>
   );
 }
 
-/** One flat observation: who, what, and an optional margin note. */
-function Row({ first, people, title, body, children }: { first: boolean; people: FamilyPerson[]; title: string; body: string; children?: React.ReactNode }) {
+/**
+ * Everyone's flower in a ring, with a strand of yarn between people who share something.
+ * Each shared thing has its own yarn colour, matched by its row below.
+ */
+function FamilyCircle({ people, links, onOpen }: { people: FamilyPerson[]; links: string[][]; onOpen: (id: string) => void }) {
+  const [ref, w] = useWidth<HTMLDivElement>();
+  const n = Math.max(people.length, 1);
+  const size = n > 6 ? 78 : n > 4 ? 90 : 104;
+  const H = n > 2 ? 300 : 190;
+  const cx = w / 2;
+  const cy = H / 2 - 4;
+  const rx = Math.max(w / 2 - size / 2 - 8, 60);
+  const ry = n > 2 ? H / 2 - size / 2 - 10 : 0;
+  const pos = new Map(
+    people.map((p, i) => {
+      const a = -Math.PI / 2 + (2 * Math.PI * i) / n + (n === 2 ? Math.PI / 2 : 0);
+      return [p.id, { x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) }] as const;
+    })
+  );
+  const strands: { d: string; color: string; key: string }[] = [];
+  links.forEach((ids, li) => {
+    const pts = ids.map((id) => pos.get(id)).filter(Boolean) as { x: number; y: number }[];
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const a = pts[i];
+      const b = pts[i + 1];
+      // Bow each strand towards the middle, a little differently per shared thing.
+      const pull = 0.35 + li * 0.12;
+      const mx = (a.x + b.x) / 2 + (cx - (a.x + b.x) / 2) * pull;
+      const my = (a.y + b.y) / 2 + (cy - (a.y + b.y) / 2) * pull + 10;
+      strands.push({ d: `M ${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}`, color: YARNS[li % YARNS.length], key: `${li}-${i}` });
+    }
+  });
   return (
-    <li className="py-4 flex gap-3" style={{ borderTop: first ? 0 : '1.5px dashed var(--line-strong)' }}>
+    <div ref={ref} className="relative -mx-5 mt-1" style={{ height: H }}>
+      <svg className="absolute inset-0 overflow-visible" width={w} height={H} aria-hidden>
+        {strands.map((s, i) => (
+          <Strand key={s.key} d={s.d} color={s.color} delay={0.2 + i * 0.12} width={3} />
+        ))}
+      </svg>
+      <ul aria-label="Everyone">
+        {people.map((p, i) => {
+          const at = pos.get(p.id)!;
+          const s = p.style ? size : Math.round(size * 0.85);
+          return (
+            <li key={p.id} className="absolute" style={{ left: at.x - s / 2, top: at.y - s / 2, width: s }}>
+              <button type="button" className="flex flex-col items-center bg-transparent border-0 p-0 w-full transition-transform active:scale-95" onClick={() => onOpen(p.id)} aria-label={`${p.name}${p.isYou ? ' (you)' : ''}`}>
+                <motion.span initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1, rotate: [-6, 5, -3, 7, -5, 4][i % 6] }} transition={{ type: 'spring', stiffness: 220, damping: 17, delay: 0.05 * i }}>
+                  <Felt name={p.style ? FELT_FOR_STYLE[p.style] : 'bud'} size={s} />
+                </motion.span>
+                <span className="tag -mt-4 relative" style={{ transform: `rotate(${i % 2 ? 3 : -3}deg)` }}>
+                  {p.name}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/** One observation: who, what, and an optional handwritten note. */
+function Row({ first, people, title, body, yarn, children }: { first: boolean; people: FamilyPerson[]; title: string; body: string; yarn?: string; children?: React.ReactNode }) {
+  return (
+    <li className="py-4 flex gap-3" style={{ borderTop: first ? 0 : '1px solid var(--line)' }}>
       <span className="flex flex-col -space-y-2 shrink-0 pt-0.5" aria-label={people.map((p) => p.name).join(', ')}>
         {people.slice(0, 3).map((p) => (
           <FlowerBadge key={p.id} style={p.style} size={30} />
         ))}
       </span>
-      <div className="min-w-0">
-        <h3 className="font-bold" style={{ fontSize: '1.0625rem', lineHeight: 1.3 }}>
+      <div className="min-w-0 flex-1">
+        <h3 className="font-bold flex items-center gap-2" style={{ fontSize: '1.0625rem', lineHeight: 1.3 }}>
+          {yarn && <span aria-hidden className="shrink-0 rounded-full" style={{ width: 14, height: 4, background: yarn }} />}
           {title}
         </h3>
         <p className="t-small ink-2 mt-1">{body}</p>
@@ -141,91 +193,26 @@ function Row({ first, people, title, body, children }: { first: boolean; people:
   );
 }
 
-function LeafMark() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 20 20" className="shrink-0 mt-0.5" aria-hidden>
-      <path d="M3 17 C 3 8, 9 3, 17 3 C 17 11, 12 17, 3 17 Z" fill="#7cc48f" stroke="var(--art-ink)" strokeWidth="1.8" />
-    </svg>
-  );
-}
+const TICKETS = ['stock-butter', 'stock-pink', 'stock-sky'];
+const TAPES = ['tape-sky', '', 'tape-butter'];
 
-const TICKETS = ['var(--sun-bg)', 'var(--petal-bg)', 'var(--sky-bg)'];
-const TICKET_INK = ['var(--sun-ink)', 'var(--petal-ink)', 'var(--sky-ink)'];
-
-/** An idea as a die-cut ticket: the title is the thing, details stay short. */
-function Ticket({ index, title, why, tip, people, onPlan }: { index: number; title: string; why: string; tip: string; people: FamilyPerson[]; onPlan: () => void }) {
-  const notch = { width: 22, height: 22, borderRadius: '50%', background: 'var(--paper)', position: 'absolute' as const, top: 112 };
+/** An idea as a ticket taped to the page: the title is the thing, the reason stays short. */
+function Ticket({ index, title, why, people, onPlan }: { index: number; title: string; why: string; people: FamilyPerson[]; onPlan: () => void }) {
   return (
-    <article
-      className="relative shrink-0 flex flex-col"
-      style={{ width: '78%', scrollSnapAlign: 'start', background: TICKETS[index % 3], color: TICKET_INK[index % 3], borderRadius: 22, padding: '18px 18px 16px', minHeight: 300 }}
-    >
-      <span style={{ ...notch, left: -11 }} aria-hidden />
-      <span style={{ ...notch, right: -11 }} aria-hidden />
-      <div className="flex items-center justify-between gap-2">
+    <article className={`stock ${TICKETS[index % 3]} relative shrink-0 flex flex-col`} style={{ width: '74%', scrollSnapAlign: 'start', minHeight: 220, transform: `rotate(${index % 2 ? 1 : -1}deg)` }}>
+      <span className={`tape ${TAPES[index % 3]}`} style={{ top: -10, left: 18, transform: 'rotate(-4deg)' }} aria-hidden />
+      <h3 className="t-title mt-1">{title}</h3>
+      <p className="t-small mt-2 opacity-85">{why}</p>
+      <div className="flex items-center justify-between gap-2 mt-auto pt-4">
         <span className="flex -space-x-2" aria-label={people.length ? `Suits ${people.map((p) => p.name).join(', ')}` : undefined}>
           {people.slice(0, 4).map((p) => (
-            <FlowerBadge key={p.id} style={p.style} size={32} />
+            <FlowerBadge key={p.id} style={p.style} size={30} />
           ))}
         </span>
-        <span className="t-label opacity-70">Idea</span>
+        <button type="button" className="btn btn-sm" onClick={onPlan}>
+          Plan it
+        </button>
       </div>
-      <h3 className="t-title mt-3" style={{ fontSize: '1.375rem', minHeight: '3.1rem' }}>
-        {title}
-      </h3>
-      <div className="mt-4 pt-4" style={{ borderTop: '2px dashed color-mix(in srgb, currentColor 30%, transparent)' }}>
-        <p className="t-small">{why}</p>
-        <p className="t-small mt-2 opacity-80">{tip}</p>
-      </div>
-      <button type="button" className="btn btn-sm mt-auto self-start" style={{ marginTop: 16 }} onClick={onPlan}>
-        Plan it with the helper
-      </button>
     </article>
-  );
-}
-
-/** Which flowers grow in this family. Counts people, never scores. */
-function Bouquet({ people }: { people: FamilyPerson[] }) {
-  const groups = STYLE_ORDER.map((s) => ({ style: s, names: people.filter((p) => p.style === s).map((p) => p.name) })).filter((g) => g.names.length);
-  const cols = Math.min(groups.length, 4);
-  return (
-    <section className="panel panel-card" aria-label="Your family bouquet">
-      <h2 className="t-label ink-2">Your family bouquet</h2>
-      <ul className="grid gap-x-2 gap-y-4 mt-3" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
-        {groups.map((g) => (
-          <li key={g.style} className="flex flex-col items-center text-center min-w-0">
-            <Flower style={g.style} size={56} />
-            <span className="t-label mt-1">{FLOWERS[g.style].flower}</span>
-            <span className="t-small ink-2" style={{ fontSize: '0.8125rem', lineHeight: 1.3 }}>
-              {g.names.join(', ')}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function Polaroid({ person, tilt, advanced, onOpen }: { person: FamilyPerson; tilt: number; advanced: boolean; onOpen: () => void }) {
-  const bg = person.style ? `color-mix(in srgb, ${FLOWERS[person.style].color} 35%, var(--card))` : 'var(--leaf-soft)';
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="relative border-0 p-2.5 pb-3 text-left transition-transform active:scale-95"
-      style={{ background: 'var(--card)', transform: `rotate(${tilt}deg)`, boxShadow: 'var(--shadow-card)', borderRadius: 6 }}
-    >
-      <span className="tape" style={{ top: -10, left: '50%', marginLeft: -37, transform: `rotate(${-tilt * 2}deg)` }} aria-hidden />
-      <span className="grid place-items-center aspect-square rounded-[3px]" style={{ background: bg }}>
-        {person.style ? <Flower style={person.style} size={92} /> : <Sprout size={76} />}
-      </span>
-      <span className="block t-hand mt-2" style={{ fontSize: '1.125rem' }}>
-        {person.name}
-        {person.isYou && <span className="ink-3"> (you)</span>}
-      </span>
-      <span className="block t-small ink-2" style={{ fontSize: '0.8125rem' }}>
-        {person.style ? `${FLOWERS[person.style].flower}${advanced ? ', deep roots' : ''}` : 'Not bloomed yet'}
-      </span>
-    </button>
   );
 }

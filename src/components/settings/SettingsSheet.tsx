@@ -122,7 +122,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
             <p className="t-title tabular-nums tracking-[0.05em]">{household?.code}</p>
             <CopyButton value={household?.code || ''} />
           </div>
-          <p className="t-small ink-2 mt-1">Anyone with this code can join and see the family’s answers, so share it only with family.</p>
+          <p className="t-small ink-2 mt-1">Share it only with family: anyone with the code sees your answers.</p>
         </section>
 
         <section className="card p-4">
