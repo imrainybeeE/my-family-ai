@@ -115,7 +115,7 @@ for (const theme of ['light', 'dark']) {
     await page.getByRole('dialog').getByRole('button', { name: 'Start', exact: true }).click();
     await page.getByRole('dialog').locator('textarea').fill('When someone remembers the little things');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await page.getByRole('button', { name: /Next question|Save and continue/ }).waitFor({ timeout: 60000 });
+    await page.getByRole('dialog').getByRole('button', { name: /^(Next question|Save and continue|Skip|Finish)$/ }).waitFor({ timeout: 60000 });
     await shot(page, `${theme}-12-roots-reflection`);
   }
 

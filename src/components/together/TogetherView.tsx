@@ -126,34 +126,27 @@ function FamilyCircle({ people, links, onOpen }: { people: FamilyPerson[]; links
   const cy = H / 2 - 4;
   const rx = Math.max(w / 2 - size / 2 - 8, 60);
   const ry = n > 2 ? H / 2 - size / 2 - 10 : 0;
-  const pos = new Map(
-    people.map((p, i) => {
-      const a = -Math.PI / 2 + (2 * Math.PI * i) / n + (n === 2 ? Math.PI / 2 : 0);
-      return [p.id, { x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) }] as const;
-    })
-  );
+  const angleOf = (i: number) => -Math.PI / 2 + (2 * Math.PI * i) / n + (n === 2 ? Math.PI / 2 : 0);
+  const pos = new Map(people.map((p, i) => [p.id, { x: cx + rx * Math.cos(angleOf(i)), y: cy + ry * Math.sin(angleOf(i)) }] as const));
   const order = new Map(people.map((p, i) => [p.id, i]));
-  // Where a strand meets each flower: the middle of the bloom, which sits high on the lavender sprig.
-  const anchor = (id: string) => {
-    const at = pos.get(id)!;
-    const person = people[order.get(id)!];
-    return person.style === 'Chiller' ? { x: at.x, y: at.y - size * 0.2 } : at;
-  };
+  // Every strand follows the ring the short way round, in its own lane, so strands never cut across the middle or each other.
   const strands: { d: string; color: string; key: string }[] = [];
+  const lanes = links.length;
   links.forEach((ids, li) => {
-    // Chain people in their order around the ring, so strands follow the circle instead of crossing.
-    const pts = ids
-      .filter((id) => pos.has(id))
-      .sort((a, b) => order.get(a)! - order.get(b)!)
-      .map(anchor);
-    for (let i = 0; i + 1 < pts.length; i++) {
-      const a = pts[i];
-      const b = pts[i + 1];
-      // Bow each strand towards the middle, a little differently per shared thing.
-      const pull = 0.35 + li * 0.12;
-      const mx = (a.x + b.x) / 2 + (cx - (a.x + b.x) / 2) * pull;
-      const my = (a.y + b.y) / 2 + (cy - (a.y + b.y) / 2) * pull + 10;
-      strands.push({ d: `M ${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}`, color: YARNS[li % YARNS.length], key: `${li}-${i}` });
+    const chain = ids.filter((id) => order.has(id)).sort((a, b) => order.get(a)! - order.get(b)!);
+    const off = (li - (lanes - 1) / 2) * 7;
+    const lrx = rx + off;
+    const lry = Math.max(ry, 24) + off;
+    for (let k = 0; k + 1 < chain.length; k++) {
+      const from = angleOf(order.get(chain[k])!);
+      let delta = angleOf(order.get(chain[k + 1])!) - from;
+      if (delta > Math.PI) delta -= 2 * Math.PI;
+      const steps = Math.max(8, Math.round((Math.abs(delta) / Math.PI) * 40));
+      const pts = Array.from({ length: steps + 1 }, (_, j) => {
+        const t = from + (delta * j) / steps;
+        return `${(cx + lrx * Math.cos(t)).toFixed(1)} ${(cy + lry * Math.sin(t)).toFixed(1)}`;
+      });
+      strands.push({ d: `M ${pts.join(' L ')}`, color: YARNS[li % YARNS.length], key: `${li}-${k}` });
     }
   });
   return (

@@ -130,7 +130,7 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
           </div>
         ) : stage === 'reflect' && !reflecting ? (
           <button type="button" className="btn btn-primary btn-block" onClick={reflection?.followUp && followText.trim() ? submitFollowUp : next}>
-            {reflection?.followUp && followText.trim() ? 'Save and continue' : index === ADVANCED_QUESTIONS.length - 1 ? 'Finish' : 'Next question'}
+            {reflection?.followUp ? (followText.trim() ? 'Save and continue' : 'Skip') : index === ADVANCED_QUESTIONS.length - 1 ? 'Finish' : 'Next question'}
           </button>
         ) : undefined
       }
@@ -201,7 +201,7 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
         )}
 
         {stage === 'reflect' && (
-          <motion.div key={`r${q.id}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="grid gap-4 content-center min-h-[calc(100dvh-220px-var(--safe-t)-var(--safe-b))]">
+          <motion.div key={`r${q.id}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="grid gap-4 pt-6">
             <section className="stock stock-lilac">
               <h3 className="t-head">{q.question}</h3>
               <p className="t-body mt-1.5 opacity-80">{text.trim()}</p>

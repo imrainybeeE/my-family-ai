@@ -119,7 +119,7 @@ export function Sheet({ open, onClose, title, hideTitle, full, children, footer,
               </div>
             )}
             <div
-              className={`flex items-center gap-2 px-5 ${full ? 'pt-[calc(12px+var(--safe-t))]' : 'pt-1'} pb-2 ${hideTitle ? 'justify-end' : ''}`}
+              className={`flex items-center gap-2 px-5 ${full ? 'pt-[calc(12px+var(--safe-t))]' : 'pt-0'} ${hideTitle && !leading ? 'pb-0 -mb-3 justify-end relative z-10' : 'pb-2'}`}
               onPointerDown={full ? undefined : (e) => drag.start(e)}
             >
               {leading}

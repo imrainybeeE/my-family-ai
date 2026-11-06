@@ -115,9 +115,9 @@ export function AskView() {
 
       {empty ? (
         <>
-          <section className="flex items-center gap-2 -ml-2">
-            <Felt name="yarnball" size={88} />
-            <p className="t-body ink-2 flex-1 -ml-2">Answers come only from what your family saved.</p>
+          <section className="flex items-center gap-3">
+            <Felt name="yarnball" size={64} className="-m-1" />
+            <p className="t-body ink-2 flex-1">Answers come only from what your family saved.</p>
           </section>
 
           <h2 className="t-head mt-4 mb-3">For {brief.asker}</h2>
@@ -194,7 +194,7 @@ export function AskView() {
       <div ref={endRef} />
 
       {/* A strip of page behind the composer and tab bar, so nothing shows between them. */}
-      <div aria-hidden className="fixed z-[19] inset-x-0 bottom-0 mx-auto max-w-[460px]" style={{ height: 'calc(var(--tabbar-top) + var(--composer-h) / 2 + var(--safe-b))', background: 'var(--page)' }} />
+      <div aria-hidden className="fixed z-[19] inset-x-0 bottom-0 mx-auto max-w-[460px]" style={{ height: 'calc(var(--tabbar-top) + var(--composer-h) + 16px + var(--safe-b))', background: 'var(--page)' }} />
       <form
         className="fixed z-20 left-1/2 -translate-x-1/2 w-[min(420px,calc(100%-32px))] flex items-end gap-2 p-1.5 pl-2 rounded-[28px]"
         style={{ bottom: 'calc(var(--tabbar-top) + var(--safe-b))', minHeight: 'var(--composer-h)', background: 'color-mix(in srgb, var(--card) 96%, transparent)', backdropFilter: 'blur(28px) saturate(1.5)', WebkitBackdropFilter: 'blur(28px) saturate(1.5)', boxShadow: '0 0 0 0.5px var(--line-strong), var(--shadow-lift)' }}

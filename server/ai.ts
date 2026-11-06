@@ -87,7 +87,8 @@ function guard(req: Request, res: Response): Guarded | null {
 }
 
 function sendError(res: Response, err: unknown) {
-  if (err instanceof ApiError && retryable(err)) return res.status(429).json({ error: 'rate_limited' });
+  if (err instanceof ApiError && err.status === 429) return res.status(429).json({ error: 'rate_limited' });
+  if (err instanceof ApiError && err.status >= 500) return res.status(503).json({ error: 'ai_error' });
   if (err instanceof ApiError) {
     console.warn('Gemini API error', err.status, err.message.slice(0, 200));
     return res.status(502).json({ error: 'ai_error' });
@@ -350,7 +351,7 @@ aiRouter.post('/chat', async (req, res) => {
         continue;
       }
       console.warn('Chat failed', err instanceof ApiError ? err.status : (err as Error)?.message?.slice(0, 200));
-      if (!res.writableEnded) send({ error: err instanceof ApiError && retryable(err) ? 'rate_limited' : 'ai_error' });
+      if (!res.writableEnded) send({ error: err instanceof ApiError && err.status === 429 ? 'rate_limited' : 'ai_error' });
       break;
     }
   }

@@ -15,18 +15,21 @@ const TABS: { id: TabType; label: string; Icon: typeof GardenIcon }[] = [
 
 export function TabBar({ tab, onChange }: { tab: TabType; onChange: (t: TabType) => void }) {
   return (
-    <nav className="tabbar" role="tablist" aria-label="Sections" onKeyDown={(e) => onRovingKeyDown(e, 'tab')}>
-      {TABS.map(({ id, label, Icon }) => {
-        const on = tab === id;
-        return (
-          <button key={id} type="button" role="tab" aria-selected={on} aria-controls="main" tabIndex={on ? 0 : -1} onClick={() => onChange(id)}>
-            {on && <motion.span layoutId="tab-well" className="tab-well" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
-            <Icon active={on} />
-            {label}
-          </button>
-        );
-      })}
-    </nav>
+    <>
+      <div aria-hidden className="tabbar-floor" />
+      <nav className="tabbar" role="tablist" aria-label="Sections" onKeyDown={(e) => onRovingKeyDown(e, 'tab')}>
+        {TABS.map(({ id, label, Icon }) => {
+          const on = tab === id;
+          return (
+            <button key={id} type="button" role="tab" aria-selected={on} aria-controls="main" tabIndex={on ? 0 : -1} onClick={() => onChange(id)}>
+              {on && <motion.span layoutId="tab-well" className="tab-well" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
+              <Icon active={on} />
+              {label}
+            </button>
+          );
+        })}
+      </nav>
+    </>
   );
 }
 
@@ -45,7 +48,7 @@ export function PageHeader({
 }) {
   const { activeMember, myAnswers, isDemo } = useHousehold();
   return (
-    <header className="flex items-start justify-between gap-3 pb-3">
+    <header className={`flex items-start justify-between gap-3 ${demoNote ? 'pb-5' : 'pb-3'}`}>
       <div className="min-w-0">
         <h1 className="t-display">{title}</h1>
         {subtitle && <p className="t-small ink-2 mt-1.5">{subtitle}</p>}

@@ -55,7 +55,7 @@ await check('chat stays with the person who had it', async (page) => {
   await page.getByRole('button', { name: 'What do we have in common?' }).click();
   await page.getByText('Mock answer for Maya.').waitFor();
   await switchTo(page, 'Mum');
-  await page.getByText('Ask anything about your family').waitFor();
+  await page.getByText('Good questions to start with').waitFor();
   assert.equal(await page.getByText('Mock answer for Maya.').count(), 0, 'Mum sees Maya’s chat');
   await switchTo(page, 'Maya');
   await page.getByText('Mock answer for Maya.').waitFor();
