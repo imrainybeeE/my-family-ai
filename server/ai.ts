@@ -40,7 +40,8 @@ How you work:
 6. Treat answers as shared family discovery, not secrets. Never present one person's answers as hidden information, and never take sides.
 7. Stay positive, practical and kind, suitable for children and grandparents alike.
 8. Don't state real-world facts you can't check (opening hours, prices, availability, weather, travel rules). Present places and plans as ideas to check.
-9. If something suggests a person might be unsafe or very upset, respond gently and encourage them to talk with a trusted adult.`;
+9. If something suggests a person might be unsafe or very upset, respond gently and encourage them to talk with a trusted adult.
+10. Write for a small phone screen: plain words, short sentences, every title in sentence case (never Title Case), no filler.`;
 
 function system(brief: FamilyBrief, task: string): Anthropic.TextBlockParam[] {
   return [
@@ -166,16 +167,16 @@ const people = z.array(z.string()).max(8);
 
 const SparkSchema = z.object({ question: line(110), why: line(80), members: people });
 
-const BloomSchema = z.object({ headline: line(50), note: line(260), tryThis: line(110) });
+const BloomSchema = z.object({ headline: line(50), note: line(200), tryThis: line(100) });
 
 const RootsSchema = z.object({ reflection: line(130), followUp: line(110).nullable() });
 
 const InsightsSchema = z.object({
-  headline: line(90),
+  headline: line(60),
   together: z.array(z.object({ title: line(44), detail: line(110), members: people })).min(1).max(3),
   differences: z.array(z.object({ title: line(44), detail: line(110), bridge: line(90), members: people })).max(2),
   ideas: z.array(z.object({ title: line(44), why: line(100), tip: line(90), members: people })).min(1).max(3),
-  missing: line(220).nullable(),
+  missing: line(70).nullable(),
 });
 
 const PlanAskSchema = z.object({
@@ -199,7 +200,6 @@ const PlanIdeasSchema = z.object({
     )
     .min(3)
     .max(3),
-  note: line(110),
 });
 
 const SuggestSchema = z.object({ suggestions: z.array(line(80)).min(1).max(4) });
@@ -309,7 +309,7 @@ aiRouter.post('/bloom', async (req, res) => {
     g.brief,
     `${m.name} just finished the Foundation discovery. Their top style is ${m.topStyle} and their second style is ${m.secondStyle}. Write a short, warm note to them about their result.
 - headline: 3–6 words, playful, about how they bloom. Don't name the styles.
-- note: 2 sentences, under 38 words, speaking to them as "you". Mention two or three specific things they picked (paraphrased) and show how both their top and second style appear in those picks.
+- note: 2 sentences, under 30 words, speaking to them as "you". Mention two or three specific things they picked (paraphrased) and show how both their top and second style appear in those picks.
 - tryThis: one small, concrete thing they could do with someone in the family this week, under 14 words, naming that person if it fits their answers.
 Never mention percentages, scores, or the other four styles.`,
     `Write the note for ${m.name}.`,
@@ -348,12 +348,12 @@ aiRouter.post('/insights', async (req, res) => {
     g.ai,
     g.brief,
     `Write the family profile for the app's Together screen, using only the saved answers.
-- headline: one sentence under 11 words celebrating something true about this family as a whole.
+- headline: one sentence under 8 words celebrating something true about this family as a whole.
 - together: 2–3 things several people enjoy or value. title under 5 words; detail is under 14 words naming who and what. members: the names involved.
 - differences: 1–2 interesting differences, described neutrally. detail is under 14 words naming who prefers what; bridge is under 12 words with a practical, positive way to enjoy that difference.
 - ideas: exactly 3 things to try together, each grounded in answers. title under 5 words; why is under 12 words; tip is one practical sentence under 12 words. members: who it suits.
 Use the family facts for any numbers. Write for a phone screen: short, concrete, warm.
-- missing: if some people haven't answered the Foundation discovery yet, one friendly sentence naming them and saying the profile grows when they do; otherwise null.
+- missing: if some people haven't answered the Foundation discovery yet, under 8 words naming them (for example "Leo hasn't answered yet"); otherwise null.
 If only one person has answered, stay honest: describe what that person brings and what the family could discover next, and say so in missing.`,
     'Write the family profile.',
     InsightsSchema,
@@ -412,8 +412,7 @@ Give exactly 3 options that fit these people, using their saved answers and prac
 - members: the names it especially suits.
 - tradeoff: one short, honest sentence under 12 words on what you give up compared with the other options.
 - check: for plans that depend on the outside world (a restaurant, venue, trip, booking or film rating), one short sentence on what to check first. For things done at home with what you have, null.
-These are AI ideas: never claim something exists, is open, is available or costs a certain amount. ${watchNote}
-- note: one sentence under 14 words on how you balanced different preferences, described neutrally.`,
+These are AI ideas: never claim something exists, is open, is available or costs a certain amount. ${watchNote}`,
     `Practical answers:\n${practical || '- none given'}`,
     PlanIdeasSchema,
   );

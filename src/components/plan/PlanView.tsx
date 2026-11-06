@@ -130,13 +130,13 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
 
   return (
     <div className="page">
-      <header className="flex items-center gap-2 pb-3">
+      <header className="flex items-center gap-2 pb-5">
         <button type="button" className="icon-btn shrink-0" onClick={reset} aria-label="Back to all plans">
           <ChevronLeft size={22} strokeWidth={2.4} />
         </button>
         <h1 className="t-title flex-1">{title}</h1>
-        <span className="-my-4 -mr-2 shrink-0">
-          <Art size={84} />
+        <span className="-my-2 -mr-1 shrink-0">
+          <Art size={60} />
         </span>
       </header>
 
@@ -179,7 +179,7 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
 
           {stage === 'questions' && ask && (
             <div className="grid gap-4">
-              {error && <p className="t-small px-1" style={{ color: 'var(--danger)' }}>{error}</p>}
+              {error && <p className="t-small" style={{ color: 'var(--danger)' }}>{error}</p>}
               {ask.known.length > 0 && (
                 <section className="stock stock-sky">
                   <h2 className="t-hand" style={{ fontSize: '0.9375rem' }}>We already know</h2>
@@ -197,7 +197,8 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
                   </h2>
                   {q.multi && <p className="t-small ink-3">Pick any</p>}
                   <div
-                    className="flex flex-wrap gap-2 mt-3"
+                    className={q.options.length <= 3 ? 'grid gap-2 mt-3' : 'flex flex-wrap gap-2 mt-3'}
+                    style={q.options.length <= 3 ? { gridTemplateColumns: `repeat(${evenColumns(q.options)}, minmax(0, 1fr))` } : undefined}
                     role={q.multi ? 'group' : 'radiogroup'}
                     aria-label={q.question}
                     onKeyDown={q.multi ? undefined : (e) => onRovingKeyDown(e)}
@@ -208,7 +209,7 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
                         <button
                           key={o}
                           type="button"
-                          className="chip"
+                          className={q.options.length <= 3 ? 'chip justify-center text-center' : 'chip'}
                           role={q.multi ? undefined : 'radio'}
                           aria-checked={q.multi ? undefined : on}
                           tabIndex={q.multi ? undefined : rovingTabIndex(oi, q.options.indexOf(picks[q.id]?.[0] ?? ''))}
@@ -228,7 +229,7 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
                   </div>
                 </section>
               ))}
-              <label className="grid gap-2 px-1">
+              <label className="grid gap-2">
                 <span className="t-label">Anything else?</span>
                 <input className="field" value={extra} onChange={(e) => setExtra(e.target.value)} placeholder={task === 'eat' ? 'Nai Nai’s birthday, something soft…' : 'It might rain, we have a toddler…'} />
               </label>
@@ -240,11 +241,11 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
 
           {stage === 'ideas' && result && (
             <div className="grid gap-3">
-              {error && <p className="t-small px-1" style={{ color: 'var(--danger)' }}>{error} Here are some simpler ideas.</p>}
+              {error && <p className="t-small" style={{ color: 'var(--danger)' }}>{error} Here are some simpler ideas.</p>}
               {result.ideas.map((idea, i) => (
                 <IdeaCard key={i} idea={idea} index={i} chosen={chosen} byName={byName} />
               ))}
-              <p className="t-small ink-3 px-1">{result.note} Ideas by AI: check times and prices before you go.</p>
+              <p className="t-small ink-3">Ideas by AI. Check times and prices first.</p>
               <div className="grid grid-cols-2 gap-2 mt-1">
                 <PickForUs count={result.ideas.length} onPick={setChosen} />
                 <button type="button" className="btn" onClick={() => setStage('questions')}>
@@ -263,6 +264,11 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
 }
 
 const IDEA_STOCK = ['stock-butter', 'stock-pink', 'stock-sky'];
+
+/** Up to three short options sit side by side at equal widths; longer ones stack. */
+function evenColumns(options: string[]) {
+  return options.every((o) => o.length <= 10) ? options.length : 1;
+}
 
 /** One idea: the title and one line up front; the reasoning one tap away. */
 function IdeaCard({ idea, index, chosen, byName }: { idea: PlanIdea; index: number; chosen: number | null; byName: ReturnType<typeof useFamily>['byName'] }) {
@@ -362,18 +368,15 @@ function offlineIdeas(task: PlanTask, members: Parameters<typeof calculateCommon
   if (task === 'eat') {
     return {
       ideas: cg.suggestedDinners.slice(0, 3).map((d) => ({ title: d.title, summary: d.cuisine, why: d.why, members: [], tradeoff: 'Picked from saved tastes, without the AI helper.', check: null })),
-      note: 'Matched to the food everyone picked.',
     };
   }
   if (task === 'watch') {
     return {
       ideas: cg.suggestedMovies.slice(0, 3).map((m) => ({ title: m.title, summary: `${m.genre}, ${m.vibe.toLowerCase()}`, why: m.why, members: [], tradeoff: 'Picked from saved tastes, without the AI helper.', check: 'Check the age rating and where to watch it.' })),
-      note: 'Matched to the film genres everyone picked.',
     };
   }
   const r = generateFamilyProfileReport(members, responses as never);
   return {
     ideas: r.ideasWorthTrying.slice(0, 3).map((i) => ({ title: i.title, summary: i.category, why: i.whyItFits, members: [], tradeoff: i.funTip, check: task === 'travel' ? 'Check travel times, costs and bookings.' : null })),
-    note: 'Based on the mix of styles in your family.',
   };
 }

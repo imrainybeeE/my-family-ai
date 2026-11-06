@@ -6,7 +6,7 @@ import { SeedMark, Thinking } from '../ui/bits';
 import { onRovingKeyDown, rovingTabIndex } from '../ui/roving';
 import { SpecimenCard } from '../profile/SpecimenCard';
 import { Felt, FeltName, Flower } from '../art/Flower';
-import { useWidth } from '../art/Garland';
+import { YarnProgress } from '../art/YarnProgress';
 import { useHousehold } from '../../context/HouseholdContext';
 import { useUI } from '../../App';
 import { FOUNDATION_QUESTIONS, FOUNDATION_SECTIONS } from '../../data/foundationQuestions';
@@ -93,7 +93,6 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
   const value = answers[String(q.id)];
   const selected = Array.isArray(value) ? value : value ? [value] : [];
   const answered = selected.length > 0;
-  const sectionIndex = FOUNDATION_SECTIONS.indexOf(q.section as (typeof FOUNDATION_SECTIONS)[number]);
   const name = activeMember ? memberName(activeMember) : 'You';
 
   const finish = async (final: Answers) => {
@@ -185,7 +184,7 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
             >
               <ChevronLeft size={22} strokeWidth={2.4} />
             </button>
-            <Vine progress={(index + (answered ? 1 : 0)) / FOUNDATION_QUESTIONS.length} section={sectionIndex} />
+            <YarnProgress progress={(index + (answered ? 1 : 0)) / FOUNDATION_QUESTIONS.length} beads={FOUNDATION_SECTIONS.length} />
           </div>
         ) : undefined
       }
@@ -269,8 +268,7 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
         {stage === 'reveal' && profile && (
           <motion.div key="reveal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid gap-5 pt-2">
             <SpecimenCard name={name} top={profile.primaryStyle} second={profile.secondaryStyle} bloom />
-            <section className="card p-5" aria-live="polite">
-              <p className="t-hand ink-2">A note for you</p>
+            <section className="card p-5" aria-live="polite" aria-label="A note for you">
               {noteState === 'loading' && (
                 <div className="mt-2">
                   <Thinking label="Reading your picks" />
@@ -278,7 +276,7 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
               )}
               {note && (
                 <>
-                  <h3 className="t-head mt-1">{note.headline}</h3>
+                  <h3 className="t-head">{note.headline}</h3>
                   <p className="t-body ink-2 mt-2">{note.note}</p>
                   <p className="t-small mt-3 stock stock-butter" style={{ padding: '10px 12px', boxShadow: 'none' }}>
                     <span className="font-bold">Try this week: </span>
@@ -300,32 +298,5 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
         )}
       </AnimatePresence>
     </Sheet>
-  );
-}
-
-/** A strand of yarn that grows across the top as you answer, with a bead for each section. */
-function Vine({ progress, section }: { progress: number; section: number }) {
-  const [ref, w] = useWidth<HTMLDivElement>(240);
-  const d = `M 6 22 C ${w * 0.2} 12, ${w * 0.32} 32, ${w * 0.5} 22 S ${w * 0.8} 12, ${w - 6} 22`;
-  return (
-    <div ref={ref} className="flex-1 relative h-11" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)} aria-label="Progress">
-      <svg width={w} height={44} className="absolute inset-0 overflow-visible" aria-hidden>
-        <path d={d} stroke="var(--line-strong)" strokeWidth="2" fill="none" strokeLinecap="round" strokeDasharray="2 6" />
-        <motion.path d={d} stroke="var(--yarn)" strokeWidth="3.4" fill="none" strokeLinecap="round" initial={false} animate={{ pathLength: Math.max(progress, 0.02) }} transition={{ type: 'spring', stiffness: 120, damping: 20 }} />
-      </svg>
-      <div className="absolute inset-0 flex justify-between items-center px-[9%]" aria-hidden>
-        {FOUNDATION_SECTIONS.map((s, i) => {
-          const done = i < section || (i === section && progress >= (i + 1) / 6);
-          return (
-            <motion.span
-              key={s}
-              className="block rounded-full"
-              animate={{ scale: done ? 1 : 0.8 }}
-              style={{ width: 11, height: 11, marginTop: [6, -10, 4, -6, 8, -4][i], background: done ? 'var(--yarn)' : 'var(--card)', boxShadow: done ? 'none' : 'inset 0 0 0 1.5px var(--line-strong)' }}
-            />
-          );
-        })}
-      </div>
-    </div>
   );
 }

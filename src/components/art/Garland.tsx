@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef, useState } from 'react';
+import React, { useId, useLayoutEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { DiscoveryStyleId } from '../../types';
 import { Felt, FELT_FOR_STYLE } from './Flower';
@@ -107,12 +107,16 @@ export function Garland({ plants, onSelect }: { plants: GardenPlant[]; onSelect?
   );
 }
 
-/** A strand of two-ply yarn: a body, a twist and a soft shadow on the page. */
+/** A strand of two-ply yarn: a body, a twist and a soft blurred shadow on the page. */
 export function Strand({ d, color = 'var(--yarn)', delay = 0, width = 3.4 }: { d: string; color?: string; delay?: number; width?: number }) {
+  const blur = useId();
   const draw = { initial: { pathLength: 0 }, animate: { pathLength: 1 }, transition: { duration: 0.9, ease: [0.3, 0.6, 0.2, 1] as const, delay } };
   return (
     <g fill="none" strokeLinecap="round">
-      <motion.path d={d} stroke="rgba(20,30,50,.14)" strokeWidth={width} transform="translate(1 3)" {...draw} />
+      <filter id={blur} x="-10%" y="-50%" width="120%" height="200%">
+        <feGaussianBlur stdDeviation="1.6" />
+      </filter>
+      <motion.path d={d} stroke="rgb(20,30,50)" strokeOpacity={0.12} strokeWidth={width + 1} transform="translate(0 3.5)" filter={`url(#${blur})`} {...draw} />
       <motion.path d={d} stroke={color} strokeWidth={width} {...draw} />
       <motion.path
         d={d}

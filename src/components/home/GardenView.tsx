@@ -21,14 +21,15 @@ export function GardenView() {
 
   return (
     <div className="page">
-      <PageHeader title={household?.name || 'Our family'} onProfile={ui.openSettings} />
+      <PageHeader title={household?.name || 'Our family'} onProfile={ui.openSettings} demoNote />
       <Garland plants={people.map((p) => ({ id: p.id, name: p.name, style: p.style, isYou: p.isYou }))} onSelect={ui.openMember} />
       <NextStep />
       <TableQuestion />
       <SectionTitle>Plan something</SectionTitle>
       <PlanTiles onPick={ui.startPlan} />
-      <SectionTitle>Invite the family</SectionTitle>
-      <FamilyCode />
+      <div className="mt-8">
+        <FamilyCode />
+      </div>
     </div>
   );
 }
@@ -171,35 +172,36 @@ export function PlanTiles({ onPick }: { onPick: (t: PlanTask) => void }) {
   );
 }
 
-/** The family code, with copy and share. */
+/** The family code, with copy and share. The demo family has nothing to share. */
 function FamilyCode() {
   const { household, isDemo } = useHousehold();
   const toast = useToast();
   const code = household?.code || '';
   return (
     <CodeCard code={code}>
-      <div className="grid grid-cols-2 gap-2">
+      <div className={`grid gap-2 ${isDemo ? '' : 'grid-cols-2'}`}>
         <CopyButton value={code} label="Copy" />
-        <button
-          type="button"
-          className="btn btn-sm btn-primary"
-          disabled={isDemo}
-          onClick={async () => {
-            const text = `Join our family on My Family AI with the code ${code}.`;
-            try {
-              if (navigator.share) await navigator.share({ title: 'My Family AI', text, url: window.location.origin });
-              else {
-                await navigator.clipboard.writeText(`${text} ${window.location.origin}`);
-                toast('Invite copied');
+        {!isDemo && (
+          <button
+            type="button"
+            className="btn btn-sm btn-primary"
+            onClick={async () => {
+              const text = `Join our family on My Family AI with the code ${code}.`;
+              try {
+                if (navigator.share) await navigator.share({ title: 'My Family AI', text, url: window.location.origin });
+                else {
+                  await navigator.clipboard.writeText(`${text} ${window.location.origin}`);
+                  toast('Invite copied');
+                }
+              } catch {
+                // Share sheet dismissed.
               }
-            } catch {
-              // Share sheet dismissed.
-            }
-          }}
-        >
-          <Share2 size={17} strokeWidth={2.2} />
-          Share
-        </button>
+            }}
+          >
+            <Share2 size={17} strokeWidth={2.2} />
+            Share
+          </button>
+        )}
       </div>
     </CodeCard>
   );

@@ -35,16 +35,19 @@ export function PageHeader({
   title,
   subtitle,
   onProfile,
+  demoNote = false,
 }: {
   title: React.ReactNode;
   subtitle?: React.ReactNode;
   onProfile: () => void;
+  /** Shows the demo-family reminder; only the home tab asks for it. */
+  demoNote?: boolean;
 }) {
   const { activeMember, myAnswers, isDemo } = useHousehold();
   return (
     <header className="flex items-start justify-between gap-3 pb-3">
       <div className="min-w-0">
-        {isDemo && <p className="t-hand ink-3 mb-1" style={{ fontSize: '0.875rem' }}>Demo family, nothing is saved</p>}
+        {isDemo && demoNote && <p className="t-hand ink-3 mb-1" style={{ fontSize: '0.875rem' }}>Demo family, nothing is saved</p>}
         <h1 className="t-display">{title}</h1>
         {subtitle && <p className="t-small ink-2 mt-1.5">{subtitle}</p>}
       </div>

@@ -64,7 +64,9 @@ export function TogetherView() {
             </div>
           ) : (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <p className="t-title mt-2">{data.headline}</p>
+              <p className="t-head mt-2" style={{ fontSize: '1.25rem' }}>
+                {data.headline}
+              </p>
               {Boolean(insights.error) && <p className="t-small ink-2 mt-2">{aiErrorMessage(insights.error)}</p>}
 
               <SectionTitle>You all enjoy</SectionTitle>
@@ -80,8 +82,9 @@ export function TogetherView() {
                   <ul className="card px-4" aria-label="Where you differ">
                     {data.differences.map((d, i) => (
                       <Row key={i} first={i === 0} people={who(d.members)} title={d.title} body={d.detail}>
-                        <p className="t-hand mt-2" style={{ color: 'var(--accent-ink)', fontSize: '0.9375rem', lineHeight: 1.35 }}>
-                          {d.bridge}
+                        <p className="mt-2 flex gap-2 items-start" style={{ color: 'var(--accent-ink)', fontSize: '0.9375rem', lineHeight: 1.4, fontWeight: 500 }}>
+                          <span aria-hidden className="shrink-0 rounded-full mt-2" style={{ width: 12, height: 4, background: 'var(--yarn)', transform: 'rotate(-20deg)' }} />
+                          <span>{d.bridge}</span>
                         </p>
                       </Row>
                     ))}
@@ -90,17 +93,16 @@ export function TogetherView() {
               )}
 
               <SectionTitle>Ideas to try</SectionTitle>
-              <div className="-mx-5 px-5 flex gap-3 overflow-x-auto no-scrollbar pt-3 pb-3" style={{ scrollSnapType: 'x mandatory', scrollPaddingInline: 20 }} aria-label="Ideas to try, scroll for more">
+              <div className="-mx-5 px-5 -mt-1 -mb-5 flex gap-3 overflow-x-auto no-scrollbar pt-4 pb-8" style={{ scrollSnapType: 'x mandatory', scrollPaddingInline: 20 }} aria-label="Ideas to try, scroll for more">
                 {data.ideas.map((idea, i) => (
                   <Ticket key={i} index={i} title={idea.title} why={idea.why} people={who(idea.members)} onPlan={() => ui.askAbout(`Help us plan this: ${idea.title}`)} />
                 ))}
               </div>
 
-              {data.missing && <p className="t-small ink-2 mt-2">{data.missing}</p>}
-              <div className="flex items-center justify-between gap-3 mt-3">
-                <p className="t-small ink-3">Written by AI from your answers.</p>
-                <button type="button" className="btn btn-quiet btn-sm shrink-0" onClick={insights.refresh} disabled={insights.loading}>
-                  <RefreshCw size={16} strokeWidth={2.2} /> Rewrite
+              <div className="flex items-center justify-between gap-3 mt-2">
+                <p className="t-small ink-3">{data.missing || 'Written by AI from your answers.'}</p>
+                <button type="button" className="icon-btn shrink-0" style={{ background: 'transparent', boxShadow: 'none' }} onClick={insights.refresh} disabled={insights.loading} aria-label="Write it again">
+                  <RefreshCw size={18} strokeWidth={2.2} />
                 </button>
               </div>
             </motion.div>

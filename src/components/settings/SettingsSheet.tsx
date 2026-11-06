@@ -39,7 +39,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
     <Sheet open={open} onClose={onClose} title="Settings">
       <div className="grid gap-7 pb-4">
         <section>
-          <h3 className="t-label ink-2 mb-2 px-1">Appearance</h3>
+          <h3 className="t-label ink-2 mb-2">Appearance</h3>
           <Segmented<ThemeMode>
             label="Appearance"
             value={mode}
@@ -53,7 +53,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
         </section>
 
         <section>
-          <h3 className="t-label ink-2 mb-2 px-1">Who’s using this phone?</h3>
+          <h3 className="t-label ink-2 mb-2">Who’s using this phone?</h3>
           <div className="grid gap-2" role="radiogroup" aria-label="Who’s using this phone?" onKeyDown={(e) => onRovingKeyDown(e)}>
             {members.map((m, i) => {
               const on = m.id === activeMember?.id;

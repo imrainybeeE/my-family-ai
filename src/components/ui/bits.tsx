@@ -156,7 +156,7 @@ export function Segmented<T extends string>({
 /* ---------- Small "who" stack of flower badges ---------- */
 export function SectionTitle({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="flex items-end justify-between gap-3 mt-8 mb-3 px-1">
+    <div className="flex items-end justify-between gap-3 mt-8 mb-3">
       <h2 className="t-head">{children}</h2>
       {action}
     </div>

@@ -5,6 +5,7 @@ import { Sheet } from '../ui/Sheet';
 import { Thinking } from '../ui/bits';
 import { onRovingKeyDown, rovingTabIndex } from '../ui/roving';
 import { Felt } from '../art/Flower';
+import { YarnProgress } from '../art/YarnProgress';
 import { useHousehold } from '../../context/HouseholdContext';
 import { ADVANCED_QUESTIONS } from '../../data/advancedQuestions';
 import { ai } from '../../services/ai';
@@ -104,10 +105,32 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
       onClose={onClose}
       full
       title="Deeper roots"
+      hideTitle={stage === 'ask' || stage === 'reflect'}
       leading={
+        stage === 'ask' || stage === 'reflect' ? (
+          <div className="flex-1 flex items-center gap-2">
+            {stage === 'ask' && (
+              <button type="button" className="icon-btn" aria-label="Previous question" onClick={() => (index === 0 ? setStage('intro') : setIndex((i) => i - 1))}>
+                <ChevronLeft size={22} strokeWidth={2.4} />
+              </button>
+            )}
+            <YarnProgress progress={(index + (stage === 'reflect' ? 1 : 0)) / ADVANCED_QUESTIONS.length} beads={4} />
+          </div>
+        ) : undefined
+      }
+      footer={
         stage === 'ask' ? (
-          <button type="button" className="icon-btn" aria-label="Previous question" onClick={() => (index === 0 ? setStage('intro') : setIndex((i) => i - 1))}>
-            <ChevronLeft size={22} strokeWidth={2.4} />
+          <div className="grid grid-cols-[1fr_2fr] gap-2">
+            <button type="button" className="btn" onClick={next}>
+              Skip
+            </button>
+            <button type="button" className="btn btn-primary" disabled={!text.trim()} onClick={submit}>
+              Save
+            </button>
+          </div>
+        ) : stage === 'reflect' && !reflecting ? (
+          <button type="button" className="btn btn-primary btn-block" onClick={reflection?.followUp && followText.trim() ? submitFollowUp : next}>
+            {reflection?.followUp && followText.trim() ? 'Save and continue' : index === ADVANCED_QUESTIONS.length - 1 ? 'Finish' : 'Next question'}
           </button>
         ) : undefined
       }
@@ -134,14 +157,10 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
         {stage === 'ask' && (
           <motion.div key={`q${q.id}`} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.22 }} className="grid gap-4 pt-1">
             <section className="stock stock-lilac">
-              <div className="flex items-baseline justify-between gap-3">
-                <p className="t-hand" style={{ fontSize: '0.9375rem' }}>
-                  {q.theme}
-                </p>
-                <p className="t-small opacity-70 tabular-nums">
-                  {index + 1} of {ADVANCED_QUESTIONS.length}
-                </p>
-              </div>
+              <p className="t-hand" style={{ fontSize: '0.9375rem' }}>
+                {q.theme}
+                <span className="sr-only">. Question {index + 1} of {ADVANCED_QUESTIONS.length}.</span>
+              </p>
               <h3 className="t-title mt-1.5">{q.question}</h3>
             </section>
             {quickPicks.length > 0 && (
@@ -178,23 +197,15 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
                 {error}
               </p>
             )}
-            <div className="grid grid-cols-[1fr_2fr] gap-2">
-              <button type="button" className="btn" onClick={next}>
-                Skip
-              </button>
-              <button type="button" className="btn btn-primary" disabled={!text.trim()} onClick={submit}>
-                Save
-              </button>
-            </div>
           </motion.div>
         )}
 
         {stage === 'reflect' && (
           <motion.div key={`r${q.id}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="grid gap-4 pt-2">
-            <div className="card p-4">
-              <p className="t-small ink-3">{q.question}</p>
-              <p className="t-body font-semibold mt-1">{text.trim()}</p>
-            </div>
+            <section className="stock stock-lilac">
+              <h3 className="t-head">{q.question}</h3>
+              <p className="t-body mt-1.5 opacity-80">{text.trim()}</p>
+            </section>
             <div className="flex gap-2.5 items-start">
               <span className="shrink-0 w-9 h-9 grid place-items-center -mt-0.5" aria-hidden>
                 <Felt name="yarnball" size={52} />
@@ -220,11 +231,6 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
               <p role="alert" className="t-small" style={{ color: 'var(--danger)' }}>
                 {error}
               </p>
-            )}
-            {!reflecting && (
-              <button type="button" className="btn btn-primary btn-block" onClick={reflection?.followUp && followText.trim() ? submitFollowUp : next}>
-                {reflection?.followUp && followText.trim() ? 'Save and continue' : index === ADVANCED_QUESTIONS.length - 1 ? 'Finish' : 'Next question'}
-              </button>
             )}
           </motion.div>
         )}

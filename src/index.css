@@ -81,18 +81,19 @@
   --yarn: #f08aa6;
   --yarn-deep: #c95d7c;
 
-  --stock-pink: #3b2232;
-  --stock-pink-ink: #ffd3e1;
-  --stock-butter: #383016;
-  --stock-butter-ink: #fbe6a8;
-  --stock-mint: #17352a;
-  --stock-mint-ink: #c6eed6;
-  --stock-lilac: #282345;
-  --stock-lilac-ink: #e2d9ff;
-  --stock-sky: #172c45;
-  --stock-sky-ink: #cfe4fa;
-  --stock-coral: #3d2219;
-  --stock-coral-ink: #ffd6c8;
+  --stock-pink: color-mix(in srgb, #f08aa6 20%, var(--card));
+  --stock-pink-ink: #ffd9e4;
+  /* Yellow over navy turns olive, so at night butter stock is plain paper with golden ink. */
+  --stock-butter: var(--card-2);
+  --stock-butter-ink: #fbe7ae;
+  --stock-mint: color-mix(in srgb, #7fc49a 18%, var(--card));
+  --stock-mint-ink: #cdf0da;
+  --stock-lilac: color-mix(in srgb, #b8a3ee 22%, var(--card));
+  --stock-lilac-ink: #e6ddff;
+  --stock-sky: color-mix(in srgb, #8cc4e8 20%, var(--card));
+  --stock-sky-ink: #d6eafb;
+  --stock-coral: color-mix(in srgb, #f08aa6 14%, var(--card-2));
+  --stock-coral-ink: #ffd8cb;
 
   --danger: #ff8a7d;
   --danger-soft: #3a1a17;
@@ -141,6 +142,16 @@
   ::selection {
     background: var(--accent-soft);
   }
+  /* No single word left alone on the last line. */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p,
+  li {
+    text-wrap: pretty;
+  }
 }
 
 /* Component classes sit in the components layer so Tailwind utilities can still adjust them. */
@@ -153,6 +164,7 @@
   margin: 0 auto;
   background: var(--page);
   isolation: isolate;
+  overflow-x: clip;
 }
 @media (min-width: 520px) {
   .app-column {
@@ -348,16 +360,6 @@
   background: var(--stock-coral);
   color: var(--stock-coral-ink);
 }
-/* A running stitch sewn just inside the edge. */
-.stitched::after {
-  content: '';
-  position: absolute;
-  inset: 7px;
-  border-radius: calc(var(--r-paper) - 5px);
-  border: 1.5px dashed color-mix(in srgb, currentColor 28%, transparent);
-  pointer-events: none;
-}
-
 /* Washi tape: a translucent paper strip with torn ends. Colour comes from --tape. */
 .tape {
   --tape: rgba(232, 111, 143, 0.5);
@@ -427,7 +429,7 @@
   min-height: 44px;
   padding: 0 0.95rem;
   border-radius: var(--r-ctl);
-  border: 1.5px solid var(--line);
+  border: 1px solid var(--line-strong);
   background: var(--card);
   color: var(--ink);
   font-weight: 600;
@@ -549,9 +551,9 @@ textarea.field {
   grid-template-columns: repeat(4, 1fr);
   padding: 6px;
   border-radius: 28px;
-  background: color-mix(in srgb, var(--card) 86%, transparent);
-  backdrop-filter: blur(20px) saturate(1.5);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  background: color-mix(in srgb, var(--card) 95%, transparent);
+  backdrop-filter: blur(28px) saturate(1.5);
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
   box-shadow: 0 0 0 0.5px var(--line-strong), var(--shadow-lift);
 }
 .tabbar button {
@@ -595,7 +597,9 @@ textarea.field {
 .sheet {
   position: fixed;
   z-index: 41;
-  left: 50%;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
   bottom: 0;
   width: min(460px, 100%);
   max-height: calc(100dvh - 24px - var(--safe-t));

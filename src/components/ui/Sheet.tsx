@@ -99,7 +99,7 @@ export function Sheet({ open, onClose, title, hideTitle, full, children, footer,
             aria-labelledby={titleId}
             tabIndex={-1}
             className={`sheet ${full ? 'sheet-full' : ''}`}
-            style={{ x: '-50%', outline: 'none' }}
+            style={{ outline: 'none' }}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
@@ -119,7 +119,7 @@ export function Sheet({ open, onClose, title, hideTitle, full, children, footer,
               </div>
             )}
             <div
-              className={`flex items-center gap-2 px-4 ${full ? 'pt-[calc(12px+var(--safe-t))]' : 'pt-1'} pb-2 ${hideTitle ? 'justify-end' : ''}`}
+              className={`flex items-center gap-2 px-5 ${full ? 'pt-[calc(12px+var(--safe-t))]' : 'pt-1'} pb-2 ${hideTitle ? 'justify-end' : ''}`}
               onPointerDown={full ? undefined : (e) => drag.start(e)}
             >
               {leading}

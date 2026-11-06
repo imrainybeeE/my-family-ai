@@ -7,6 +7,8 @@ argv = sys.argv[sys.argv.index('--') + 1:]
 OUT = argv[0]
 WHICH = argv[1] if len(argv) > 1 else 'all'
 SIZE = int(argv[2]) if len(argv) > 2 else 640
+# The per-piece crop keeps the object near the centre, so small pieces render larger.
+SIZE_FOR = {'watch': 1.6, 'travel': 1.6, 'do': 1.3, 'eat': 1.2}
 SAMPLES = int(argv[3]) if len(argv) > 3 else 96
 
 
@@ -35,6 +37,7 @@ def reset():
     sc.render.film_transparent = True
     sc.render.resolution_x = SIZE
     sc.render.resolution_y = SIZE
+    sc.render.resolution_percentage = 100
     sc.render.image_settings.file_format = 'PNG'
     sc.render.image_settings.color_mode = 'RGBA'
     sc.view_settings.view_transform = 'Standard'
@@ -581,6 +584,10 @@ FLOWERS = {'daisy': daisy, 'poppy': poppy, 'sunflower': sunflower, 'dandelion': 
 names = list(FLOWERS) if WHICH == 'all' else WHICH.split(',')
 for nm in names:
     sc = reset()
+    sc.render.resolution_x = sc.render.resolution_y = int(SIZE * SIZE_FOR.get(nm, 1))
+    if nm == 'yarnball':
+        # A round object occludes a lot of sky; less ambient keeps its shadow clean.
+        sc.world.node_tree.nodes['Background'].inputs[1].default_value = 0.12
     MATS.clear()
     rnd = random.Random(7)
     FLOWERS[nm](rnd)

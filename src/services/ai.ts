@@ -82,7 +82,6 @@ export interface PlanIdea {
 
 export interface PlanIdeas {
   ideas: PlanIdea[];
-  note: string;
 }
 
 export const ai = {
