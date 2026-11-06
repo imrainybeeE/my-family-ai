@@ -23,7 +23,14 @@ export type FeltName =
   | 'watch'
   | 'travel'
   | 'coin-heads'
-  | 'coin-tails';
+  | 'coin-tails'
+  | 'centre'
+  | 'petal-explorer'
+  | 'petal-creator'
+  | 'petal-connector'
+  | 'petal-achiever'
+  | 'petal-chiller'
+  | 'petal-thinker';
 
 export const FELT_FOR_STYLE: Record<DiscoveryStyleId, FeltName> = {
   Explorer: 'dandelion',

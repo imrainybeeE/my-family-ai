@@ -12,6 +12,8 @@ GROUPS = {
     'travel': ['travel'],
     'yarnball': ['yarnball'],
     'coins': ['coin-heads', 'coin-tails'],
+    'petals': ['petal-explorer', 'petal-creator', 'petal-connector', 'petal-achiever', 'petal-chiller', 'petal-thinker'],
+    'centre': ['centre'],
 }
 SIZE = 512
 # Fades alpha to zero in a thin band at each edge, so a long soft shadow never shows a

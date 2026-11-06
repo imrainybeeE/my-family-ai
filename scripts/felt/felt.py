@@ -576,10 +576,31 @@ def suitcase(rnd):  # Travel: a felt suitcase with a yarn handle and stickers
     shape('s3', rotpts(petal_pts(0.3, 0.2, power=0.6), 0.5), felt('#ffffff'), z=0.14, thick=0.015, loc=(-0.15, -0.2))
 
 
+def petal(rnd, col, stitch='#ffffff'):
+    """One loose felt petal, pointing up, for the flower you stitch during the quiz."""
+    pts = petal_pts(1.9, 0.95, r0=-0.95, power=0.6)
+    shape('p', pts, felt(col), z=0.0, thick=0.04, bevel=0.022)
+    running_stitch([(0, -0.6), (0, 0.65)], thread(stitch), 0.124, r=0.02, stitch=0.13, gap=0.08)
+
+
+def centre(rnd):
+    """The middle of the quiz flower: a felt disc covered in French knots."""
+    shape('c', circle_pts(0.9, wobble=0.02, seed=4), felt('#f4c542'), z=0.0, thick=0.05)
+    km = thread('#c98f12')
+    for ring, (r, cnt) in enumerate([(0.68, 18), (0.46, 12), (0.24, 7), (0.0, 1)]):
+        for i in range(cnt):
+            a = 2 * math.pi * i / cnt + ring * 0.3
+            knot(r * math.cos(a), r * math.sin(a), 0.14, 0.085, km, rnd)
+
+
+PETALS = {'explorer': '#8cc4e8', 'creator': '#ee5a3c', 'connector': '#f2a6c0', 'achiever': '#f4c542', 'chiller': '#b8a3ee', 'thinker': '#6f7fe0'}
+
 FLOWERS = {'daisy': daisy, 'poppy': poppy, 'sunflower': sunflower, 'dandelion': dandelion, 'iris': iris, 'lavender': lavender,
            'coin-heads': lambda rnd: button(0, 0, 0, 1.3, '#f4c542', '#8a6410', cross=False),
            'coin-tails': lambda rnd: button(0, 0, 0, 1.3, '#f08aa6', '#8f2f4c', cross=False),
-           'bud': bud, 'yarnball': yarnball, 'eat': bowl, 'do': kite, 'watch': popcorn, 'travel': suitcase}
+           'bud': bud,
+           'centre': centre,
+           **{f'petal-{k}': (lambda c: lambda rnd: petal(rnd, c))(v) for k, v in PETALS.items()}, 'yarnball': yarnball, 'eat': bowl, 'do': kite, 'watch': popcorn, 'travel': suitcase}
 
 names = list(FLOWERS) if WHICH == 'all' else WHICH.split(',')
 for nm in names:

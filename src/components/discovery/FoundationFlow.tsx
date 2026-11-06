@@ -2,28 +2,33 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ChevronLeft } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
-import { SeedMark, Thinking } from '../ui/bits';
+import { Thinking } from '../ui/bits';
 import { onRovingKeyDown, rovingTabIndex } from '../ui/roving';
 import { SpecimenCard } from '../profile/SpecimenCard';
-import { Felt, FeltName, Flower } from '../art/Flower';
+import { Flower } from '../art/Flower';
 import { YarnProgress } from '../art/YarnProgress';
 import { useHousehold } from '../../context/HouseholdContext';
 import { useUI } from '../../App';
-import { FOUNDATION_QUESTIONS, FOUNDATION_SECTIONS } from '../../data/foundationQuestions';
-import { scoreDiscoveryProfile } from '../../utils/discoveryScoring';
+import { FOUNDATION_QUESTIONS, FOUNDATION_SECTIONS, STYLE_MAPPING_CONFIG } from '../../data/foundationQuestions';
+import { petalsFor, scoreDiscoveryProfile } from '../../utils/discoveryScoring';
+import { PetalMark, StitchedFlower } from '../art/StitchedFlower';
 import { buildBrief } from '../../services/brief';
 import { ai } from '../../services/ai';
 import { memberName } from '../../utils/member';
-import { BloomNote, DiscoveryProfile } from '../../types';
+import { BloomNote, DiscoveryProfile, DiscoveryStyleId } from '../../types';
 
-const SECTION_LOOK: Record<string, { stock: string; art: FeltName }> = {
-  'Free Time & Me Time': { stock: 'stock-lilac', art: 'lavender' },
-  Food: { stock: 'stock-butter', art: 'eat' },
-  'Travel & Experiences': { stock: 'stock-sky', art: 'travel' },
-  'Interests & Together Time': { stock: 'stock-mint', art: 'do' },
-  'How I Approach Things': { stock: 'stock-coral', art: 'iris' },
-  'Family & Support': { stock: 'stock-pink', art: 'daisy' },
+/** Each section has its own card stock colour, so a new section is felt at a glance. */
+const SECTION_STOCK: Record<string, string> = {
+  'Free Time & Me Time': 'stock-lilac',
+  Food: 'stock-butter',
+  'Travel & Experiences': 'stock-sky',
+  'Interests & Together Time': 'stock-mint',
+  'How I Approach Things': 'stock-coral',
+  'Family & Support': 'stock-pink',
 };
+
+/** A few petals to show how the flower grows, before any answers. */
+const INTRO_PETALS: DiscoveryStyleId[] = ['Explorer', 'Creator', 'Connector', 'Achiever', 'Chiller', 'Thinker'];
 
 const SECTION_LABEL: Record<string, string> = {
   'Free Time & Me Time': 'Free time and me time',
@@ -60,7 +65,10 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
   };
   useEffect(() => cancelAdvance, [index, stage, open]);
   useEffect(() => {
-    if (stage === 'ask') headingRef.current?.focus({ preventScroll: true });
+    if (stage !== 'ask') return;
+    // Each question starts at the top of the sheet, whatever was scrolled before.
+    headingRef.current?.closest('.sheet-body')?.scrollTo({ top: 0 });
+    headingRef.current?.focus({ preventScroll: true });
   }, [index, stage]);
 
   useEffect(() => {
@@ -90,6 +98,7 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
   }, [answers, index, stage, draftKey]);
 
   const q = FOUNDATION_QUESTIONS[index];
+  const petals = petalsFor(answers);
   const value = answers[String(q.id)];
   const selected = Array.isArray(value) ? value : value ? [value] : [];
   const answered = selected.length > 0;
@@ -199,9 +208,9 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
       <AnimatePresence mode="wait" initial={false}>
         {stage === 'intro' && (
           <motion.div key="intro" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center text-center pt-6">
-            <Felt name="bud" size={180} />
-            <h3 className="t-display mt-2">18 quick picks</h3>
-            <p className="t-body ink-2 mt-2 max-w-[19rem]">Pick what sounds most like you today. Your family can see your answers.</p>
+            <StitchedFlower petals={INTRO_PETALS} size={200} />
+            <h3 className="t-display mt-4">Sew your flower</h3>
+            <p className="t-body ink-2 mt-2 max-w-[19rem]">18 quick picks. Every answer stitches on a petal. Your family can see your answers.</p>
             {myAnswers.discoveryProfile && <p className="t-small ink-3 mt-2">This replaces your current flower.</p>}
             <button type="button" className="btn btn-primary btn-block mt-8" onClick={() => setStage('ask')}>
               {index > 0 ? `Continue from ${index + 1}` : 'Start'}
@@ -211,9 +220,9 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
 
         {stage === 'ask' && (
           <motion.div key={`q${q.id}`} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.22 }} className="pt-1">
-            <section className={`stock ${SECTION_LOOK[q.section].stock} pr-24`}>
-              <span className="absolute -right-2 -top-3" aria-hidden>
-                <Felt name={SECTION_LOOK[q.section].art} size={104} />
+            <section className={`stock ${SECTION_STOCK[q.section]} pr-32`}>
+              <span className="absolute right-2 top-1/2 -translate-y-1/2">
+                <StitchedFlower petals={petals} size={116} />
               </span>
               <p className="t-hand" style={{ fontSize: '0.9375rem' }}>
                 {SECTION_LABEL[q.section]}
@@ -249,7 +258,7 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
                     className="option"
                     onClick={(e) => choose(o, e.detail > 0)}
                   >
-                    <SeedMark on={on} />
+                    <PetalMark on={on} style={STYLE_MAPPING_CONFIG[q.id]?.[o]?.[0]} />
                     <span className="flex-1">{o}</span>
                   </button>
                 );
@@ -260,8 +269,13 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
 
         {stage === 'blooming' && profile && (
           <motion.div key="blooming" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid place-items-center text-center pt-24 gap-4">
-            <Flower style={profile.primaryStyle} size={220} bloom delay={0.3} />
-            <p className="t-head ink-2">Stitching your flower…</p>
+            <div className="relative grid place-items-center" style={{ width: 240, height: 240 }}>
+              <motion.div className="absolute" initial={{ opacity: 1, rotate: 0, scale: 1 }} animate={{ opacity: 0, rotate: 200, scale: 0.6 }} transition={{ duration: 1.1, delay: 0.4, ease: [0.5, 0, 0.3, 1] }}>
+                <StitchedFlower petals={petals} size={220} />
+              </motion.div>
+              <Flower style={profile.primaryStyle} size={230} bloom delay={1.2} />
+            </div>
+            <p className="t-head ink-2">Your flower is ready</p>
           </motion.div>
         )}
 
