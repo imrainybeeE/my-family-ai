@@ -16,6 +16,7 @@ import {
 import { buildBrief, FamilyBrief } from '../services/brief';
 import { DEMO_ACTIVE_MEMBER, DEMO_HOUSEHOLD, DEMO_MEMBERS, DEMO_RESPONSES } from '../data/demoFamily';
 import { AVATAR_PALETTE } from '../utils/familyCode';
+import { mergeAnswers, rollbackAnswers } from '../utils/member';
 import { Household, HouseholdMember, MemberRole, MemberTasteAnswers } from '../types';
 
 const SESSION_KEY = 'myfamilyai_last_session';
@@ -314,15 +315,19 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
   const updateMyAnswers = useCallback(
     async (patch: Partial<MemberTasteAnswers>) => {
       if (!household || !activeMember) return;
-      const merged: MemberTasteAnswers = { ...(responsesRef.current[activeMember.id] || {}), ...patch };
-      for (const key of Object.keys(merged) as Array<keyof MemberTasteAnswers>) {
-        if (merged[key] === undefined) delete merged[key];
-      }
-      setResponses((prev) => ({ ...prev, [activeMember.id]: merged }));
+      const id = activeMember.id;
+      const previous = responsesRef.current[id];
+      const merged = mergeAnswers(previous, patch);
+      // Show the change straight away; put it back if the save fails, so the screen and the
+      // AI only ever reflect answers that were actually saved.
+      responsesRef.current = { ...responsesRef.current, [id]: merged };
+      setResponses((prev) => ({ ...prev, [id]: merged }));
       if (isDemo) return;
       try {
-        await saveMemberAnswers(household.code, activeMember.id, merged);
+        await saveMemberAnswers(household.code, id, merged);
       } catch (err) {
+        responsesRef.current = rollbackAnswers(responsesRef.current, id, merged, previous);
+        setResponses((prev) => rollbackAnswers(prev, id, merged, previous));
         const msg = errorText(err, 'Couldn’t save your answers. Check your connection and try again.');
         setError(msg);
         throw new Error(msg);

@@ -17,6 +17,7 @@ import {
 import { MemberRole } from '../../types';
 import { Sprout } from '../art/Flower';
 import { SeedMark } from '../ui/bits';
+import { onRovingKeyDown, rovingTabIndex } from '../ui/roving';
 
 interface Draft {
   key: number;
@@ -239,10 +240,10 @@ export function CreateFamily({ open, onClose }: { open: boolean; onClose: () => 
           )}
 
           {step === 2 && (
-            <div className="grid gap-3 pt-2" role="radiogroup" aria-label="Which one are you?">
+            <div className="grid gap-3 pt-2" role="radiogroup" aria-label="Which one are you?" onKeyDown={(e) => onRovingKeyDown(e)}>
               <p className="t-small ink-2">This phone will answer as you. Anyone can switch later in settings.</p>
               {people.map((p, i) => (
-                <button key={p.key} type="button" role="radio" aria-checked={me === i} className="option" onClick={() => setMe(i)}>
+                <button key={p.key} type="button" role="radio" aria-checked={me === i} tabIndex={rovingTabIndex(i, me)} className="option" onClick={() => setMe(i)}>
                   <Sprout size={36} />
                   <span className="flex-1">
                     <span className="block font-semibold">{label(p)}</span>

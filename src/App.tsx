@@ -46,7 +46,7 @@ const tabFromHash = (): TabType => {
 };
 
 function Shell() {
-  const { household, isLoading } = useHousehold();
+  const { household, isLoading, activeMember } = useHousehold();
   const [tab, setTab] = useState<TabType>(tabFromHash);
   const [planTask, setPlanTask] = useState<PlanTask | null>(null);
   const [askPrefill, setAskPrefill] = useState<string | null>(null);
@@ -108,6 +108,9 @@ function Shell() {
     <UIContext.Provider value={ui}>
       <AnimatePresence mode="wait" initial={false}>
         <motion.main
+          id="main"
+          role="tabpanel"
+          aria-label={tab}
           key={tab}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -117,7 +120,8 @@ function Shell() {
           {tab === 'garden' && <GardenView />}
           {tab === 'together' && <TogetherView />}
           {tab === 'plan' && <PlanView initialTask={planTask} onConsumeTask={() => setPlanTask(null)} />}
-          {tab === 'ask' && <AskView />}
+          {/* A fresh chat per person: switching profile never carries someone else's conversation. */}
+          {tab === 'ask' && <AskView key={activeMember?.id || 'none'} />}
         </motion.main>
       </AnimatePresence>
       <TabBar tab={tab} onChange={goTab} />

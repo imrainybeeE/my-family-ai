@@ -18,6 +18,29 @@ interface SheetProps {
 
 let openSheets = 0;
 
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** Keeps Tab and Shift+Tab cycling inside the open sheet. */
+function trapFocus(e: KeyboardEvent, panel: HTMLElement | null) {
+  if (!panel) return;
+  const items = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => el.offsetParent !== null);
+  if (!items.length) {
+    e.preventDefault();
+    panel.focus();
+    return;
+  }
+  const first = items[0];
+  const last = items[items.length - 1];
+  const active = document.activeElement;
+  if (e.shiftKey && (active === first || active === panel || !panel.contains(active))) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && (active === last || !panel.contains(active))) {
+    e.preventDefault();
+    first.focus();
+  }
+}
+
 /** A paper sheet that slides up from the bottom. Drag down or press Escape to close. */
 export function Sheet({ open, onClose, title, hideTitle, full, children, footer, leading }: SheetProps) {
   const titleId = useId();
@@ -34,8 +57,12 @@ export function Sheet({ open, onClose, title, hideTitle, full, children, footer,
     restoreRef.current = document.activeElement as HTMLElement | null;
     openSheets += 1;
     document.body.style.overflow = 'hidden';
+    // Everything behind the sheet becomes inert: no focus, no clicks, hidden from screen readers.
+    const app = document.getElementById('root');
+    app?.setAttribute('inert', '');
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeRef.current();
+      if (e.key === 'Tab') trapFocus(e, panelRef.current);
     };
     window.addEventListener('keydown', onKey);
     const t = window.setTimeout(() => {
@@ -46,7 +73,10 @@ export function Sheet({ open, onClose, title, hideTitle, full, children, footer,
       window.clearTimeout(t);
       window.removeEventListener('keydown', onKey);
       openSheets -= 1;
-      if (openSheets <= 0) document.body.style.overflow = '';
+      if (openSheets <= 0) {
+        document.body.style.overflow = '';
+        app?.removeAttribute('inert');
+      }
       restoreRef.current?.focus?.();
     };
   }, [open]);

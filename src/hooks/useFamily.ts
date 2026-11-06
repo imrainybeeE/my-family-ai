@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useHousehold } from '../context/HouseholdContext';
 import { DiscoveryStyleId, HouseholdMember } from '../types';
-import { memberName } from '../utils/member';
+import { uniqueNames } from '../utils/member';
 import { hashBrief } from '../services/brief';
 
 export interface FamilyPerson {
@@ -16,18 +16,17 @@ export interface FamilyPerson {
 /** People in the household with their flowers, plus a name lookup for AI attributions. */
 export function useFamily() {
   const { members, responses, activeMember } = useHousehold();
-  const people = useMemo<FamilyPerson[]>(
-    () =>
-      members.map((m) => ({
+  const people = useMemo<FamilyPerson[]>(() => {
+    const names = uniqueNames(members);
+    return members.map((m) => ({
         member: m,
         id: m.id,
-        name: memberName(m),
+        name: names.get(m.id) || m.role,
         style: responses[m.id]?.discoveryProfile?.primaryStyle,
         second: responses[m.id]?.discoveryProfile?.secondaryStyle,
         isYou: m.id === activeMember?.id,
-      })),
-    [members, responses, activeMember?.id]
-  );
+      }));
+  }, [members, responses, activeMember?.id]);
   const byName = useCallback(
     (name: string) => people.find((p) => p.name.toLowerCase() === name.trim().toLowerCase()),
     [people]

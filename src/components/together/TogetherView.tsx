@@ -11,7 +11,6 @@ import { Flower, FlowerBadge, Sprout } from '../art/Flower';
 import { SectionTitle, Thinking } from '../ui/bits';
 import { FLOWERS, STYLE_ORDER } from '../../data/flowers';
 import { advancedProgress } from '../../utils/member';
-import { DiscoveryStyleId } from '../../types';
 
 export function TogetherView() {
   const { brief, members, responses, myAnswers } = useHousehold();
@@ -32,6 +31,7 @@ export function TogetherView() {
     };
   }, [insights.error, members, responses]);
   const data = insights.data || fallback;
+  const who = (names: string[]) => names.map(byName).filter(Boolean) as FamilyPerson[];
 
   return (
     <div className="page">
@@ -57,51 +57,50 @@ export function TogetherView() {
           <Bouquet people={bloomed} />
 
           {!data ? (
-            <div className="card p-5 mt-4 grid gap-3" aria-busy>
+            <div className="mt-6 grid gap-3 px-1" aria-busy>
               <Thinking label="Reading everyone’s answers" />
-              <div className="skeleton h-5 w-full" />
-              <div className="skeleton h-5 w-4/5" />
+              <div className="skeleton h-7 w-full" />
+              <div className="skeleton h-7 w-3/4" />
             </div>
           ) : (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="contents">
-              <p className="t-title mt-6 px-1" style={{ fontSize: '1.5rem' }}>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <p className="t-title mt-7 px-1" style={{ fontSize: '1.625rem' }}>
                 {data.headline}
               </p>
               {Boolean(insights.error) && <p className="t-small ink-2 mt-2 px-1">{aiErrorMessage(insights.error)} Showing a simpler summary for now.</p>}
 
               <SectionTitle>You all enjoy</SectionTitle>
-              <div className="grid gap-3">
+              <ul className="card px-4" aria-label="Things you enjoy together">
                 {data.together.map((t, i) => (
-                  <InsightCard key={i} title={t.title} body={t.detail} names={t.members} byName={byName} tone="sun" />
+                  <Row key={i} first={i === 0} people={who(t.members)} title={t.title} body={t.detail} />
                 ))}
-              </div>
+              </ul>
 
-              <SectionTitle>Where you differ</SectionTitle>
-              <div className="grid gap-3">
-                {data.differences.map((d, i) => (
-                  <InsightCard key={i} title={d.title} body={d.detail} names={d.members} byName={byName} tone="sky">
-                    <p className="t-small mt-3 pt-3 border-t" style={{ borderColor: 'var(--line)' }}>
-                      <span className="font-bold">How it helps: </span>
-                      {d.bridge}
-                    </p>
-                  </InsightCard>
-                ))}
-              </div>
+              {data.differences.length > 0 && (
+                <>
+                  <SectionTitle>Where you differ</SectionTitle>
+                  <ul className="card px-4" aria-label="Where you differ">
+                    {data.differences.map((d, i) => (
+                      <Row key={i} first={i === 0} people={who(d.members)} title={d.title} body={d.detail}>
+                        <p className="t-hand mt-2 flex gap-2 items-start" style={{ color: 'var(--leaf-ink)', fontSize: '0.9375rem', lineHeight: 1.35 }}>
+                          <LeafMark />
+                          <span>{d.bridge}</span>
+                        </p>
+                      </Row>
+                    ))}
+                  </ul>
+                </>
+              )}
 
               <SectionTitle>Ideas to try</SectionTitle>
-              <div className="grid gap-3">
+              <div className="-mx-4 px-4 flex gap-3 overflow-x-auto no-scrollbar pb-3" style={{ scrollSnapType: 'x mandatory', scrollPaddingInline: 16 }} aria-label="Ideas to try, scroll for more">
                 {data.ideas.map((idea, i) => (
-                  <InsightCard key={i} title={idea.title} body={idea.why} names={idea.members} byName={byName} tone="petal" label="Idea">
-                    <p className="t-small mt-2 ink-2">{idea.tip}</p>
-                    <button type="button" className="btn btn-sm mt-3" onClick={() => ui.askAbout(`Help us plan this: ${idea.title}`)}>
-                      Plan this with the helper
-                    </button>
-                  </InsightCard>
+                  <Ticket key={i} index={i} title={idea.title} why={idea.why} tip={idea.tip} people={who(idea.members)} onPlan={() => ui.askAbout(`Help us plan this: ${idea.title}`)} />
                 ))}
               </div>
 
-              {data.missing && <p className="t-small ink-2 mt-5 px-1">{data.missing}</p>}
-              <div className="flex items-center justify-between gap-3 mt-5 px-1">
+              {data.missing && <p className="t-small ink-2 mt-3 px-1">{data.missing}</p>}
+              <div className="flex items-center justify-between gap-3 mt-4 px-1">
                 <p className="t-small ink-3">Written by AI from your answers. Talk it over; it can get things wrong.</p>
                 <button type="button" className="icon-btn shrink-0" onClick={insights.refresh} disabled={insights.loading} aria-label="Write it again">
                   <RefreshCw size={18} strokeWidth={2.4} />
@@ -122,52 +121,65 @@ export function TogetherView() {
   );
 }
 
-const TONES = {
-  sun: 'var(--sun-bg)',
-  sky: 'var(--sky-bg)',
-  petal: 'var(--petal-bg)',
-};
-
-function InsightCard({
-  title,
-  body,
-  names,
-  byName,
-  tone,
-  label,
-  children,
-}: {
-  title: string;
-  body: string;
-  names: string[];
-  byName: (n: string) => FamilyPerson | undefined;
-  tone: keyof typeof TONES;
-  label?: string;
-  children?: React.ReactNode;
-}) {
-  const known = names.map((n) => byName(n)).filter(Boolean) as FamilyPerson[];
+/** One flat observation: who, what, and an optional margin note. */
+function Row({ first, people, title, body, children }: { first: boolean; people: FamilyPerson[]; title: string; body: string; children?: React.ReactNode }) {
   return (
-    <article className="card p-4 pl-5 overflow-hidden">
-      <span aria-hidden className="absolute left-0 top-0 bottom-0 w-[6px]" style={{ background: TONES[tone] }} />
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="t-head" style={{ fontSize: '1.125rem' }}>
-          {label && (
-            <span className="t-label align-middle mr-2 px-2 py-0.5 rounded-md" style={{ background: TONES[tone], fontSize: '0.75rem' }}>
-              {label}
-            </span>
-          )}
+    <li className="py-4 flex gap-3" style={{ borderTop: first ? 0 : '1.5px dashed var(--line-strong)' }}>
+      <span className="flex flex-col -space-y-2 shrink-0 pt-0.5" aria-label={people.map((p) => p.name).join(', ')}>
+        {people.slice(0, 3).map((p) => (
+          <FlowerBadge key={p.id} style={p.style} size={30} />
+        ))}
+      </span>
+      <div className="min-w-0">
+        <h3 className="font-bold" style={{ fontSize: '1.0625rem', lineHeight: 1.3 }}>
           {title}
         </h3>
-        {known.length > 0 && (
-          <span className="flex -space-x-2 shrink-0" aria-label={known.map((p) => p.name).join(', ')}>
-            {known.slice(0, 4).map((p) => (
-              <FlowerBadge key={p.id} style={p.style} size={30} />
-            ))}
-          </span>
-        )}
+        <p className="t-small ink-2 mt-1">{body}</p>
+        {children}
       </div>
-      <p className="t-small ink-2 mt-1.5">{body}</p>
-      {children}
+    </li>
+  );
+}
+
+function LeafMark() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 20 20" className="shrink-0 mt-0.5" aria-hidden>
+      <path d="M3 17 C 3 8, 9 3, 17 3 C 17 11, 12 17, 3 17 Z" fill="#7cc48f" stroke="var(--art-ink)" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+const TICKETS = ['var(--sun-bg)', 'var(--petal-bg)', 'var(--sky-bg)'];
+const TICKET_INK = ['var(--sun-ink)', 'var(--petal-ink)', 'var(--sky-ink)'];
+
+/** An idea as a die-cut ticket: the title is the thing, details stay short. */
+function Ticket({ index, title, why, tip, people, onPlan }: { index: number; title: string; why: string; tip: string; people: FamilyPerson[]; onPlan: () => void }) {
+  const notch = { width: 22, height: 22, borderRadius: '50%', background: 'var(--paper)', position: 'absolute' as const, top: 112 };
+  return (
+    <article
+      className="relative shrink-0 flex flex-col"
+      style={{ width: '78%', scrollSnapAlign: 'start', background: TICKETS[index % 3], color: TICKET_INK[index % 3], borderRadius: 22, padding: '18px 18px 16px', minHeight: 300 }}
+    >
+      <span style={{ ...notch, left: -11 }} aria-hidden />
+      <span style={{ ...notch, right: -11 }} aria-hidden />
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex -space-x-2" aria-label={people.length ? `Suits ${people.map((p) => p.name).join(', ')}` : undefined}>
+          {people.slice(0, 4).map((p) => (
+            <FlowerBadge key={p.id} style={p.style} size={32} />
+          ))}
+        </span>
+        <span className="t-label opacity-70">Idea</span>
+      </div>
+      <h3 className="t-title mt-3" style={{ fontSize: '1.375rem', minHeight: '3.1rem' }}>
+        {title}
+      </h3>
+      <div className="mt-4 pt-4" style={{ borderTop: '2px dashed color-mix(in srgb, currentColor 30%, transparent)' }}>
+        <p className="t-small">{why}</p>
+        <p className="t-small mt-2 opacity-80">{tip}</p>
+      </div>
+      <button type="button" className="btn btn-sm mt-auto self-start" style={{ marginTop: 16 }} onClick={onPlan}>
+        Plan it with the helper
+      </button>
     </article>
   );
 }
@@ -175,20 +187,21 @@ function InsightCard({
 /** Which flowers grow in this family. Counts people, never scores. */
 function Bouquet({ people }: { people: FamilyPerson[] }) {
   const groups = STYLE_ORDER.map((s) => ({ style: s, names: people.filter((p) => p.style === s).map((p) => p.name) })).filter((g) => g.names.length);
+  const cols = Math.min(groups.length, 4);
   return (
     <section className="panel panel-card" aria-label="Your family bouquet">
       <h2 className="t-label ink-2">Your family bouquet</h2>
-      <div className="flex gap-4 overflow-x-auto no-scrollbar mt-3 -mx-1 px-1 pb-1">
+      <ul className="grid gap-x-2 gap-y-4 mt-3" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
         {groups.map((g) => (
-          <div key={g.style} className="flex flex-col items-center shrink-0 text-center" style={{ minWidth: 76 }}>
-            <Flower style={g.style as DiscoveryStyleId} size={56} />
+          <li key={g.style} className="flex flex-col items-center text-center min-w-0">
+            <Flower style={g.style} size={56} />
             <span className="t-label mt-1">{FLOWERS[g.style].flower}</span>
-            <span className="t-small ink-2" style={{ fontSize: '0.8125rem' }}>
+            <span className="t-small ink-2" style={{ fontSize: '0.8125rem', lineHeight: 1.3 }}>
               {g.names.join(', ')}
             </span>
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
     </section>
   );
 }

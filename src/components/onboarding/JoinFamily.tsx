@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
 import { SeedMark } from '../ui/bits';
+import { onRovingKeyDown, rovingTabIndex } from '../ui/roving';
 import { useHousehold } from '../../context/HouseholdContext';
 import { ALLOWED_ROLES, cleanDigitsInput, cleanLettersInput, formatFamilyCode, validateFamilyCode, validateMemberInput } from '../../utils/familyCode';
 import { Household, HouseholdMember, MemberRole } from '../../types';
 import { Sprout } from '../art/Flower';
-import { memberName } from '../../utils/member';
+import { uniqueNames } from '../../utils/member';
 
 export function JoinFamily({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { lookupFamily, joinFamily } = useHousehold();
@@ -20,6 +21,7 @@ export function JoinFamily({ open, onClose }: { open: boolean; onClose: () => vo
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const code = formatFamilyCode(letters, digits);
+  const names = uniqueNames(found?.members || []);
 
   const find = async () => {
     setError(null);
@@ -136,13 +138,14 @@ export function JoinFamily({ open, onClose }: { open: boolean; onClose: () => vo
           </div>
         </div>
       ) : (
-        <div className="grid gap-3 pt-2" role="radiogroup" aria-label="Which one are you?">
-          {found.members.map((m) => (
+        <div className="grid gap-3 pt-2" role="radiogroup" aria-label="Which one are you?" onKeyDown={(e) => onRovingKeyDown(e)}>
+          {found.members.map((m, i) => (
             <button
               key={m.id}
               type="button"
               role="radio"
               aria-checked={!adding && picked === m.id}
+              tabIndex={rovingTabIndex(i, adding ? found.members.length : found.members.findIndex((x) => x.id === picked))}
               className="option"
               onClick={() => {
                 setAdding(false);
@@ -150,11 +153,11 @@ export function JoinFamily({ open, onClose }: { open: boolean; onClose: () => vo
               }}
             >
               <Sprout size={36} />
-              <span className="flex-1 font-semibold">{memberName(m)}</span>
+              <span className="flex-1 font-semibold">{names.get(m.id)}</span>
               <SeedMark on={!adding && picked === m.id} />
             </button>
           ))}
-          <button type="button" role="radio" aria-checked={adding} className="option" onClick={() => setAdding(true)}>
+          <button type="button" role="radio" aria-checked={adding} tabIndex={adding ? 0 : -1} className="option" onClick={() => setAdding(true)}>
             <span className="w-9 h-9 grid place-items-center rounded-full t-head" style={{ background: 'var(--leaf-soft)', color: 'var(--leaf-ink)' }}>
               +
             </span>

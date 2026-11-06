@@ -104,7 +104,28 @@ const text = (v: unknown, max = 600) => (typeof v === 'string' ? v.trim().slice(
 const names = (v: unknown) =>
   Array.isArray(v) ? v.map((n) => text(n, 40)).filter(Boolean).slice(0, 12) : [];
 
-/** Runs one structured request and replies with the parsed object. */
+/** Keeps every `members` list to real people in the brief, spelled as the brief spells them. */
+function keepKnownMembers<T>(value: T, brief: FamilyBrief): T {
+  const canonical = new Map(brief.members.map((m) => [m.name.toLowerCase(), m.name]));
+  const walk = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(walk);
+    if (!v || typeof v !== 'object') return v;
+    const out: Record<string, unknown> = {};
+    for (const [k, child] of Object.entries(v)) {
+      out[k] =
+        k === 'members' && Array.isArray(child)
+          ? [...new Set(child.map((n) => canonical.get(String(n).trim().toLowerCase())).filter(Boolean))]
+          : walk(child);
+    }
+    return out;
+  };
+  return walk(value) as T;
+}
+
+/**
+ * Runs one structured request and replies with the parsed object. The SDK checks the reply
+ * against the schema (including length limits); one invalid reply gets a single retry.
+ */
 async function structured<T extends z.ZodType>(
   res: Response,
   ai: Anthropic,
@@ -114,76 +135,74 @@ async function structured<T extends z.ZodType>(
   schema: T,
   maxTokens = 8000
 ) {
-  try {
-    const msg = await ai.messages.parse({
-      model: MODEL,
-      max_tokens: maxTokens,
-      output_config: { effort: EFFORT, format: zodOutputFormat(schema) },
-      system: system(brief, task),
-      messages: [{ role: 'user', content: user }],
-    });
-    if (msg.stop_reason === 'refusal' || !msg.parsed_output) {
-      console.warn('Claude gave no usable answer', { stop: msg.stop_reason, outputTokens: msg.usage.output_tokens });
-      return res.status(502).json({ error: 'ai_declined' });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const msg = await ai.messages.parse({
+        model: MODEL,
+        max_tokens: maxTokens,
+        output_config: { effort: EFFORT, format: zodOutputFormat(schema) },
+        system: system(brief, task),
+        messages: [
+          {
+            role: 'user',
+            content: attempt === 0 ? user : `${user}\n\nYour last reply broke a length or format limit. Keep every field short and within its limit.`,
+          },
+        ],
+      });
+      if (msg.stop_reason === 'refusal') return res.status(502).json({ error: 'ai_declined' });
+      if (msg.parsed_output) return res.json(keepKnownMembers(msg.parsed_output, brief));
+      console.warn('Claude reply had no parsed output', { stop: msg.stop_reason, attempt });
+    } catch (err) {
+      if (err instanceof Anthropic.APIError) return sendError(res, err);
+      console.warn('Claude reply failed validation', { attempt, message: (err as Error)?.message?.slice(0, 200) });
     }
-    return res.json(msg.parsed_output);
-  } catch (err) {
-    return sendError(res, err);
   }
+  return res.status(502).json({ error: 'ai_invalid' });
 }
 
-// --- Schemas -----------------------------------------------------------------------------------
-const SparkSchema = z.object({
-  question: z.string(),
-  why: z.string(),
-  members: z.array(z.string()),
-});
+// --- Schemas: limits are hints to the model and are checked when the reply is parsed --------
+const line = (max: number) => z.string().min(1).max(max);
+const people = z.array(z.string()).max(8);
 
-const BloomSchema = z.object({
-  headline: z.string(),
-  note: z.string(),
-  tryThis: z.string(),
-});
+const SparkSchema = z.object({ question: line(170), why: line(130), members: people });
 
-const RootsSchema = z.object({
-  reflection: z.string(),
-  followUp: z.string().nullable(),
-});
+const BloomSchema = z.object({ headline: line(60), note: line(400), tryThis: line(150) });
+
+const RootsSchema = z.object({ reflection: line(190), followUp: line(130).nullable() });
 
 const InsightsSchema = z.object({
-  headline: z.string(),
-  together: z.array(z.object({ title: z.string(), detail: z.string(), members: z.array(z.string()) })),
-  differences: z.array(
-    z.object({ title: z.string(), detail: z.string(), bridge: z.string(), members: z.array(z.string()) })
-  ),
-  ideas: z.array(
-    z.object({ title: z.string(), why: z.string(), tip: z.string(), members: z.array(z.string()) })
-  ),
-  missing: z.string().nullable(),
+  headline: line(130),
+  together: z.array(z.object({ title: line(50), detail: line(170), members: people })).min(1).max(4),
+  differences: z.array(z.object({ title: line(50), detail: line(170), bridge: line(150), members: people })).max(3),
+  ideas: z.array(z.object({ title: line(50), why: line(170), tip: line(150), members: people })).min(1).max(3),
+  missing: line(220).nullable(),
 });
 
 const PlanAskSchema = z.object({
-  known: z.array(z.string()),
-  questions: z.array(
-    z.object({ id: z.string(), question: z.string(), options: z.array(z.string()), multi: z.boolean() })
-  ),
+  known: z.array(line(150)).max(4),
+  questions: z
+    .array(z.object({ id: line(40), question: line(80), options: z.array(line(36)).min(2).max(5), multi: z.boolean() }))
+    .max(3),
 });
 
 const PlanIdeasSchema = z.object({
-  ideas: z.array(
-    z.object({
-      title: z.string(),
-      summary: z.string(),
-      why: z.string(),
-      members: z.array(z.string()),
-      tradeoff: z.string(),
-      check: z.string().nullable(),
-    })
-  ),
-  note: z.string(),
+  ideas: z
+    .array(
+      z.object({
+        title: line(48),
+        summary: line(160),
+        why: line(230),
+        members: people,
+        tradeoff: line(150),
+        check: line(150).nullable(),
+      })
+    )
+    .min(3)
+    .max(3),
+  note: line(220),
 });
 
-const SuggestSchema = z.object({ suggestions: z.array(z.string()) });
+const SuggestSchema = z.object({ suggestions: z.array(line(80)).min(1).max(4) });
 
 const TASKS: Record<string, string> = {
   eat: 'What should we eat?',
@@ -330,9 +349,10 @@ aiRouter.post('/insights', async (req, res) => {
     g.brief,
     `Write the family profile for the app's Together screen, using only the saved answers.
 - headline: one sentence under 16 words celebrating something true about this family as a whole.
-- together: 2–4 things several people enjoy or value. title under 7 words; detail is one or two sentences naming who and what in their answers. members: the names involved.
-- differences: 1–3 interesting differences, described neutrally. detail names who prefers what; bridge is a practical, positive way the family can enjoy or use that difference.
-- ideas: exactly 3 things to try together, each grounded in answers. title under 7 words; why is one sentence; tip is one practical sentence. members: who it suits.
+- together: 2–4 things several people enjoy or value. title under 6 words; detail is one sentence under 22 words naming who and what in their answers. members: the names involved.
+- differences: 1–3 interesting differences, described neutrally. detail is one sentence under 22 words naming who prefers what; bridge is one sentence under 18 words with a practical, positive way to enjoy or use that difference.
+- ideas: exactly 3 things to try together, each grounded in answers. title under 6 words; why is one sentence under 20 words; tip is one practical sentence under 20 words. members: who it suits.
+Use the family facts for any numbers. Write for a phone screen: short, concrete, warm.
 - missing: if some people haven't answered the Foundation discovery yet, one friendly sentence naming them and saying the profile grows when they do; otherwise null.
 If only one person has answered, stay honest: describe what that person brings and what the family could discover next, and say so in missing.`,
     'Write the family profile.',

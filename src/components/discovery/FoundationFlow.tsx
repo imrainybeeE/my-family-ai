@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { ChevronLeft } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
 import { SeedMark, Thinking } from '../ui/bits';
+import { onRovingKeyDown, rovingTabIndex } from '../ui/roving';
 import { SpecimenCard } from '../profile/SpecimenCard';
 import { Flower, Sprout } from '../art/Flower';
 import { DoArt, EatArt, TravelArt } from '../art/Icons';
@@ -16,17 +17,17 @@ import { memberName } from '../../utils/member';
 import { BloomNote, DiscoveryProfile } from '../../types';
 
 const SECTION_LOOK: Record<string, { panel: string; art: React.ReactNode }> = {
-  'Free Time & Me Time': { panel: 'panel-lilac', art: <Flower style="Chiller" size={86} /> },
-  Food: { panel: 'panel-sun', art: <Sticker tint="#ffe1d8"><EatArt size={60} /></Sticker> },
-  'Travel & Experiences': { panel: 'panel-sky', art: <Sticker tint="#fff4cc"><TravelArt size={60} /></Sticker> },
-  'Interests & Together Time': { panel: 'panel-mint', art: <Sticker tint="#ffe2ec"><DoArt size={60} /></Sticker> },
-  'How I Approach Things': { panel: 'panel-poppy', art: <Flower style="Thinker" size={86} /> },
-  'Family & Support': { panel: 'panel-petal', art: <Flower style="Connector" size={86} /> },
+  'Free Time & Me Time': { panel: 'panel-lilac', art: <Flower style="Chiller" size={52} /> },
+  Food: { panel: 'panel-sun', art: <Sticker tint="#ffe1d8"><EatArt size={40} /></Sticker> },
+  'Travel & Experiences': { panel: 'panel-sky', art: <Sticker tint="#fff4cc"><TravelArt size={40} /></Sticker> },
+  'Interests & Together Time': { panel: 'panel-mint', art: <Sticker tint="#ffe2ec"><DoArt size={40} /></Sticker> },
+  'How I Approach Things': { panel: 'panel-poppy', art: <Flower style="Thinker" size={52} /> },
+  'Family & Support': { panel: 'panel-petal', art: <Flower style="Connector" size={52} /> },
 };
 
 function Sticker({ tint, children }: { tint: string; children: React.ReactNode }) {
   return (
-    <span className="sticker mr-5 mb-6" style={{ background: tint, width: 76, height: 76, transform: 'rotate(-6deg)' }}>
+    <span className="sticker" style={{ background: tint, width: 54, height: 54, borderRadius: 16, transform: 'rotate(-6deg)' }}>
       {children}
     </span>
   );
@@ -55,7 +56,20 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
   const [note, setNote] = useState<BloomNote | null>(null);
   const [noteState, setNoteState] = useState<'idle' | 'loading' | 'failed'>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
-  const advancing = useRef(false);
+  // Latest answers and the pending auto-advance, so a quick change of mind always wins and
+  // Back or Close cancels the move.
+  const answersRef = useRef<Answers>({});
+  answersRef.current = answers;
+  const advanceTimer = useRef<number | null>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const cancelAdvance = () => {
+    if (advanceTimer.current !== null) window.clearTimeout(advanceTimer.current);
+    advanceTimer.current = null;
+  };
+  useEffect(() => cancelAdvance, [index, stage, open]);
+  useEffect(() => {
+    if (stage === 'ask') headingRef.current?.focus({ preventScroll: true });
+  }, [index, stage]);
 
   useEffect(() => {
     if (!open) return;
@@ -130,7 +144,17 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
     }
   };
 
-  const choose = (option: string) => {
+  const goNext = () => {
+    cancelAdvance();
+    const latest = answersRef.current;
+    const v = latest[String(q.id)];
+    if (!(Array.isArray(v) ? v.length : v)) return;
+    if (index < FOUNDATION_QUESTIONS.length - 1) setIndex((i) => i + 1);
+    else finish(latest);
+  };
+
+  /** Picks an option. A tap or click on a single-choice question moves on after a beat. */
+  const choose = (option: string, byPointer: boolean) => {
     const id = String(q.id);
     if (q.isMultiSelect) {
       const max = q.maxSelections || 2;
@@ -138,22 +162,11 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
       setAnswers((a) => ({ ...a, [id]: next }));
       return;
     }
-    const next = { ...answers, [id]: option };
+    const next = { ...answersRef.current, [id]: option };
+    answersRef.current = next;
     setAnswers(next);
-    if (advancing.current) return;
-    advancing.current = true;
-    // Single-choice questions move on by themselves after a beat, so the pick registers.
-    window.setTimeout(() => {
-      advancing.current = false;
-      if (index < FOUNDATION_QUESTIONS.length - 1) setIndex((i) => i + 1);
-      else finish(next);
-    }, 320);
-  };
-
-  const goNext = () => {
-    if (!answered) return;
-    if (index < FOUNDATION_QUESTIONS.length - 1) setIndex((i) => i + 1);
-    else finish(answers);
+    cancelAdvance();
+    if (byPointer) advanceTimer.current = window.setTimeout(goNext, 380);
   };
 
   const title = stage === 'reveal' ? 'Your flower' : 'Find your flower';
@@ -168,7 +181,16 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
       leading={
         stage === 'ask' ? (
           <div className="flex-1 flex items-center gap-2">
-            <button type="button" className="icon-btn" onClick={() => (index === 0 ? setStage('intro') : setIndex((i) => i - 1))} aria-label="Previous question">
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={() => {
+                cancelAdvance();
+                if (index === 0) setStage('intro');
+                else setIndex((i) => i - 1);
+              }}
+              aria-label="Previous question"
+            >
               <ChevronLeft size={22} strokeWidth={2.4} />
             </button>
             <Vine progress={(index + (answered ? 1 : 0)) / FOUNDATION_QUESTIONS.length} section={sectionIndex} />
@@ -176,7 +198,7 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
         ) : undefined
       }
       footer={
-        stage === 'ask' && q.isMultiSelect ? (
+        stage === 'ask' ? (
           <button type="button" className="btn btn-primary btn-block" disabled={!answered} onClick={goNext}>
             {index === FOUNDATION_QUESTIONS.length - 1 ? 'See my flower' : 'Next'}
           </button>
@@ -217,15 +239,21 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
 
         {stage === 'ask' && (
           <motion.div key={`q${q.id}`} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.22 }} className="pt-1">
-            <section className={`panel ${SECTION_LOOK[q.section].panel}`} style={{ paddingRight: 96 }}>
-              <div className="absolute -right-3 -bottom-3" aria-hidden>
-                {SECTION_LOOK[q.section].art}
+            <section className={`panel ${SECTION_LOOK[q.section].panel}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="t-label">{SECTION_LABEL[q.section]}</p>
+                  <p className="t-small opacity-75 mt-0.5">
+                    Question {index + 1} of {FOUNDATION_QUESTIONS.length}
+                  </p>
+                </div>
+                <div className="-mt-1 -mr-1 shrink-0" aria-hidden>
+                  {SECTION_LOOK[q.section].art}
+                </div>
               </div>
-              <p className="t-label">{SECTION_LABEL[q.section]}</p>
-              <p className="t-small opacity-75 mt-0.5">
-                Question {index + 1} of {FOUNDATION_QUESTIONS.length}
-              </p>
-              <h3 className="t-title mt-3">{q.question}</h3>
+              <h3 ref={headingRef} tabIndex={-1} className="t-title mt-2 outline-none">
+                {q.question}
+              </h3>
               <p className="t-small mt-2 opacity-90">
                 {q.isMultiSelect ? `Pick up to ${q.maxSelections || 2}.${selected.length ? ` ${selected.length} of ${q.maxSelections || 2} picked.` : ''}` : q.subtitle}
               </p>
@@ -235,11 +263,24 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
                 {saveError}
               </p>
             )}
-            <div className="grid gap-2.5 mt-5" role={q.isMultiSelect ? 'group' : 'radiogroup'} aria-label={q.question}>
-              {q.options.map((o) => {
+            <div
+              className="grid gap-2.5 mt-5"
+              role={q.isMultiSelect ? 'group' : 'radiogroup'}
+              aria-label={q.question}
+              onKeyDown={q.isMultiSelect ? undefined : (e) => onRovingKeyDown(e)}
+            >
+              {q.options.map((o, i) => {
                 const on = selected.includes(o);
                 return (
-                  <button key={o} type="button" role={q.isMultiSelect ? 'checkbox' : 'radio'} aria-checked={on} className="option" onClick={() => choose(o)}>
+                  <button
+                    key={o}
+                    type="button"
+                    role={q.isMultiSelect ? 'checkbox' : 'radio'}
+                    aria-checked={on}
+                    tabIndex={q.isMultiSelect ? undefined : rovingTabIndex(i, q.options.indexOf(selected[0]))}
+                    className="option"
+                    onClick={(e) => choose(o, e.detail > 0)}
+                  >
                     <SeedMark on={on} />
                     <span className="flex-1">{o}</span>
                   </button>

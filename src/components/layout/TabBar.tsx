@@ -4,6 +4,7 @@ import { TabType } from '../../types';
 import { AskIcon, GardenIcon, PlanIcon, TogetherIcon } from '../art/Icons';
 import { useHousehold } from '../../context/HouseholdContext';
 import { FlowerBadge } from '../art/Flower';
+import { onRovingKeyDown } from '../ui/roving';
 
 const TABS: { id: TabType; label: string; Icon: typeof GardenIcon }[] = [
   { id: 'garden', label: 'Garden', Icon: GardenIcon },
@@ -14,11 +15,11 @@ const TABS: { id: TabType; label: string; Icon: typeof GardenIcon }[] = [
 
 export function TabBar({ tab, onChange }: { tab: TabType; onChange: (t: TabType) => void }) {
   return (
-    <nav className="tabbar" role="tablist" aria-label="Sections">
+    <nav className="tabbar" role="tablist" aria-label="Sections" onKeyDown={(e) => onRovingKeyDown(e, 'tab')}>
       {TABS.map(({ id, label, Icon }) => {
         const on = tab === id;
         return (
-          <button key={id} type="button" role="tab" aria-selected={on} onClick={() => onChange(id)}>
+          <button key={id} type="button" role="tab" aria-selected={on} aria-controls="main" tabIndex={on ? 0 : -1} onClick={() => onChange(id)}>
             {on && <motion.span layoutId="tab-well" className="tab-well" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
             <Icon active={on} />
             {label}

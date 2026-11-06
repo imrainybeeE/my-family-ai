@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ChevronLeft, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronLeft, Sparkles } from 'lucide-react';
+import { onRovingKeyDown, rovingTabIndex } from '../ui/roving';
 import { useHousehold } from '../../context/HouseholdContext';
 import { useUI } from '../../App';
 import { useFamily } from '../../hooks/useFamily';
@@ -30,7 +31,8 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
   const { people, byName } = useFamily();
   const [task, setTask] = useState<PlanTask | null>(initialTask);
   const [stage, setStage] = useState<Stage>('who');
-  const [who, setWho] = useState<string[]>(() => people.map((p) => p.name));
+  const [whoIds, setWhoIds] = useState<string[]>(() => people.map((p) => p.id));
+  const who = people.filter((p) => whoIds.includes(p.id)).map((p) => p.name);
   const [ask, setAsk] = useState<PlanAsk | null>(null);
   const [picks, setPicks] = useState<Record<string, string[]>>({});
   const [extra, setExtra] = useState('');
@@ -133,14 +135,14 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
               <h2 className="t-head">Who’s joining?</h2>
               <div className="flex flex-wrap gap-2 mt-3" role="group" aria-label="Who’s joining">
                 {people.map((p) => {
-                  const on = who.includes(p.name);
+                  const on = whoIds.includes(p.id);
                   return (
                     <button
                       key={p.id}
                       type="button"
                       className="chip"
                       aria-pressed={on}
-                      onClick={() => setWho((w) => (on ? w.filter((n) => n !== p.name) : [...w, p.name]))}
+                      onClick={() => setWhoIds((w) => (on ? w.filter((id) => id !== p.id) : [...w, p.id]))}
                     >
                       <FlowerBadge style={p.style} size={26} ring={false} />
                       {p.name}
@@ -182,8 +184,13 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
                     {q.question}
                   </h2>
                   {q.multi && <p className="t-small ink-3">Pick any that apply.</p>}
-                  <div className="flex flex-wrap gap-2 mt-3" role={q.multi ? 'group' : 'radiogroup'} aria-label={q.question}>
-                    {q.options.map((o) => {
+                  <div
+                    className="flex flex-wrap gap-2 mt-3"
+                    role={q.multi ? 'group' : 'radiogroup'}
+                    aria-label={q.question}
+                    onKeyDown={q.multi ? undefined : (e) => onRovingKeyDown(e)}
+                  >
+                    {q.options.map((o, oi) => {
                       const on = picks[q.id]?.includes(o) || false;
                       return (
                         <button
@@ -192,6 +199,7 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
                           className="chip"
                           role={q.multi ? undefined : 'radio'}
                           aria-checked={q.multi ? undefined : on}
+                          tabIndex={q.multi ? undefined : rovingTabIndex(oi, q.options.indexOf(picks[q.id]?.[0] ?? ''))}
                           aria-pressed={q.multi ? on : undefined}
                           onClick={() =>
                             setPicks((p) => {
@@ -243,51 +251,70 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
   );
 }
 
+const IDEA_TINTS = ['var(--sun-bg)', 'var(--petal-bg)', 'var(--sky-bg)'];
+const IDEA_INKS = ['var(--sun-ink)', 'var(--petal-ink)', 'var(--sky-ink)'];
+
+/** One idea: the title and one line up front; the reasoning one tap away. */
 function IdeaCard({ idea, index, chosen, byName }: { idea: PlanIdea; index: number; chosen: number | null; byName: ReturnType<typeof useFamily>['byName'] }) {
+  const [open, setOpen] = useState(false);
   const isChosen = chosen === index;
   const people = idea.members.map(byName).filter(Boolean);
   return (
     <motion.article
       layout
-      className="card p-5"
-      animate={{ scale: isChosen ? 1.02 : 1, opacity: chosen !== null && !isChosen ? 0.55 : 1 }}
+      className="card overflow-hidden"
+      animate={{ scale: isChosen ? 1.02 : 1, opacity: chosen !== null && !isChosen ? 0.5 : 1 }}
       style={{ outline: isChosen ? '3px solid var(--leaf)' : 'none', outlineOffset: 2 }}
       aria-current={isChosen || undefined}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="t-label" style={{ color: 'var(--leaf-ink)' }}>
-            {isChosen ? 'The garden picked this one' : `Idea ${index + 1}`}
-          </p>
-          <h3 className="t-head mt-0.5">{idea.title}</h3>
+      <div className="px-5 pt-4 pb-4" style={{ background: IDEA_TINTS[index % 3], color: IDEA_INKS[index % 3] }}>
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="t-head">{idea.title}</h3>
+          {people.length > 0 && (
+            <span className="flex -space-x-2 shrink-0" aria-label={`Suits ${idea.members.join(', ')}`}>
+              {people.slice(0, 4).map((p) => (
+                <FlowerBadge key={p!.id} style={p!.style} size={30} />
+              ))}
+            </span>
+          )}
         </div>
-        {people.length > 0 && (
-          <span className="flex -space-x-2 shrink-0" aria-label={`Suits ${idea.members.join(', ')}`}>
-            {people.slice(0, 4).map((p) => (
-              <FlowerBadge key={p!.id} style={p!.style} size={30} />
-            ))}
-          </span>
+        {isChosen && <p className="t-label mt-1">The garden picked this one</p>}
+      </div>
+      <div className="px-5 pt-3 pb-4">
+        <p className="t-body">{idea.summary}</p>
+        <button
+          type="button"
+          className="t-label mt-2 bg-transparent border-0 p-0 min-h-[44px] flex items-center gap-1"
+          style={{ color: 'var(--leaf-ink)' }}
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+        >
+          {open ? 'Hide details' : 'Why it fits'}
+          <ChevronDown size={16} strokeWidth={2.6} style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 180ms' }} />
+        </button>
+        {open && (
+          <div className="grid gap-2 pb-1">
+            <p className="t-small ink-2">{idea.why}</p>
+            <p className="t-small ink-2">
+              <span className="font-bold" style={{ color: 'var(--ink)' }}>
+                Trade-off:{' '}
+              </span>
+              {idea.tradeoff}
+            </p>
+          </div>
+        )}
+        {idea.check && (
+          <p className="t-small mt-2 flex gap-2 items-start ink-2">
+            <span aria-hidden className="mt-1.5 w-2.5 h-2.5 rounded-full shrink-0" style={{ background: '#ffd23f', boxShadow: '0 0 0 1.5px var(--art-ink)' }} />
+            <span>
+              <span className="font-bold" style={{ color: 'var(--ink)' }}>
+                Check first:{' '}
+              </span>
+              {idea.check}
+            </span>
+          </p>
         )}
       </div>
-      <p className="t-body mt-2">{idea.summary}</p>
-      <p className="t-small ink-2 mt-2">
-        <span className="font-bold" style={{ color: 'var(--ink)' }}>
-          Why it fits:{' '}
-        </span>
-        {idea.why}
-      </p>
-      <p className="t-small ink-2 mt-1.5">
-        <span className="font-bold" style={{ color: 'var(--ink)' }}>
-          Trade-off:{' '}
-        </span>
-        {idea.tradeoff}
-      </p>
-      {idea.check && (
-        <p className="t-small mt-3 rounded-xl px-3 py-2" style={{ background: 'var(--sun-bg)', color: 'var(--sun-ink)' }}>
-          <span className="font-bold">Check first: </span>
-          {idea.check}
-        </p>
-      )}
     </motion.article>
   );
 }

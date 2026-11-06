@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
 import { CopyButton, Segmented, SeedMark, useToast } from '../ui/bits';
+import { onRovingKeyDown, rovingTabIndex } from '../ui/roving';
 import { useHousehold } from '../../context/HouseholdContext';
 import { useTheme, ThemeMode } from '../../context/ThemeContext';
 import { FlowerBadge } from '../art/Flower';
 import { ALLOWED_ROLES, validateMemberInput } from '../../utils/familyCode';
-import { memberName } from '../../utils/member';
+import { uniqueNames } from '../../utils/member';
 import { MemberRole } from '../../types';
 
 export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -18,6 +19,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
   const [nickname, setNickname] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const names = uniqueNames(members);
 
   const add = async () => {
     setError(null);
@@ -52,8 +54,8 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
 
         <section>
           <h3 className="t-label ink-2 mb-2 px-1">Who’s using this phone?</h3>
-          <div className="grid gap-2" role="radiogroup" aria-label="Who’s using this phone?">
-            {members.map((m) => {
+          <div className="grid gap-2" role="radiogroup" aria-label="Who’s using this phone?" onKeyDown={(e) => onRovingKeyDown(e)}>
+            {members.map((m, i) => {
               const on = m.id === activeMember?.id;
               return (
                 <button
@@ -61,12 +63,13 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
                   type="button"
                   role="radio"
                   aria-checked={on}
+                  tabIndex={rovingTabIndex(i, members.findIndex((x) => x.id === activeMember?.id))}
                   className="option"
                   onClick={async () => {
                     if (on) return;
                     try {
                       await selectActiveMember(m.id);
-                      toast(`Switched to ${memberName(m)}`);
+                      toast(`Switched to ${names.get(m.id)}`);
                     } catch (err) {
                       setError(err instanceof Error ? err.message : 'Couldn’t switch.');
                     }
@@ -74,7 +77,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
                 >
                   <FlowerBadge style={responses[m.id]?.discoveryProfile?.primaryStyle} size={38} ring={false} />
                   <span className="flex-1">
-                    <span className="block font-semibold">{memberName(m)}</span>
+                    <span className="block font-semibold">{names.get(m.id)}</span>
                     {m.nickname && <span className="block t-small ink-2">{m.role === 'Me' ? 'Student' : m.role}</span>}
                   </span>
                   <SeedMark on={on} />

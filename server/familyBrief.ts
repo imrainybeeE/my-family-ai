@@ -85,11 +85,39 @@ export function parseBrief(input: unknown): FamilyBrief | null {
   };
 }
 
+const list = (names: string[]) => (names.length ? names.join(', ') : 'nobody yet');
+
+/** Facts the app computes itself, so the model never has to count. */
+export function familyFacts(brief: FamilyBrief): string[] {
+  const done = brief.members.filter((m) => m.foundation === 'complete' && m.topStyle);
+  const waiting = brief.members.filter((m) => !(m.foundation === 'complete' && m.topStyle));
+  const byStyle = (pick: (m: BriefMember) => string | undefined) => {
+    const groups = new Map<string, string[]>();
+    for (const m of done) {
+      const style = pick(m);
+      if (style) groups.set(style, [...(groups.get(style) || []), m.name]);
+    }
+    return [...groups].map(([style, names]) => `${style}: ${names.join(', ')}`);
+  };
+  const tops = byStyle((m) => m.topStyle);
+  return [
+    `People in the family: ${brief.members.length} (${list(brief.members.map((m) => m.name))})`,
+    `Finished the Foundation discovery: ${done.length} (${list(done.map((m) => m.name))})`,
+    `Not answered yet: ${waiting.length} (${list(waiting.map((m) => m.name))})`,
+    `Different top styles in the family: ${tops.length}${tops.length ? ` (${tops.join('; ')})` : ''}`,
+    `Second styles: ${list(byStyle((m) => m.secondStyle))}`,
+    `Advanced discovery complete: ${list(brief.members.filter((m) => m.advancedComplete).map((m) => m.name))}`,
+  ];
+}
+
 /** Renders the brief as compact prompt text. Answers are data, never instructions. */
 export function renderBrief(brief: FamilyBrief): string {
   const lines: string[] = [];
-  lines.push(`Household: ${brief.householdName} (${brief.members.length} people)`);
+  lines.push(`Household: ${brief.householdName}`);
   lines.push(`Person using the app right now: ${brief.asker}`);
+  lines.push('');
+  lines.push('Family facts (computed by the app; use these for any counts or lists of who has answered):');
+  for (const fact of familyFacts(brief)) lines.push(`- ${fact}`);
   for (const m of brief.members) {
     lines.push('');
     lines.push(`## ${m.name} (role in the family: ${m.role})`);

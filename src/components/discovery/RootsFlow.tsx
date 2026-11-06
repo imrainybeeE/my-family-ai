@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { ChevronLeft } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
 import { Thinking } from '../ui/bits';
+import { onRovingKeyDown, rovingTabIndex } from '../ui/roving';
 import { Flower } from '../art/Flower';
 import { useHousehold } from '../../context/HouseholdContext';
 import { ADVANCED_QUESTIONS } from '../../data/advancedQuestions';
@@ -151,8 +152,13 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
               <h3 className="t-title mt-3">{q.question}</h3>
             </div>
             {quickPicks.length > 0 && (
-              <div className="flex flex-wrap gap-2" role={q.options ? 'radiogroup' : 'group'} aria-label={q.options ? 'Choose one' : 'Quick picks'}>
-                {quickPicks.map((o) => {
+              <div
+                className="flex flex-wrap gap-2"
+                role={q.options ? 'radiogroup' : 'group'}
+                aria-label={q.options ? 'Choose one' : 'Quick picks'}
+                onKeyDown={q.options ? (e) => onRovingKeyDown(e) : undefined}
+              >
+                {quickPicks.map((o, oi) => {
                   const on = q.options ? text === o : false;
                   return (
                     <button
@@ -161,6 +167,7 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
                       className="chip"
                       role={q.options ? 'radio' : undefined}
                       aria-checked={q.options ? on : undefined}
+                      tabIndex={q.options ? rovingTabIndex(oi, q.options.indexOf(text)) : undefined}
                       onClick={() => setText(q.options ? o : text ? `${text} ${o}` : o)}
                     >
                       {o}

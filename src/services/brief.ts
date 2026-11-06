@@ -2,7 +2,7 @@ import { FOUNDATION_QUESTIONS } from '../data/foundationQuestions';
 import { ADVANCED_QUESTIONS } from '../data/advancedQuestions';
 import { FLOWERS } from '../data/flowers';
 import { HouseholdMember, MemberTasteAnswers } from '../types';
-import { advancedProgress, memberName } from '../utils/member';
+import { advancedProgress, uniqueNames } from '../utils/member';
 
 /** Mirrors server/familyBrief.ts. The brief is the only family data sent to the AI. */
 export interface FamilyBrief {
@@ -39,10 +39,10 @@ export function buildBrief(
   responses: Record<string, MemberTasteAnswers>,
   askerId: string | undefined
 ): FamilyBrief {
-  const asker = members.find((m) => m.id === askerId);
+  const names = uniqueNames(members);
   return {
     householdName: householdName || 'Our family',
-    asker: asker ? memberName(asker) : 'A family member',
+    asker: (askerId && names.get(askerId)) || 'A family member',
     members: members.map((m) => {
       const r = responses[m.id] || {};
       const profile = r.discoveryProfile;
@@ -63,7 +63,7 @@ export function buildBrief(
           : [];
       });
       return {
-        name: memberName(m),
+        name: names.get(m.id) || m.role,
         role: m.role === 'Me' ? 'Student (the person who set up the app)' : m.role,
         foundation: profile ? 'complete' : 'not started',
         topStyle: style(profile?.primaryStyle),

@@ -1,4 +1,6 @@
 import React, { createContext, useCallback, useContext, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { onRovingKeyDown, rovingTabIndex } from './roving';
 import { AnimatePresence, motion } from 'motion/react';
 import { Check, Copy } from 'lucide-react';
 
@@ -15,6 +17,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={show}>
       {children}
+      {createPortal(
       <div className="fixed inset-x-0 top-[calc(10px+var(--safe-t))] z-[60] flex justify-center pointer-events-none" aria-live="polite">
         <AnimatePresence>
           {message && (
@@ -34,7 +37,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </div>,
+        document.body
+      )}
     </ToastContext.Provider>
   );
 }
@@ -131,9 +136,16 @@ export function Segmented<T extends string>({
   label: string;
 }) {
   return (
-    <div className="segmented" role="radiogroup" aria-label={label}>
-      {options.map((o) => (
-        <button key={o.value} type="button" role="radio" aria-checked={value === o.value} onClick={() => onChange(o.value)}>
+    <div className="segmented" role="radiogroup" aria-label={label} onKeyDown={(e) => onRovingKeyDown(e)}>
+      {options.map((o, i) => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={value === o.value}
+          tabIndex={rovingTabIndex(i, options.findIndex((x) => x.value === value))}
+          onClick={() => onChange(o.value)}
+        >
           {o.label}
         </button>
       ))}
