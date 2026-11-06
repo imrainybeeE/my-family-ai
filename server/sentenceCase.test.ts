@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sentenceCase } from './ai.ts';
+import { sentenceCase, tidyChatLine } from './ai.ts';
 
 const names = ['Maya', 'Mum', 'Dad', 'Nai Nai', 'Leo', 'The Tan family'];
 
@@ -20,4 +20,10 @@ test('keeps family names, the surname, proper adjectives and acronyms', () => {
 test('leaves sentence case alone', () => {
   assert.equal(sentenceCase('Explore a hidden park', names), 'Explore a hidden park');
   assert.equal(sentenceCase('Pizza', names), 'Pizza');
+});
+
+test('tidies streamed chat lines: bold ideas in sentence case, British spelling', () => {
+  assert.equal(tidyChatLine('- **Curry & Rice** with Nai Nai\n', names), '- **Curry and rice** with Nai Nai\n');
+  assert.equal(tidyChatLine('A **Movie Night** with your favorite snacks.', names), 'A **Film night** with your favourite snacks.');
+  assert.equal(tidyChatLine('Try **Walks With Nai Nai** this Sunday.', names), 'Try **Walks with Nai Nai** this Sunday.');
 });

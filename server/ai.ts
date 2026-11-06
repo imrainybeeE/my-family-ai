@@ -116,6 +116,9 @@ const BRITISH: [RegExp, string][] = [
   [/\bcenter/g, 'centre'],
   [/\borganiz/g, 'organis'],
   [/\bpajama/g, 'pyjama'],
+  [/\bmovie/g, 'film'],
+  [/\bMovie/g, 'Film'],
+  [/\benergiz/g, 'energis'],
 ];
 const british = (s: string) => BRITISH.reduce((t, [from, to]) => t.replace(from, to), s);
 
@@ -140,6 +143,11 @@ export function sentenceCase(title: string, names: string[]): string {
       return /^[A-Z][a-z]/.test(w) ? w[0].toLowerCase() + w.slice(1) : w;
     })
     .join(' ');
+}
+
+/** Tidies one line of a streamed chat answer: British spelling, and **bold ideas** in sentence case with "and" for "&". */
+export function tidyChatLine(line: string, names: string[]): string {
+  return british(line).replace(/\*\*([^*]+)\*\*/g, (_, idea: string) => `**${sentenceCase(idea.replace(/\s*&\s*/g, ' and '), names)}**`);
 }
 
 /**
@@ -321,8 +329,9 @@ aiRouter.post('/chat', async (req, res) => {
   res.flushHeaders();
   const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 
-  const task = `You're chatting in the app's Ask tab with ${g.brief.asker}. Hard limit: 70 words in total. Open with the answer in one short sentence, then at most three "- " bullets of under 12 words each, or one more short sentence instead of bullets. Use **bold** only for the name of an idea. No headings, tables or emojis. Speak to ${g.brief.asker} directly and call family members by the names shown. Name concrete things from their answers (foods, places, activities) rather than style labels.`;
+  const task = `You're chatting in the app's Ask tab with ${g.brief.asker}. Hard limit: 70 words in total. Your first sentence is the answer itself and names at least one specific food, place, activity, film or person (good: "Walks in the park and stir fry are your shared favourites."). Never open by describing the answers or announcing a list ("You share some great favourites", "Here are some ideas", "Based on"). Don't end with a question. After the first sentence, then at most three "- " bullets of under 12 words each, or one more short sentence instead of bullets. Use **bold** only for the name of an idea, in sentence case ("**Curry and rice**"). No headings, tables or emojis. Speak to ${g.brief.asker} directly and call family members by the names shown. Name concrete things from their answers (foods, places, activities) rather than style labels.`;
 
+  const proper = [...g.brief.members.map((m) => m.name), g.brief.householdName];
   const abort = new AbortController();
   res.on('close', () => abort.abort());
   let sent = false;
@@ -334,13 +343,21 @@ aiRouter.post('/chat', async (req, res) => {
         contents: history,
         config: { systemInstruction: system(g.brief, task), thinkingConfig: { thinkingLevel: THINKING }, abortSignal: abort.signal },
       });
+      // Whole lines are tidied before they go out; a reply takes about a second, so holding a line back costs little.
+      let pending = '';
       for await (const chunk of stream) {
         if (chunk.text) {
           sent = true;
-          send({ t: chunk.text });
+          pending += chunk.text;
+          const cut = pending.lastIndexOf('\n');
+          if (cut !== -1) {
+            send({ t: tidyChatLine(pending.slice(0, cut + 1), proper) });
+            pending = pending.slice(cut + 1);
+          }
         }
         if (declined(chunk.candidates?.[0]?.finishReason, chunk.promptFeedback?.blockReason)) refused = true;
       }
+      if (pending) send({ t: tidyChatLine(pending, proper) });
       send({ done: true, refused });
       break;
     } catch (err) {
