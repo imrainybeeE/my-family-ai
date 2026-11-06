@@ -242,7 +242,7 @@ aiRouter.post('/chat', async (req, res) => {
   res.flushHeaders();
   const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 
-  const task = `You're chatting in the app's Ask tab with ${g.brief.asker}. Write for a phone screen: usually 30–80 words, one or two short paragraphs, or up to four "- " bullets when listing. Use **bold** only for the name of an idea. No headings, tables or emojis. Speak to ${g.brief.asker} directly and call family members by the names shown.`;
+  const task = `You're chatting in the app's Ask tab with ${g.brief.asker}. Hard limit: 70 words in total. Open with the answer in one short sentence, then at most three "- " bullets of under 12 words each, or one more short sentence instead of bullets. Use **bold** only for the name of an idea. No headings, tables or emojis. Speak to ${g.brief.asker} directly and call family members by the names shown.`;
 
   const stream = g.ai.messages.stream({
     model: MODEL,
