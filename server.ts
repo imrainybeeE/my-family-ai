@@ -2,17 +2,15 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { aiRouter, aiConfigured } from './server/ai.ts';
+import { aiConfigured } from './server/ai.ts';
+import { createApp } from './server/app.ts';
 
 dotenv.config({ path: ['.env.local', '.env'], quiet: true });
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const app = express();
+const app = createApp();
 const port = Number(process.env.PORT || 3000);
 
-app.set('trust proxy', true);
-app.use(express.json({ limit: '300kb' }));
-app.use('/api/ai', aiRouter);
 
 async function startServer() {
   const isProd = process.env.NODE_ENV === 'production';
