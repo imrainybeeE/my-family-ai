@@ -55,7 +55,6 @@ export interface Insights {
   together: { title: string; detail: string; members: string[] }[];
   differences: { title: string; detail: string; bridge: string; members: string[] }[];
   ideas: { title: string; why: string; tip: string; members: string[] }[];
-  missing: string | null;
 }
 
 export interface PlanQuestion {

@@ -336,15 +336,15 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
               <motion.div
                 className="absolute"
                 initial={{ opacity: 1, rotate: 0, scale: 1 }}
-                animate={reduceMotion ? { opacity: 0 } : { opacity: 0, rotate: 200, scale: 0.6 }}
-                transition={reduceMotion ? { duration: 0.15 } : { duration: 0.7, delay: 0.15, ease: [0.5, 0, 0.3, 1] }}
+                animate={reduceMotion ? { opacity: 0 } : { opacity: 0, rotate: 160, scale: 0.85 }}
+                transition={reduceMotion ? { duration: 0.15 } : { duration: 0.6, delay: 0.1, ease: [0.5, 0, 0.3, 1] }}
               >
                 <StitchedFlower petals={petals} size={220} />
               </motion.div>
               {/* The petals fly out from under the flower's rim once it is mostly open. */}
-              <PetalBurst styles={[profile.primaryStyle, profile.secondaryStyle]} delay={0.75} />
+              <PetalBurst styles={[profile.primaryStyle, profile.secondaryStyle]} delay={0.55} />
               <div className="relative">
-                <Flower style={profile.primaryStyle} size={230} bloom delay={reduceMotion ? 0.15 : 0.6} />
+                <Flower style={profile.primaryStyle} size={230} bloom delay={reduceMotion ? 0.15 : 0.35} />
               </div>
             </div>
             <motion.div initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduceMotion ? 0.25 : 1.4, duration: reduceMotion ? 0.2 : 0.4 }}>

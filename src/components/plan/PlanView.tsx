@@ -322,7 +322,7 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
                   }}
                 />
               ))}
-              <p className="t-small ink-3">Ideas from your saved answers.</p>
+              <p className="t-small ink-3">Written by AI</p>
               <div className="grid gap-1 mt-1">
                 <PickForUs titles={result.ideas.map((x) => x.title)} onPick={setChosen} />
                 <div className="grid grid-cols-2">

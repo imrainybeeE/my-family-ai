@@ -12,6 +12,7 @@ import { Felt, FELT_FOR_STYLE } from '../art/Flower';
 import { DoArt, EatArt, TravelArt, WatchArt } from '../art/Icons';
 import { CopyButton, SectionTitle, useToast } from '../ui/bits';
 import { CodeCard } from '../onboarding/CodeCard';
+import { tidyLine } from '../../utils/member';
 import { advancedProgress } from '../../utils/member';
 import { PlanTask } from '../../types';
 
@@ -134,7 +135,7 @@ function TableQuestion() {
       </div>
       {data && !spark.loading ? (
         <motion.p key={data.question} className="t-title mt-1" initial={{ opacity: 0, rotateX: -70, transformPerspective: 600 }} animate={{ opacity: 1, rotateX: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 22 }} style={{ fontSize: '1.375rem', lineHeight: '26px', transformOrigin: '50% 0%' }}>
-          {data.question}
+          {tidyLine(data.question, brief.members.map((m) => m.name))}
         </motion.p>
       ) : (
         <div className="mt-2 grid gap-2" aria-hidden>

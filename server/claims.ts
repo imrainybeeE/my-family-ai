@@ -262,3 +262,28 @@ export function alignMembers<T>(value: T, brief: FamilyBrief): T {
   };
   return walk(value);
 }
+
+/**
+ * Together's rows and ideas are about what people share. A row about a saved pick is pinned to
+ * one exact option two or more people chose, and its people become exactly that group, so a row
+ * can never merge different people's picks (Mum's curry with Dad's pizza). A row about a pick
+ * nobody shares goes, as does any row or idea left with fewer than two people. With no shared
+ * rows left, the headline says so.
+ */
+export function sharedOnly<T>(value: T, brief: FamilyBrief): T {
+  const v = value as { headline?: string; together?: { title: string; members: string[] }[]; ideas?: { members: string[] }[] };
+  if (!Array.isArray(v?.together)) return value;
+  const picks = tastePicks(brief);
+  const together = v.together.flatMap((row) => {
+    const about = picksIn(row.title, picks);
+    if (!about.length) return row.members.length >= 2 ? [row] : [];
+    const shared = about
+      .filter((p) => p.people.length >= 2)
+      .sort((a, b) => overlap(b.people, row.members) - overlap(a.people, row.members) || b.people.length - a.people.length)[0];
+    return shared ? [{ ...row, members: [...shared.people] }] : [];
+  });
+  const ideas = Array.isArray(v.ideas) ? v.ideas.filter((idea) => idea.members.length >= 2) : v.ideas;
+  return { ...value, together, ...(ideas ? { ideas } : {}), ...(together.length ? {} : { headline: 'No shared picks yet' }) } as T;
+}
+
+const overlap = (a: string[], b: string[]) => a.filter((x) => b.includes(x)).length;

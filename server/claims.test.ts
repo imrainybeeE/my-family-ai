@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { alignMembers, checkClaims, sharedHeadline, sharedPickLines, sharesTopic, stem, stripClaims } from './claims.ts';
+import { sharedOnly, alignMembers, checkClaims, sharedHeadline, sharedPickLines, sharesTopic, stem, stripClaims } from './claims.ts';
 import { buildBrief } from '../src/services/brief.ts';
 import { DEMO_HOUSEHOLD, DEMO_MEMBERS, DEMO_RESPONSES, DEMO_ACTIVE_MEMBER } from '../src/data/demoFamily.ts';
 
@@ -88,4 +88,22 @@ test('reads a row detail with its title, and checks "everyone" beside names', ()
 test('a shared name is not a shared topic', () => {
   assert.equal(sharesTopic('Maya and Dad enjoy park walks', 'Asian stir fry. Maya and Nai Nai both picked this.', ['Maya', 'Dad', 'Nai Nai']), false);
   assert.equal(sharesTopic('Maya and Nai Nai love stir fry', 'Asian stir fry', ['Maya', 'Nai Nai']), true);
+});
+
+test('a shared row is pinned to one pick two people share', () => {
+  const brief = {
+    householdName: 'The Tans',
+    asker: 'Maya',
+    members: [
+      { name: 'Mum', tastes: [{ q: 'Favourite food', a: ['Curry & Rice'] }] },
+      { name: 'Dad', tastes: [{ q: 'Favourite food', a: ['Pizza & Italian'] }] },
+      { name: 'Nai Nai', tastes: [{ q: 'Favourite food', a: ['Curry & Rice'] }] },
+    ],
+  } as never;
+  const out = sharedOnly({ headline: 'x', together: [{ title: 'Curry and pizza', detail: '', members: ['Mum', 'Dad'] }], ideas: [] }, brief);
+  assert.deepEqual(out.together[0].members, ['Mum', 'Nai Nai']);
+  const none = sharedOnly({ headline: 'x', together: [{ title: 'Pizza nights', detail: '', members: ['Dad', 'Mum'] }], ideas: [{ members: ['Dad'] }] }, brief);
+  assert.deepEqual(none.together, []);
+  assert.equal(none.headline, 'No shared picks yet');
+  assert.deepEqual(none.ideas, []);
 });

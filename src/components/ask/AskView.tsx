@@ -7,7 +7,7 @@ import { useAiResource } from '../../hooks/useFamily';
 import { ai, aiErrorMessage, ChatTurn, streamChat } from '../../services/ai';
 import { PageHeader } from '../layout/TabBar';
 import { AiText, Thinking } from '../ui/bits';
-import { keepNames } from '../../utils/member';
+import { keepNames, tidyLine } from '../../utils/member';
 import { Felt } from '../art/Flower';
 import { feel } from '../../feel/feel';
 
@@ -153,7 +153,7 @@ export function AskView() {
           <div className="grid gap-2" aria-busy={starters.loading}>
             {starters.loading && !suggestions.length
               ? [0, 1, 2].map((i) => <div key={i} className="skeleton h-[52px] w-full" />)
-              : suggestions.map((s) => <SuggestionButton key={s} text={keepNames(s, names)} onClick={() => send(s)} />)}
+              : suggestions.map((s) => <SuggestionButton key={s} text={tidyLine(s, names)} onClick={() => send(s)} />)}
           </div>
 
           <button
@@ -235,7 +235,7 @@ export function AskView() {
           {!busy && followUps.length > 0 && (
             <div className="grid gap-2 pl-11">
               {followUps.map((f) => (
-                <SuggestionButton key={f} text={keepNames(f, names)} onClick={() => send(f)} small />
+                <SuggestionButton key={f} text={tidyLine(f, names)} onClick={() => send(f)} small />
               ))}
             </div>
           )}
@@ -247,8 +247,12 @@ export function AskView() {
       <div aria-hidden className="scrim fixed z-[19] inset-x-0 bottom-0 mx-auto max-w-[460px]" style={{ height: `calc(var(--tabbar-top) + ${composerH}px + 32px + var(--safe-b))`, ['--scrim-mask' as string]: 'linear-gradient(to bottom, transparent, #000 24px)' }} />
       <form
         ref={composerRef}
-        className="fixed z-20 left-1/2 -translate-x-1/2 w-[min(420px,calc(100%-32px))] flex items-end gap-2 p-[5px] pl-1 rounded-[14px]"
-        style={{ bottom: 'calc(var(--tabbar-top) + var(--safe-b))', minHeight: 54, background: 'color-mix(in srgb, var(--card) 96%, transparent)', backdropFilter: 'blur(28px) saturate(1.5)', WebkitBackdropFilter: 'blur(28px) saturate(1.5)', boxShadow: '0 0 0 0.5px var(--line-strong), var(--shadow-lift)' }}
+        className="glass fixed z-20 inset-x-0 mx-auto w-[min(420px,calc(100%-32px))] flex items-end gap-2 p-[5px] pl-2 rounded-[27px]"
+        data-liquid=""
+        data-liquid-bezel="14"
+        data-liquid-strength="14"
+        data-liquid-frost="3"
+        style={{ bottom: 'calc(var(--tabbar-top) + var(--safe-b))', minHeight: 54 }}
         onSubmit={(e) => {
           e.preventDefault();
           send(input);
@@ -301,7 +305,7 @@ function SuggestionButton({ text, onClick, small }: { text: string; onClick: () 
 function HelperAvatar() {
   return (
     <span className="shrink-0 w-9 h-9 grid place-items-center -mt-0.5" aria-hidden>
-      <Felt name="yarnball" size={52} />
+      <Felt name="yarnball" size={44} />
     </span>
   );
 }

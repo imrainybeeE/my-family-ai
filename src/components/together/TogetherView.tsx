@@ -11,7 +11,7 @@ import { Felt, FELT_FOR_STYLE, FlowerBadge } from '../art/Flower';
 import { Strand, useWidth } from '../art/Garland';
 import { SectionTitle, Thinking } from '../ui/bits';
 import { seatRing } from '../../utils/ring';
-import { keepNames } from '../../utils/member';
+import { joinNames, tidyLine } from '../../utils/member';
 import { feel } from '../../feel/feel';
 
 /** One yarn colour per shared thing, used for its strand in the circle and its row below. */
@@ -40,12 +40,12 @@ export function TogetherView() {
       })),
       differences: [],
       ideas: [],
-      missing: null,
     };
   }, [insights.error, brief]);
   const data = insights.data || fallback;
+  const waiting = people.filter((p) => !p.style);
   const who = (names: string[]) => names.map(byName).filter(Boolean) as FamilyPerson[];
-  const keep = (text: string) => keepNames(text, brief.members.map((m) => m.name));
+  const keep = (text: string) => tidyLine(text, brief.members.map((m) => m.name));
   const links = useMemo(
     () => (data?.together || []).map((t) => t.members.map(byName).filter((p): p is FamilyPerson => Boolean(p)).map((p) => p.id)),
     [data, byName]
@@ -83,15 +83,19 @@ export function TogetherView() {
               <p className="t-head mt-2" style={{ fontSize: '1.375rem', lineHeight: '26px', textWrap: 'balance' }}>
                 {keep(data.headline)}
               </p>
-              {data.missing && <p className="t-small ink-2 mt-2">{data.missing}</p>}
+              {waiting.length > 0 && (
+                <p className="t-small ink-2 mt-2">
+                  {joinNames(waiting.map((p) => p.name))} {waiting.length === 1 ? 'hasn’t' : 'haven’t'} answered yet
+                </p>
+              )}
 
               {data.together.length > 0 && (
                 <>
                   <SectionTitle>Shared interests</SectionTitle>
                   <ul className="card px-4" aria-label="Things you enjoy together">
                     {data.together.map((t, i) => (
-                      // The headline already says the first row in words, so that row shows only its title and people.
-                      <Row key={i} first={i === 0} yarn={YARNS[i % YARNS.length]} people={who(t.members)} title={t.title} body={i === 0 ? '' : keep(t.detail)} />
+                      // Who shares it is a fact the app knows, so every row states it directly rather than in AI words.
+                      <Row key={i} first={i === 0} yarn={YARNS[i % YARNS.length]} people={who(t.members)} title={t.title} body={keep(joinNames(who(t.members).map((p) => p.name)))} />
                     ))}
                   </ul>
                 </>
@@ -316,11 +320,11 @@ const TAPES = ['tape-sky', '', 'tape-butter'];
 /** An idea as a ticket taped to the page: the title is the thing, the reason stays short. */
 function Ticket({ index, title, why, people, onPlan }: { index: number; title: string; why: string; people: FamilyPerson[]; onPlan: () => void }) {
   return (
-    <article className={`stock ${TICKETS[index % 3]} relative flex flex-col`} style={{ padding: 16, minHeight: 176 }}>
+    <article className={`stock ${TICKETS[index % 3]} relative flex flex-col`} style={{ padding: 16 }}>
       <span className={`tape ${TAPES[index % 3]}`} style={{ top: -10, left: 18, transform: 'rotate(-4deg)' }} aria-hidden />
       <h3 className="t-title mt-1" style={{ fontSize: '1.375rem', lineHeight: '26px' }}>{title}</h3>
       <p className="t-small mt-2 opacity-85">{why}</p>
-      <div className="flex items-center justify-between gap-2 mt-auto pt-4">
+      <div className="flex items-center justify-between gap-2 mt-4">
         <span className="flex -space-x-2" aria-label={people.length ? `Suits ${people.map((p) => p.name).join(', ')}` : undefined}>
           {people.slice(0, 4).map((p) => (
             <FlowerBadge key={p.id} style={p.style} size={30} />
