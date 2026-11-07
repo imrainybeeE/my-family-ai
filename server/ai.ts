@@ -725,7 +725,7 @@ aiRouter.post('/plan/ideas', async (req, res) => {
     g.ai,
     g.brief,
     `The family wants help with "${taskTitle}". People joining: ${who.join(', ')}.
-Give exactly 3 options that fit these people, using their saved answers and practical answers. Every practical answer is binding for all three options: if they chose take-out, all three are take-out; if they chose at home, all three are at home; if they chose right now, none of them is for this evening or the weekend. Within those limits, make the three clearly different (for example the cuisine, the effort, or who it suits most), and keep them the same kind of thing: for "What should we eat?", three dinners unless the practical answers ask for snacks or another meal. Each summary names the actual food or activity (not "a rice dish").
+Give exactly 3 options that fit these people, using their saved answers and practical answers. Every practical answer is binding for all three options: if they chose take-out, all three are take-out; if they chose at home, all three are at home; if they chose right now, none of them is for this evening or the weekend. Within those limits, make the three clearly different: for food, three different cuisines drawn from different people's picks (never two dishes of the same kind); otherwise different activities. Keep them the same kind of thing: for "What should we eat?", three dinners unless the practical answers ask for snacks or another meal. Each summary names the actual food or activity (not "a rice dish").
 - title: under 5 words.
 - summary: one sentence under 14 words describing the idea, without repeating words from the title.
 - why: one sentence under 18 words on why it fits, naming people and what in their answers points to it.
