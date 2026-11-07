@@ -341,8 +341,11 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
               >
                 <StitchedFlower petals={petals} size={220} />
               </motion.div>
-              <Flower style={profile.primaryStyle} size={230} bloom delay={reduceMotion ? 0.15 : 0.6} />
-              <PetalBurst styles={[profile.primaryStyle, profile.secondaryStyle]} delay={0.65} />
+              {/* The petals fly out from under the flower's rim once it is mostly open. */}
+              <PetalBurst styles={[profile.primaryStyle, profile.secondaryStyle]} delay={0.75} />
+              <div className="relative">
+                <Flower style={profile.primaryStyle} size={230} bloom delay={reduceMotion ? 0.15 : 0.6} />
+              </div>
             </div>
             <motion.div initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduceMotion ? 0.25 : 1.4, duration: reduceMotion ? 0.2 : 0.4 }}>
               <p className="t-title">{FLOWERS[profile.primaryStyle].flower}</p>

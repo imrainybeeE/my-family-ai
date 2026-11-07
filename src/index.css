@@ -87,9 +87,9 @@
 
   --stock-pink: color-mix(in srgb, #f08aa6 14%, var(--card));
   --stock-pink-ink: #ffd9e4;
-  /* Yellow over navy turns olive, so at night butter stock is plain paper. */
-  --stock-butter: var(--card);
-  --stock-butter-ink: var(--ink);
+  /* Yellow over navy turns olive, so at night butter stock borrows the lilac tint. */
+  --stock-butter: var(--stock-lilac);
+  --stock-butter-ink: var(--stock-lilac-ink);
   --stock-mint: color-mix(in srgb, #7fc49a 18%, var(--card));
   --stock-mint-ink: #cdf0da;
   --stock-lilac: color-mix(in srgb, #b8a3ee 22%, var(--card));
@@ -214,7 +214,6 @@
 .t-small {
   font-size: 0.9375rem;
   line-height: 1.42;
-  text-wrap: pretty;
 }
 .t-label {
   font-size: 0.875rem;
@@ -737,11 +736,11 @@ textarea.field {
   padding-left: 1.1em;
   margin-top: 0.35em;
 }
-/* Bullets are little stitches. */
 /* A chat answer leads with its one-line answer, set a step heavier than the facts below it. */
 .prose-ai.lead > p:first-child {
   font-weight: 600;
 }
+/* Bullets are little stitches. */
 .prose-ai li::before {
   content: '';
   position: absolute;

@@ -7,6 +7,7 @@ import { useAiResource } from '../../hooks/useFamily';
 import { ai, aiErrorMessage, ChatTurn, streamChat } from '../../services/ai';
 import { PageHeader } from '../layout/TabBar';
 import { AiText, Thinking } from '../ui/bits';
+import { keepNames } from '../../utils/member';
 import { Felt } from '../art/Flower';
 import { feel } from '../../feel/feel';
 
@@ -30,6 +31,7 @@ interface Msg extends ChatTurn {
 
 export function AskView() {
   const { brief, activeMember } = useHousehold();
+  const names = brief.members.map((m) => m.name);
   const ui = useUI();
   const storeKey = `mfa:chat:${activeMember?.id}`;
   const [messages, setMessages] = useState<Msg[]>(() => {
@@ -103,7 +105,12 @@ export function AskView() {
           setMessages((list) => list.map((m) => (m.id === replyId ? { ...m, content: answer } : m)));
         }
         ai.suggest(brief, { question: q, answer }, controller.signal)
-          .then((r) => gen === genRef.current && setFollowUps(r.suggestions.slice(0, 3)))
+          .then((r) => {
+            if (gen !== genRef.current) return;
+            // Never suggest something already asked in this chat.
+            const asked = new Set(history.filter((m) => m.role === 'user').map((m) => m.content.trim().toLowerCase()));
+            setFollowUps(r.suggestions.filter((x) => !asked.has(x.trim().toLowerCase())).slice(0, 3));
+          })
           .catch(() => gen === genRef.current && setFollowUps([]));
       } catch (err) {
         if ((err as Error)?.name === 'AbortError' || gen !== genRef.current) return;
@@ -146,7 +153,7 @@ export function AskView() {
           <div className="grid gap-2" aria-busy={starters.loading}>
             {starters.loading && !suggestions.length
               ? [0, 1, 2].map((i) => <div key={i} className="skeleton h-[52px] w-full" />)
-              : suggestions.map((s) => <SuggestionButton key={s} text={s} onClick={() => send(s)} />)}
+              : suggestions.map((s) => <SuggestionButton key={s} text={keepNames(s, names)} onClick={() => send(s)} />)}
           </div>
 
           <button
@@ -176,7 +183,7 @@ export function AskView() {
           <div className="flex justify-end">
             <button
               type="button"
-              className="btn btn-quiet btn-sm"
+              className="btn btn-quiet btn-sm -mr-3"
               onClick={() => {
                 genRef.current += 1;
                 abortRef.current?.abort();
@@ -200,7 +207,7 @@ export function AskView() {
                     <HelperAvatar />
                     <div className="card px-4 py-3.5 flex-1 min-w-0" style={{ borderRadius: '6px 20px 20px 20px' }}>
                       {m.content ? (
-                        <AiText text={m.content} className="t-body lead" />
+                        <AiText text={keepNames(m.content, names)} className="t-body lead" />
                       ) : (
                         <Thinking label="Reading your family’s answers" />
                       )}
@@ -228,7 +235,7 @@ export function AskView() {
           {!busy && followUps.length > 0 && (
             <div className="grid gap-2 pl-11">
               {followUps.map((f) => (
-                <SuggestionButton key={f} text={f} onClick={() => send(f)} small />
+                <SuggestionButton key={f} text={keepNames(f, names)} onClick={() => send(f)} small />
               ))}
             </div>
           )}

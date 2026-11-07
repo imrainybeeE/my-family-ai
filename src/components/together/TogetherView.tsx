@@ -11,6 +11,7 @@ import { Felt, FELT_FOR_STYLE, FlowerBadge } from '../art/Flower';
 import { Strand, useWidth } from '../art/Garland';
 import { SectionTitle, Thinking } from '../ui/bits';
 import { seatRing } from '../../utils/ring';
+import { keepNames } from '../../utils/member';
 import { feel } from '../../feel/feel';
 
 /** One yarn colour per shared thing, used for its strand in the circle and its row below. */
@@ -44,6 +45,7 @@ export function TogetherView() {
   }, [insights.error, brief]);
   const data = insights.data || fallback;
   const who = (names: string[]) => names.map(byName).filter(Boolean) as FamilyPerson[];
+  const keep = (text: string) => keepNames(text, brief.members.map((m) => m.name));
   const links = useMemo(
     () => (data?.together || []).map((t) => t.members.map(byName).filter((p): p is FamilyPerson => Boolean(p)).map((p) => p.id)),
     [data, byName]
@@ -79,14 +81,15 @@ export function TogetherView() {
           ) : (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <p className="t-head mt-2" style={{ fontSize: '1.375rem', lineHeight: '26px', textWrap: 'balance' }}>
-                {data.headline}
+                {keep(data.headline)}
               </p>
               {data.missing && <p className="t-small ink-2 mt-2">{data.missing}</p>}
 
               <SectionTitle>Shared interests</SectionTitle>
               <ul className="card px-4" aria-label="Things you enjoy together">
                 {data.together.map((t, i) => (
-                  <Row key={i} first={i === 0} yarn={YARNS[i % YARNS.length]} people={who(t.members)} title={t.title} body={t.detail} />
+                  // The headline already says the first row in words, so that row shows only its title and people.
+                  <Row key={i} first={i === 0} yarn={YARNS[i % YARNS.length]} people={who(t.members)} title={t.title} body={i === 0 ? '' : keep(t.detail)} />
                 ))}
               </ul>
 
@@ -95,7 +98,7 @@ export function TogetherView() {
                   <SectionTitle>Where you differ</SectionTitle>
                   <ul className="card px-4" aria-label="Where you differ">
                     {data.differences.map((d, i) => (
-                      <Row key={i} first={i === 0} people={who(d.members)} title={d.title} body={d.detail}>
+                      <Row key={i} first={i === 0} people={who(d.members)} title={d.title} body={keep(d.detail)}>
                         <p className="t-small mt-2 flex gap-2 items-start font-medium" style={{ color: 'var(--accent-ink)' }}>
                           <span aria-hidden className="shrink-0 rounded-full mt-2" style={{ width: 12, height: 4, background: 'var(--yarn)', transform: 'rotate(-20deg)' }} />
                           <span>{d.bridge}</span>
@@ -112,12 +115,12 @@ export function TogetherView() {
                   const idea = data.ideas[i];
                   const names = who(idea.members).filter((p) => !p.isYou).map((p) => p.name);
                   const withWho = names.length ? ` with ${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0]}` : '';
-                  return <Ticket index={i} title={idea.title} why={idea.why} people={who(idea.members)} onPlan={() => ui.askAbout(`Help me plan ${idea.title.toLowerCase()}${withWho}.`)} />;
+                  return <Ticket index={i} title={idea.title} why={keep(idea.why)} people={who(idea.members)} onPlan={() => ui.askAbout(`Help me plan ${idea.title.replace(/^([A-Z])(?=[a-z])/, (c) => c.toLowerCase())}${withWho}.`)} />;
                 }}
               </IdeaPager>
 
               <div className="flex items-center justify-between gap-3 mt-2">
-                <p className="t-small ink-3">{insights.error ? 'From your saved answers.' : 'Written by AI from your answers.'}</p>
+                <p className="t-small ink-3 whitespace-nowrap">{insights.error ? 'From your answers' : 'Written by AI'}</p>
                 <button
                   type="button"
                   className="btn btn-quiet btn-sm shrink-0 -mr-3"
@@ -230,20 +233,20 @@ function FamilyCircle({ people: given, links, onOpen }: { people: FamilyPerson[]
 /** One observation: who, what, and an optional handwritten note. */
 function Row({ first, people, title, body, yarn, children }: { first: boolean; people: FamilyPerson[]; title: string; body: string; yarn?: string; children?: React.ReactNode }) {
   return (
-    <li className="py-4 flex gap-3" style={{ borderTop: first ? 0 : '1px solid var(--line)' }}>
-      <span className="flex flex-col -space-y-2 shrink-0 pt-0.5" aria-label={people.map((p) => p.name).join(', ')}>
-        {people.slice(0, 3).map((p) => (
-          <FlowerBadge key={p.id} style={p.style} size={30} />
-        ))}
-      </span>
-      <div className="min-w-0 flex-1">
-        <h3 className="t-head flex items-start gap-2">
+    <li className="py-4" style={{ borderTop: first ? 0 : '1px solid var(--line)' }}>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="t-head flex items-start gap-2 min-w-0">
           {yarn && <span aria-hidden className="shrink-0 rounded-full mt-[0.55em]" style={{ width: 14, height: 4, background: yarn }} />}
           {title}
         </h3>
-        <p className="t-small ink-2 mt-1">{body}</p>
-        {children}
+        <span className="flex -space-x-2 shrink-0" aria-label={people.map((p) => p.name).join(', ')}>
+          {people.slice(0, 3).map((p) => (
+            <FlowerBadge key={p.id} style={p.style} size={28} />
+          ))}
+        </span>
       </div>
+      {body && <p className="t-small ink-2 mt-1">{body}</p>}
+      {children}
     </li>
   );
 }

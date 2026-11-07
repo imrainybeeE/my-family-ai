@@ -162,7 +162,9 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  */
 export function caseTastes(text: string, options: string[]): string {
   let out = text;
-  for (const option of options) {
+  // Whole labels first, then their parts ("Asian Stir Fry" from "Asian Stir Fry & Noodles").
+  const parts = options.flatMap((o) => o.split(/\s*[&/]\s*/)).filter((p) => p.split(/\s+/).filter((w) => /^[A-Z]/.test(w)).length >= 2);
+  for (const option of [...options, ...parts]) {
     const tokens = option.split(/\s+/).filter(Boolean);
     if (tokens.filter((t) => /^[A-Z]/.test(t)).length < 2) continue;
     const re = new RegExp(`\\b${tokens.map((t) => (t === '&' ? '(?:&|and)' : escapeRe(t))).join('\\s+')}(?![A-Za-z])`, 'gi');

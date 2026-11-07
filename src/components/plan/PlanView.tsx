@@ -399,7 +399,7 @@ function IdeaCard({ idea, index, chosen, byName, onChoose }: { idea: PlanIdea; i
             </span>
           </p>
         )}
-        <div className="flex items-center justify-between gap-3 mt-3">
+        <div className="flex items-center justify-between gap-3 mt-1">
         {people.length > 0 && (
             <span className="flex items-center -space-x-2 shrink-0" aria-label={`Suits ${idea.members.join(', ')}`}>
               {people.slice(0, 3).map((p) => (

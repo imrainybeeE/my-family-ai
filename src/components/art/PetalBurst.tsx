@@ -37,8 +37,8 @@ export function PetalBurst({ styles, count = 10, delay = 0, radius = 170 }: { st
           key={i}
           className="absolute"
           style={{ width: p.size, height: p.size, transformPerspective: 400 }}
-          initial={{ x: 0, y: 0, opacity: 0, scale: 0.3, rotate: p.tilt, rotateX: 0 }}
-          animate={{ x: [0, p.x, p.x * 1.05], y: [0, p.y, p.y + p.fall], opacity: [0, 1, 1, 0], scale: [0.3, 1, 1], rotate: [p.tilt, p.tilt + p.spin], rotateX: [0, 55] }}
+          initial={{ x: p.x * 0.3, y: p.y * 0.3, opacity: 0, scale: 0.6, rotate: p.tilt, rotateX: 0 }}
+          animate={{ x: [p.x * 0.3, p.x, p.x * 1.05], y: [p.y * 0.3, p.y, p.y + p.fall], opacity: [0, 1, 1, 0], scale: [0.6, 1, 1], rotate: [p.tilt, p.tilt + p.spin], rotateX: [0, 55] }}
           transition={{ duration: 1.6, delay: delay + (i % 6) * 0.015, ease: [0.2, 0.7, 0.3, 1], times: [0, 0.4, 1], opacity: { duration: 1.6, delay, times: [0, 0.1, 0.7, 1] } }}
         >
           <Felt name={PETAL[p.style]} size={p.size} />

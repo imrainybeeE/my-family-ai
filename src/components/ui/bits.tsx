@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { onRovingKeyDown, rovingTabIndex } from './roving';
+import { noLoneWord } from '../../utils/member';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Check, Copy } from 'lucide-react';
 
@@ -71,11 +72,11 @@ export function AiText({ text, className = '' }: { text: string; className?: str
   for (const raw of text.split('\n')) {
     const line = raw.trim();
     if (/^([-*•]|\d+\.)\s+/.test(line)) {
-      list.push(line.replace(/^([-*•]|\d+\.)\s+/, ''));
+      list.push(noLoneWord(line.replace(/^([-*•]|\d+\.)\s+/, '')));
       continue;
     }
     flush();
-    if (line) blocks.push(<p key={`p${blocks.length}`}>{inline(line.replace(/^#+\s*/, ''))}</p>);
+    if (line) blocks.push(<p key={`p${blocks.length}`}>{inline(noLoneWord(line.replace(/^#+\s*/, '')))}</p>);
   }
   flush();
   return <div className={`prose-ai ${className}`}>{blocks}</div>;

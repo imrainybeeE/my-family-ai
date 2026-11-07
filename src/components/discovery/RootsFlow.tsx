@@ -147,10 +147,13 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
       leading={
         stage === 'ask' || stage === 'reflect' ? (
           <div className="flex-1 flex items-center gap-2">
-            {stage === 'ask' && (
+            {stage === 'ask' ? (
               <button type="button" className="icon-btn" aria-label="Previous question" disabled={saving} onClick={() => (index === 0 ? setStage('intro') : setIndex((i) => i - 1))}>
                 <ChevronLeft size={22} strokeWidth={2.4} />
               </button>
+            ) : (
+              // Holds the back button's place, so the yarn doesn't jump between a question and its reflection.
+              <span className="w-11 h-11 shrink-0" aria-hidden />
             )}
             <YarnProgress progress={(index + (stage === 'reflect' ? 1 : 0)) / ADVANCED_QUESTIONS.length} beads={4} label={`${index + 1} of ${ADVANCED_QUESTIONS.length}`} />
           </div>

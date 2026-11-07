@@ -62,3 +62,7 @@ test('removes a run of adjectives before choosing the article', () => {
   assert.equal(dropFiller('Bake a warm, fragrant apple pie.'), 'Bake an apple pie.');
   assert.equal(youify('Try Maya’s favourite park.', 'Maya'), 'Try your favourite park.');
 });
+
+test('writes parts of taste labels as words too', () => {
+  assert.equal(caseTastes('Cook Asian Stir Fry for dinner.', ['Asian Stir Fry & Noodles']), 'Cook Asian stir fry for dinner.');
+});

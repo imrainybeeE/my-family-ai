@@ -75,3 +75,18 @@ export function rollbackAnswers(
   else delete next[memberId];
   return next;
 }
+
+/**
+ * Keeps each multi-word name on one line ("Nai Nai"), using non-breaking spaces inside the names,
+ * so a line never ends in the middle of a person.
+ */
+export function keepNames(text: string, names: string[]): string {
+  return names
+    .filter((n) => n.includes(' '))
+    .reduce((t, n) => t.split(n).join(n.replace(/ /g, '\u00a0')), text);
+}
+
+/** Joins a short last word to the one before it, so a line of copy never ends on one lone word. */
+export function noLoneWord(text: string): string {
+  return text.replace(/ (\S{1,7})$/, '\u00a0$1');
+}
