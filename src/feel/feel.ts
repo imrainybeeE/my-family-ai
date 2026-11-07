@@ -24,6 +24,13 @@ export function setSoundOn(on: boolean) {
     // Without storage the choice lasts for this visit only.
   }
   muted = !on;
+  // Sounds already scheduled (the tail of a chime) fade out at once, and come back with the switch.
+  if (ctx && master) {
+    const t = ctx.currentTime;
+    master.gain.cancelScheduledValues(t);
+    master.gain.setValueAtTime(master.gain.value, t);
+    master.gain.linearRampToValueAtTime(on ? 0.5 : 0, t + 0.01);
+  }
 }
 
 let muted = !soundOn();

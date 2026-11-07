@@ -110,7 +110,9 @@ export function TogetherView() {
               <IdeaPager count={data.ideas.length}>
                 {(i) => {
                   const idea = data.ideas[i];
-                  return <Ticket index={i} title={idea.title} why={idea.why} people={who(idea.members)} onPlan={() => ui.askAbout(`Help us plan this: ${idea.title}`)} />;
+                  const names = who(idea.members).filter((p) => !p.isYou).map((p) => p.name);
+                  const withWho = names.length ? ` with ${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0]}` : '';
+                  return <Ticket index={i} title={idea.title} why={idea.why} people={who(idea.members)} onPlan={() => ui.askAbout(`Help me plan ${idea.title.toLowerCase()}${withWho}.`)} />;
                 }}
               </IdeaPager>
 
@@ -318,7 +320,7 @@ function Ticket({ index, title, why, people, onPlan }: { index: number; title: s
           ))}
         </span>
         <button type="button" className="btn btn-sm btn-soft" style={{ ['--btn-bg' as string]: 'var(--card)' }} onClick={onPlan}>
-          Ask about this
+          Ask to plan
         </button>
       </div>
     </article>

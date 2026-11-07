@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { ArrowUp, ChevronDown, RotateCcw } from 'lucide-react';
 import { useHousehold } from '../../context/HouseholdContext';
 import { useUI } from '../../App';
@@ -68,7 +68,8 @@ export function AskView() {
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  const scrollDown = () => window.requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }));
+  const reduce = useReducedMotion();
+  const scrollDown = () => window.requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'end' }));
 
   const send = useCallback(
     async (text: string, base?: Msg[]) => {

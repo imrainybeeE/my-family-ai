@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { motion, useAnimate } from 'motion/react';
+import { motion, useAnimate, useReducedMotion } from 'motion/react';
 import { DiscoveryStyleId } from '../../types';
 import { Felt, FeltName } from './Flower';
 
@@ -25,10 +25,11 @@ export function StitchedFlower({ petals, size = 120 }: { petals: DiscoveryStyleI
   const petalSize = size * 0.52;
   const centre = size * 0.34;
   const [scope, animate] = useAnimate();
-  // A little bounce each time a petal is sewn on.
+  const reduce = useReducedMotion();
+  // A little bounce each time a petal is sewn on (none with reduced motion).
   useEffect(() => {
-    if (petals.length) animate(scope.current, { scale: [0.95, 1] }, { type: 'spring', stiffness: 500, damping: 12 });
-  }, [petals.length, animate, scope]);
+    if (petals.length && !reduce) animate(scope.current, { scale: [0.95, 1] }, { type: 'spring', stiffness: 500, damping: 12 });
+  }, [petals.length, animate, scope, reduce]);
   return (
     <div ref={scope} className="relative" style={{ width: size, height: size }} aria-hidden>
       {petals.map((style, i) => {

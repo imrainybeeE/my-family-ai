@@ -428,6 +428,7 @@ function IdeaCard({ idea, index, chosen, byName, onChoose }: { idea: PlanIdea; i
 function PickForUs({ titles, onPick }: { titles: string[]; onPick: (i: number) => void }) {
   const [spinning, setSpinning] = useState(false);
   const [picked, setPicked] = useState('');
+  const [current, setCurrent] = useState('');
   const timer = useRef<number | null>(null);
   const reduce = useReducedMotion();
   useEffect(() => () => {
@@ -449,6 +450,7 @@ function PickForUs({ titles, onPick }: { titles: string[]; onPick: (i: number) =
           let i = 0;
           const tick = () => {
             onPick(i % count);
+            setCurrent(titles[i % count]);
             i += 1;
             if (i <= steps) {
               feel('select');
@@ -463,7 +465,10 @@ function PickForUs({ titles, onPick }: { titles: string[]; onPick: (i: number) =
           tick();
         }}
       >
-        {spinning ? 'Choosing…' : 'Pick for us'}
+        {/* The shuffle shows in the button itself, wherever the cards are. */}
+        <span className="truncate" aria-hidden={spinning}>
+          {spinning ? current : 'Pick for us'}
+        </span>
       </button>
       <p className="sr-only" aria-live="polite">
         {picked ? `Picked ${picked}` : ''}

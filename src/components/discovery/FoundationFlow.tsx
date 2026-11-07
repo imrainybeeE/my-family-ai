@@ -74,7 +74,7 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
   // Sound isn't motion, so reduced-motion users still hear it, just sooner. Closing cancels it.
   useEffect(() => {
     if (stage !== 'blooming' || !open) return;
-    const t = window.setTimeout(() => feel('bloom'), reduceMotion ? 250 : 650);
+    const t = window.setTimeout(() => feel('bloom'), reduceMotion ? 150 : 650);
     return () => window.clearTimeout(t);
   }, [stage, open, reduceMotion]);
   // The finish run in flight: its reveal timer and bloom-note request. Closing, switching person or
@@ -333,13 +333,18 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
             className="grid place-items-center place-content-center text-center gap-4 min-h-[calc(100dvh-160px-var(--safe-t)-var(--safe-b))]"
           >
             <div className="relative grid place-items-center" style={{ width: 240, height: 240 }}>
-              <motion.div className="absolute" initial={{ opacity: 1, rotate: 0, scale: 1 }} animate={{ opacity: 0, rotate: 200, scale: 0.6 }} transition={{ duration: 0.7, delay: 0.15, ease: [0.5, 0, 0.3, 1] }}>
+              <motion.div
+                className="absolute"
+                initial={{ opacity: 1, rotate: 0, scale: 1 }}
+                animate={reduceMotion ? { opacity: 0 } : { opacity: 0, rotate: 200, scale: 0.6 }}
+                transition={reduceMotion ? { duration: 0.15 } : { duration: 0.7, delay: 0.15, ease: [0.5, 0, 0.3, 1] }}
+              >
                 <StitchedFlower petals={petals} size={220} />
               </motion.div>
-              <Flower style={profile.primaryStyle} size={230} bloom delay={0.6} />
+              <Flower style={profile.primaryStyle} size={230} bloom delay={reduceMotion ? 0.15 : 0.6} />
               <PetalBurst styles={[profile.primaryStyle, profile.secondaryStyle]} delay={0.65} />
             </div>
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.4, duration: 0.4 }}>
+            <motion.div initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduceMotion ? 0.25 : 1.4, duration: reduceMotion ? 0.2 : 0.4 }}>
               <p className="t-title">{FLOWERS[profile.primaryStyle].flower}</p>
               <p className="t-body ink-2 mt-1">{profile.primaryStyle}</p>
             </motion.div>

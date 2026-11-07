@@ -78,3 +78,9 @@ test('matches words by stem, not by their first letters', () => {
   assert.notEqual(stem('animation'), stem('animals'));
   assert.deepEqual(checkClaims({ answer: 'Maya likes animation while Dad prefers sports films.' }, brief), []);
 });
+
+test('reads a row detail with its title, and checks "everyone" beside names', () => {
+  assert.equal(checkClaims({ together: [{ title: 'Mystery shows', detail: 'Maya and Dad both picked this.', members: [] }] }, brief).length, 1);
+  assert.deepEqual(checkClaims({ together: [{ title: 'Mystery shows', detail: 'Mum and Nai Nai both picked this.', members: [] }] }, brief), []);
+  assert.equal(checkClaims({ answer: 'Mum and everyone love curry and rice.' }, brief).length, 1);
+});

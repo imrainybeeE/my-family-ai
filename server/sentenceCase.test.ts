@@ -57,3 +57,8 @@ test('calls the person asking "you"', () => {
   assert.equal(youify('Maya likes tacos.', 'Maya'), 'You like tacos.');
   assert.equal(youify("Try Maya's favourite park.", 'Maya'), 'Try your favourite park.');
 });
+
+test('removes a run of adjectives before choosing the article', () => {
+  assert.equal(dropFiller('Bake a warm, fragrant apple pie.'), 'Bake an apple pie.');
+  assert.equal(youify('Try Maya’s favourite park.', 'Maya'), 'Try your favourite park.');
+});

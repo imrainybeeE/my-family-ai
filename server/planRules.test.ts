@@ -24,3 +24,9 @@ test('holds ideas to the chosen time', () => {
   assert.equal(breaksTiming('Curry night. A curry this evening.', 'now').length, 1);
   assert.deepEqual(breaksTiming('Noodle bowls. Quick noodles in twenty minutes.', 'now'), []);
 });
+
+test('knows staying in, outings and later plans', () => {
+  assert.equal(settingOf('Stay in'), 'home');
+  assert.equal(breaksSetting('Park picnic. Take a picnic to the park.', 'home').length, 1);
+  assert.equal(breaksTiming('Museum tour. Visit the museum tomorrow morning.', 'now').length, 1);
+});

@@ -173,7 +173,8 @@ export function checkClaims(value: unknown, brief: FamilyBrief): ClaimIssue[] {
         }
       }
     }
-    if (!claims.length && familyWide.test(sentence)) {
+    // "Everyone" is checked even when names come with it ("Mum and everyone love curry").
+    if (familyWide.test(sentence)) {
       for (const p of picksIn(sentence, picks)) {
         if (p.label !== AVOID_LABEL && tasters.some((n) => !p.people.includes(n))) problems.push(`only ${p.people.join(', ')} picked "${p.option}", not the whole family`);
       }
@@ -181,17 +182,22 @@ export function checkClaims(value: unknown, brief: FamilyBrief): ClaimIssue[] {
     return problems.length ? `"${sentence}": ${[...new Set(problems)].join('; ')}` : null;
   };
 
-  const walk = (v: unknown, path: (string | number)[], key: string) => {
+  const walk = (v: unknown, path: (string | number)[], key: string, title?: string) => {
     if (typeof v === 'string') {
       if (!FACT_KEYS.has(key)) return;
       for (const sentence of sentences(v)) {
-        const message = checkSentence(sentence);
+        // A row's detail often points back at its title ("both picked this"): read it with the title in place.
+        const read = title ? sentence.replace(/\b(this|these|it|them)\b/i, title) : sentence;
+        const message = checkSentence(read);
         if (message) issues.push({ path, sentence, message });
       }
       return;
     }
     if (Array.isArray(v)) return v.forEach((x, i) => walk(x, [...path, i], key));
-    if (v && typeof v === 'object') for (const [k, child] of Object.entries(v)) walk(child, [...path, k], k);
+    if (v && typeof v === 'object') {
+      const rowTitle = typeof (v as { title?: unknown }).title === 'string' ? (v as { title: string }).title : undefined;
+      for (const [k, child] of Object.entries(v)) walk(child, [...path, k], k, k === 'detail' ? rowTitle : undefined);
+    }
   };
   walk(value, [], '');
   return issues;
