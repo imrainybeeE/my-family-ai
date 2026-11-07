@@ -309,8 +309,7 @@ function dropBrokenItems(value: unknown, paths: PropertyKey[][]): unknown {
 function sharedRowsOnly<T>(value: T): T {
   const v = value as { together?: { members: string[] }[] };
   if (!Array.isArray(v?.together)) return value;
-  const shared = v.together.filter((row) => row.members.length >= 2);
-  return shared.length ? ({ ...value, together: shared } as T) : value;
+  return { ...value, together: v.together.filter((row) => row.members.length >= 2) } as T;
 }
 
 type Generated<T> = { ok: true; data: T } | { ok: false; status: number; error: string };
@@ -396,7 +395,7 @@ async function generate<T extends z.ZodType>(
     // false survives, nothing is sent: no flagged claim ever reaches the family.
     const fixed = sharedRowsOnly(alignMembers(issues.length ? stripClaims(data, issues, { headline: sharedHeadline(brief) }) : data, brief));
     const checked = schema.safeParse(fixed);
-    if (!checked.success || checkClaims(checked.data, brief).length) {
+    if (!checked.success || checkClaims(checked.data, brief).length || (rules?.(checked.data) || []).length) {
       console.warn('Reply still had wrong attributions after a retry; not sent', checked.success ? checkClaims(checked.data, brief).map((i) => i.message) : checked.error.issues.slice(0, 2).map((i) => `${i.path.join('.')}: ${i.message}`));
       return { ok: false, status: 502, error: 'ai_invalid' };
     }
@@ -431,7 +430,8 @@ const RootsSchema = z.object({ reflection: line(90), followUp: line(110).nullabl
 
 const InsightsSchema = z.object({
   headline: line(60),
-  together: z.array(z.object({ title: line(44), detail: line(110), members: people })).min(1).max(3),
+  // Up to three shared rows; none when nobody shares a pick yet (the screen says so).
+  together: z.array(z.object({ title: line(44), detail: line(110), members: people })).max(3),
   differences: z.array(z.object({ title: line(44), detail: words(10, 110), bridge: words(10, 90), members: people })).max(2),
   ideas: z.array(z.object({ title: line(44), why: line(100), tip: line(90), members: people })).min(1).max(3),
   missing: line(70).nullable(),
@@ -479,10 +479,14 @@ export function settingOf(answers: string): Setting | null {
   if (HOME.test(answers)) return 'home';
   return null;
 }
+/** Drops negated mentions ("no restaurant trip needed") so only what an idea proposes is checked. */
+const affirmed = (idea: string) => idea.replace(/\b(no|not|without|instead of|skip|skipping|rather than|no need for)\b[^.,;]*/gi, '');
+
 export function breaksSetting(idea: string, setting: Setting): string[] {
-  const takeout = TAKEOUT.test(idea);
-  const out = OUT_PLACES.test(idea);
-  const home = HOME.test(idea) && !takeout;
+  const text = affirmed(idea);
+  const takeout = TAKEOUT.test(text);
+  const out = OUT_PLACES.test(text);
+  const home = HOME.test(text) && !takeout;
   if (setting === 'home' && (takeout || out)) return ['must be at home: they chose to stay in'];
   if (setting === 'takeout' && (home || out) && !takeout) return ['must be take-out: they chose to order in'];
   if (setting === 'out' && home && !out) return ['must be out: they chose to go out'];
@@ -492,7 +496,7 @@ export function breaksSetting(idea: string, setting: Setting): string[] {
 /** When the family said it should happen. Ideas that name a different time are rejected. */
 type Timing = 'now' | 'tonight' | 'weekend';
 const TIMES: Record<Timing, RegExp> = {
-  now: /\b(right now|now|straight away|this afternoon|in an hour)\b/i,
+  now: /\b(right now|now|straight away|this afternoon)\b/i,
   tonight: /\b(tonight|this evening|after dinner|evening)\b/i,
   weekend: /\b(this weekend|weekend|saturday|sunday)\b/i,
 };
@@ -500,8 +504,10 @@ export function timingOf(answers: string): Timing | null {
   return (Object.keys(TIMES) as Timing[]).find((t) => TIMES[t].test(answers)) || null;
 }
 export function breaksTiming(idea: string, timing: Timing): string[] {
-  if (timing !== 'weekend' && /\b(tomorrow|next week|next month)\b/i.test(idea)) return [`must fit "${timing === 'now' ? 'right now' : timing}", but is for later`];
-  const other = (Object.keys(TIMES) as Timing[]).filter((t) => t !== timing && TIMES[t].test(idea));
+  const text = affirmed(idea);
+  if (timing !== 'weekend' && /\b(tomorrow|next week|next month)\b/i.test(text)) return [`must fit "${timing === 'now' ? 'right now' : timing}", but is for later`];
+  // Only times an idea is scheduled for count; "now" inside a step ("start the rice now") doesn't.
+  const other = (Object.keys(TIMES) as Timing[]).filter((t) => t !== timing && t !== 'now' && TIMES[t].test(text));
   return other.length ? [`must fit "${timing === 'now' ? 'right now' : timing}", but mentions ${other.join(' and ')}`] : [];
 }
 
@@ -676,7 +682,15 @@ If only one person has answered, stay honest: describe what that person brings a
     'Write the family profile.',
     InsightsSchema,
     // The headline sums up the first shared interest, so the two never disagree.
-    (data) => (data.together[0] && !sharesTopic(data.headline, `${data.together[0].title} ${data.together[0].detail}`) ? ['headline: restate the first "together" item'] : []),
+    (data) => {
+      const first = data.together[0];
+      if (!first) return [];
+      const names = g.brief.members.map((m) => m.name);
+      // Same thing, without counting names as the topic, and the same people.
+      const sameThing = sharesTopic(data.headline, `${first.title} ${first.detail}`, names);
+      const samePeople = names.filter((n) => new RegExp(`\\b${escapeRe(n)}\\b`).test(data.headline)).every((n) => first.members.includes(n));
+      return sameThing && samePeople ? [] : ['headline: restate the first "together" item: the same thing and the same people'];
+    },
   );
 });
 

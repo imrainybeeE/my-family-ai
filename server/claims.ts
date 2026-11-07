@@ -44,9 +44,10 @@ export function stem(word: string): string {
 }
 
 /** True when two texts share a meaningful word (by stem), such as a headline and the row it sums up. */
-export function sharesTopic(a: string, b: string): boolean {
-  const keys = new Set(words(b).filter((w) => w.length >= 4 && !STOP.has(w)).map(stem));
-  return words(a).some((w) => w.length >= 4 && !STOP.has(w) && keys.has(stem(w)));
+export function sharesTopic(a: string, b: string, names: string[] = []): boolean {
+  const skip = new Set([...STOP, ...names.flatMap((n) => words(n))]);
+  const keys = new Set(words(b).filter((w) => w.length >= 4 && !skip.has(w)).map(stem));
+  return words(a).some((w) => w.length >= 4 && !skip.has(w) && keys.has(stem(w)));
 }
 
 function hits(key: string, word: string): boolean {
@@ -75,7 +76,7 @@ export function sharedHeadline(brief: FamilyBrief): string {
   const top = tastePicks(brief)
     .filter((p) => p.label !== 'Food they avoid' && p.people.length > 1)
     .sort((a, b) => b.people.length - a.people.length)[0];
-  if (!top) return 'Your family’s first shared picks';
+  if (!top) return 'No shared picks yet';
   const who = top.people.length === 2 ? `${top.people[0]} and ${top.people[1]} both` : `${top.people.slice(0, -1).join(', ')} and ${top.people[top.people.length - 1]}`;
   const option = top.option.replace(/\s*&\s*/g, ' and ').toLowerCase().replace(/\b(asian|italian|mexican)\b/g, (w) => w[0].toUpperCase() + w.slice(1));
   return `${who} picked ${option}`;

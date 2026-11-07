@@ -30,3 +30,9 @@ test('knows staying in, outings and later plans', () => {
   assert.equal(breaksSetting('Park picnic. Take a picnic to the park.', 'home').length, 1);
   assert.equal(breaksTiming('Museum tour. Visit the museum tomorrow morning.', 'now').length, 1);
 });
+
+test('ignores what an idea says it does not need, and how long it takes', () => {
+  assert.deepEqual(breaksSetting('Noodle night. Cook noodles at home. No restaurant trip needed.', 'home'), []);
+  assert.deepEqual(breaksTiming('Curry tonight. Cook dinner tonight. Ready in an hour.', 'tonight'), []);
+  assert.equal(breaksSetting('Dim sum. Try a dim sum restaurant.', 'home').length, 1);
+});

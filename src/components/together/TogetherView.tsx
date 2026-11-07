@@ -85,13 +85,17 @@ export function TogetherView() {
               </p>
               {data.missing && <p className="t-small ink-2 mt-2">{data.missing}</p>}
 
-              <SectionTitle>Shared interests</SectionTitle>
-              <ul className="card px-4" aria-label="Things you enjoy together">
-                {data.together.map((t, i) => (
-                  // The headline already says the first row in words, so that row shows only its title and people.
-                  <Row key={i} first={i === 0} yarn={YARNS[i % YARNS.length]} people={who(t.members)} title={t.title} body={i === 0 ? '' : keep(t.detail)} />
-                ))}
-              </ul>
+              {data.together.length > 0 && (
+                <>
+                  <SectionTitle>Shared interests</SectionTitle>
+                  <ul className="card px-4" aria-label="Things you enjoy together">
+                    {data.together.map((t, i) => (
+                      // The headline already says the first row in words, so that row shows only its title and people.
+                      <Row key={i} first={i === 0} yarn={YARNS[i % YARNS.length]} people={who(t.members)} title={t.title} body={i === 0 ? '' : keep(t.detail)} />
+                    ))}
+                  </ul>
+                </>
+              )}
 
               {data.differences.length > 0 && (
                 <>

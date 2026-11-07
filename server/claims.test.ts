@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { alignMembers, checkClaims, sharedHeadline, sharedPickLines, stem, stripClaims } from './claims.ts';
+import { alignMembers, checkClaims, sharedHeadline, sharedPickLines, sharesTopic, stem, stripClaims } from './claims.ts';
 import { buildBrief } from '../src/services/brief.ts';
 import { DEMO_HOUSEHOLD, DEMO_MEMBERS, DEMO_RESPONSES, DEMO_ACTIVE_MEMBER } from '../src/data/demoFamily.ts';
 
@@ -83,4 +83,9 @@ test('reads a row detail with its title, and checks "everyone" beside names', ()
   assert.equal(checkClaims({ together: [{ title: 'Mystery shows', detail: 'Maya and Dad both picked this.', members: [] }] }, brief).length, 1);
   assert.deepEqual(checkClaims({ together: [{ title: 'Mystery shows', detail: 'Mum and Nai Nai both picked this.', members: [] }] }, brief), []);
   assert.equal(checkClaims({ answer: 'Mum and everyone love curry and rice.' }, brief).length, 1);
+});
+
+test('a shared name is not a shared topic', () => {
+  assert.equal(sharesTopic('Maya and Dad enjoy park walks', 'Asian stir fry. Maya and Nai Nai both picked this.', ['Maya', 'Dad', 'Nai Nai']), false);
+  assert.equal(sharesTopic('Maya and Nai Nai love stir fry', 'Asian stir fry', ['Maya', 'Nai Nai']), true);
 });
