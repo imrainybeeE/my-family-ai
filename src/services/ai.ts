@@ -17,10 +17,17 @@ function kindFor(status: number): AiErrorKind {
   return 'error';
 }
 
+/**
+ * Where the AI server lives. A static build (GitHub Pages) has no server of its own: unless
+ * VITE_AI_URL points at one, AI features report that the helper is off and use built-in content.
+ */
+const AI_URL: string = import.meta.env.VITE_AI_URL || (import.meta.env.VITE_STATIC ? '' : '/api/ai');
+
 async function post<T>(path: string, body: object, signal?: AbortSignal): Promise<T> {
+  if (!AI_URL) throw new AiError('unavailable');
   let res: Response;
   try {
-    res = await fetch(`/api/ai/${path}`, {
+    res = await fetch(`${AI_URL}/${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -107,9 +114,10 @@ export async function streamChat(
   onText: (chunk: string) => void,
   signal?: AbortSignal
 ): Promise<{ refused: boolean }> {
+  if (!AI_URL) throw new AiError('unavailable');
   let res: Response;
   try {
-    res = await fetch('/api/ai/chat', {
+    res = await fetch(`${AI_URL}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ brief, messages }),
