@@ -54,6 +54,17 @@ export function tastePicks(brief: FamilyBrief): Pick[] {
   return [...map.values()].filter((p) => p.keys.length);
 }
 
+/** A true headline from the saved picks: the pick the most people share, said plainly. */
+export function sharedHeadline(brief: FamilyBrief): string {
+  const top = tastePicks(brief)
+    .filter((p) => p.label !== 'Food they avoid' && p.people.length > 1)
+    .sort((a, b) => b.people.length - a.people.length)[0];
+  if (!top) return 'Your family’s first shared picks';
+  const who = top.people.length === 2 ? `${top.people[0]} and ${top.people[1]} both` : `${top.people.slice(0, -1).join(', ')} and ${top.people[top.people.length - 1]}`;
+  const option = top.option.replace(/\s*&\s*/g, ' and ').toLowerCase().replace(/\b(asian|italian|mexican)\b/g, (w) => w[0].toUpperCase() + w.slice(1));
+  return `${who} picked ${option}`;
+}
+
 /** Lines for the prompt: who shares each pick, so the model never has to work it out. */
 export function sharedPickLines(brief: FamilyBrief): string[] {
   return tastePicks(brief)
@@ -74,6 +85,7 @@ export function sentences(text: string): string[] {
 /** Fields that state facts. Suggestions (ideas, tips, titles, questions) are not checked. */
 const FACT_KEYS = new Set(['answer', 'facts', 'detail', 'why', 'known', 'headline', 'note', 'reflection']);
 const NEGATIVE = /\b(avoid|avoids|avoiding|skip|skips|dislike|dislikes|hate|hates|no|not|never|without|won't|doesn't|don't|isn't|aren't|can't)\b/i;
+const POSITIVE = /\b(like|likes|liked|love|loves|loved|enjoy|enjoys|enjoyed|pick|picks|picked|prefer|prefers|chose|choose|share|shares|want|wants)\b/i;
 const EVERYONE = /\b(everyone|everybody|whole family|all of you|the family)\b/i;
 const AVOID_LABEL = 'Food they avoid';
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -104,7 +116,9 @@ function claimsIn(sentence: string, names: string[], asker: string): { people: s
       last.end = m.end;
     } else groups.push({ people: [m.name], start: m.start, end: m.end });
   }
-  const clauses = (t: string) => t.split(/[,;:]|\b(?:so|but|while|whereas|then|which|unlike)\b/i);
+  // A claim runs to the next clause word or semicolon. Commas and colons stay inside it, so lists
+  // ("tacos, curry and rice") and labels ("Maya: curry and rice") are checked whole.
+  const clauses = (t: string) => t.split(/;|\b(?:so|but|while|whereas|then|which|unlike)\b/i);
   const clause = (t: string) => clauses(t)[0];
   return groups.map((g, i) => {
     const after = clause(sentence.slice(g.end, groups[i + 1]?.start ?? sentence.length));
@@ -127,8 +141,14 @@ export function checkClaims(value: unknown, brief: FamilyBrief): ClaimIssue[] {
     const problems: string[] = [];
     const claims = claimsIn(sentence, names, brief.asker);
     for (const { people, about } of claims) {
-      const negative = NEGATIVE.test(about);
-      for (const p of picksIn(about, picks)) {
+      // Each comma part is a like or an avoid: "no" carries on through a list until a liking verb.
+      let negative = false;
+      const parts = about.split(',').map((part) => {
+        if (NEGATIVE.test(part)) negative = true;
+        else if (POSITIVE.test(part)) negative = false;
+        return { part, negative };
+      });
+      for (const { part, negative } of parts) for (const p of picksIn(part, picks)) {
         const avoid = p.label === AVOID_LABEL;
         for (const person of people) {
           const made = p.people.includes(person);
@@ -165,7 +185,7 @@ export function checkClaims(value: unknown, brief: FamilyBrief): ClaimIssue[] {
  * Removes flagged sentences. A field left empty drops its whole list item when the item sits in
  * a list (a "together" row, a known fact); otherwise the field keeps its other sentences.
  */
-export function stripClaims<T>(value: T, issues: ClaimIssue[]): T {
+export function stripClaims<T>(value: T, issues: ClaimIssue[], fill: Record<string, string> = {}): T {
   const copy = structuredClone(value) as any;
   const drop: { list: any[]; index: number }[] = [];
   for (const issue of issues) {
@@ -174,9 +194,10 @@ export function stripClaims<T>(value: T, issues: ClaimIssue[]): T {
     const last = issue.path[issue.path.length - 1];
     if (!parent || typeof parent[last] !== 'string') continue;
     const kept = sentences(parent[last]).filter((s) => s !== issue.sentence).join(' ');
-    // An emptied field stays empty: validation then rejects the reply rather than keep a false claim.
-    parent[last] = kept;
-    if (kept) continue;
+    // An emptied field takes a computed, true replacement when there is one (the headline); otherwise
+    // it stays empty and validation rejects the reply rather than keep a false claim.
+    parent[last] = kept || (typeof last === 'string' && fill[last]) || '';
+    if (parent[last]) continue;
     // Find the nearest list above this field and drop that entry.
     for (let depth = issue.path.length - 1; depth >= 0; depth--) {
       if (typeof issue.path[depth] !== 'number') continue;

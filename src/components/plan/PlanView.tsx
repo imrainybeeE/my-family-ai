@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { onRovingKeyDown, rovingTabIndex } from '../ui/roving';
 import { useHousehold } from '../../context/HouseholdContext';
@@ -139,7 +139,7 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
           {(Object.keys(TASK) as PlanTask[]).map((t) => {
             const { label, hint, Art } = TASK[t];
             return (
-              <button key={t} type="button" onClick={() => setTask(t)} className="card border-0 text-left px-4 pt-2 pb-4 flex flex-col transition-transform active:scale-[0.97]">
+              <button key={t} type="button" onClick={() => { feel('tap'); setTask(t); }} className="card border-0 text-left px-4 pt-2 pb-4 flex flex-col transition-transform active:scale-[0.97]">
                 <span className="-ml-2">
                   <Art size={104} />
                 </span>
@@ -263,13 +263,14 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
                           aria-checked={q.multi ? undefined : on}
                           tabIndex={q.multi ? undefined : rovingTabIndex(oi, q.options.indexOf(picks[q.id]?.[0] ?? ''))}
                           aria-pressed={q.multi ? on : undefined}
-                          onClick={() =>
+                          onClick={() => {
+                            feel(on ? 'tap' : 'select');
                             setPicks((p) => {
                               const cur = p[q.id] || [];
                               const nextVal = q.multi ? (on ? cur.filter((x) => x !== o) : [...cur, o]) : on ? [] : [o];
                               return { ...p, [q.id]: nextVal };
-                            })
-                          }
+                            });
+                          }}
                         >
                           {o}
                         </button>
@@ -322,7 +323,7 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
               ))}
               <p className="t-small ink-3">Ideas from your saved answers.</p>
               <div className="grid gap-1 mt-1">
-                <PickForUs count={result.ideas.length} onPick={setChosen} />
+                <PickForUs titles={result.ideas.map((x) => x.title)} onPick={setChosen} />
                 <div className="grid grid-cols-2">
                   <button type="button" className="btn btn-quiet btn-sm" onClick={() => setStage('questions')}>
                     Change answers
@@ -355,35 +356,36 @@ function IdeaCard({ idea, index, chosen, byName, onChoose }: { idea: PlanIdea; i
   return (
     <motion.article
       layout
+      id={`idea-${index}`}
       className="card overflow-hidden"
       style={{ outline: isChosen ? '2px solid var(--accent)' : 'none', outlineOffset: 2 }}
       aria-current={isChosen || undefined}
     >
       <div className={`px-5 pt-4 pb-4 ${IDEA_STOCK[index % 3]}`}>
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="t-head">{idea.title}</h3>
-          {people.length > 0 && (
-            <span className="flex -space-x-2 shrink-0" aria-label={`Suits ${idea.members.join(', ')}`}>
-              {people.slice(0, 4).map((p) => (
-                <FlowerBadge key={p!.id} style={p!.style} size={30} />
-              ))}
-            </span>
-          )}
-        </div>
-
+        <h3 className="t-head">{idea.title}</h3>
       </div>
       <div className="px-5 pt-4 pb-3">
         <p className="t-body">{idea.summary}</p>
-        <button
-          type="button"
-          className="t-label mt-1 -mb-1 bg-transparent border-0 p-0 min-h-[44px] flex items-center gap-1"
-          style={{ color: 'var(--accent-ink)' }}
-          aria-expanded={open}
-          onClick={() => setOpen((o) => !o)}
-        >
-          {open ? 'Hide details' : 'Why it fits'}
-          <ChevronDown size={16} strokeWidth={2.6} style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 180ms' }} />
-        </button>
+        <div className="flex items-center justify-between gap-3 mt-1 -mb-1">
+          <button
+            type="button"
+            className="t-label bg-transparent border-0 p-0 min-h-[44px] flex items-center gap-1"
+            style={{ color: 'var(--accent-ink)' }}
+            aria-expanded={open}
+            onClick={() => setOpen((o) => !o)}
+          >
+            {open ? 'Hide details' : 'Why it fits'}
+            <ChevronDown size={16} strokeWidth={2.6} style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 180ms' }} />
+          </button>
+          {people.length > 0 && (
+            <span className="flex items-center -space-x-2 shrink-0" aria-label={`Suits ${idea.members.join(', ')}`}>
+              {people.slice(0, 3).map((p) => (
+                <FlowerBadge key={p!.id} style={p!.style} size={26} />
+              ))}
+              {people.length > 3 && <span className="t-small ink-2 pl-3">+{people.length - 3}</span>}
+            </span>
+          )}
+        </div>
         {open && (
           <div className="grid gap-2 pb-1">
             <p className="t-small ink-2">{idea.why}</p>
@@ -406,7 +408,8 @@ function IdeaCard({ idea, index, chosen, byName, onChoose }: { idea: PlanIdea; i
             </span>
           </p>
         )}
-        <button type="button" className={`btn btn-sm btn-block mt-3 ${isChosen ? 'btn-primary' : 'btn-soft'}`} aria-pressed={isChosen} onClick={onChoose}>
+        <div className="flex justify-end mt-3">
+        <button type="button" className={`btn btn-sm ${isChosen ? 'btn-primary' : 'btn-soft'}`} aria-pressed={isChosen} onClick={onChoose}>
           {isChosen ? (
             <>
               <Check size={18} strokeWidth={2.6} /> Chosen
@@ -415,40 +418,57 @@ function IdeaCard({ idea, index, chosen, byName, onChoose }: { idea: PlanIdea; i
             'Choose this'
           )}
         </button>
+        </div>
       </div>
     </motion.article>
   );
 }
 
-/** Lands on one idea after a short shuffle, like spinning a bottle. */
-function PickForUs({ count, onPick }: { count: number; onPick: (i: number) => void }) {
+/** Lands on one idea after a short shuffle, like spinning a bottle, then shows and announces it. */
+function PickForUs({ titles, onPick }: { titles: string[]; onPick: (i: number) => void }) {
   const [spinning, setSpinning] = useState(false);
+  const [picked, setPicked] = useState('');
+  const timer = useRef<number | null>(null);
+  const reduce = useReducedMotion();
+  useEffect(() => () => {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+  }, []);
+  const count = titles.length;
   return (
-    <button
-      type="button"
-      className="btn"
-      disabled={spinning || count === 0}
-      onClick={() => {
-        setSpinning(true);
-        const final = Math.floor(Math.random() * count);
-        const steps = count * 3 + final;
-        let i = 0;
-        const tick = () => {
-          onPick(i % count);
-          i += 1;
-          if (i <= steps) {
-            feel('select');
-            window.setTimeout(tick, 70 + i * 12);
-          } else {
-            feel('land');
-            setSpinning(false);
-          }
-        };
-        tick();
-      }}
-    >
-      {spinning ? 'Choosing…' : 'Pick for us'}
-    </button>
+    <>
+      <button
+        type="button"
+        className="btn"
+        disabled={spinning || count === 0}
+        onClick={() => {
+          setSpinning(true);
+          setPicked('');
+          const final = Math.floor(Math.random() * count);
+          // Two rounds and a landing, all inside 900ms.
+          const steps = count * 2 + final;
+          let i = 0;
+          const tick = () => {
+            onPick(i % count);
+            i += 1;
+            if (i <= steps) {
+              feel('select');
+              timer.current = window.setTimeout(tick, 45 + i * 9);
+            } else {
+              feel('land');
+              setSpinning(false);
+              setPicked(titles[final]);
+              document.getElementById(`idea-${final}`)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+            }
+          };
+          tick();
+        }}
+      >
+        {spinning ? 'Choosing…' : 'Pick for us'}
+      </button>
+      <p className="sr-only" aria-live="polite">
+        {picked ? `Picked ${picked}` : ''}
+      </p>
+    </>
   );
 }
 

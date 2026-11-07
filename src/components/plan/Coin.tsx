@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { Felt } from '../art/Flower';
 import { feel } from '../../feel/feel';
@@ -10,6 +10,10 @@ export function Coin() {
   const [turns, setTurns] = useState(0);
   const [landed, setLanded] = useState<'a' | 'b' | null>(null);
   const [flipping, setFlipping] = useState(false);
+  const landTimer = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (landTimer.current !== null) window.clearTimeout(landTimer.current);
+  }, []);
 
   const flip = () => {
     if (!a.trim() || !b.trim() || flipping) return;
@@ -20,7 +24,7 @@ export function Coin() {
     setLanded(null);
     setFlipping(true);
     feel('flip');
-    window.setTimeout(() => {
+    landTimer.current = window.setTimeout(() => {
       setLanded(side);
       setFlipping(false);
       feel('land');

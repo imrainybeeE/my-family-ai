@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
+import { motion } from 'motion/react';
 import { Sheet } from '../ui/Sheet';
 import { SpecimenCard } from './SpecimenCard';
 import { useHousehold } from '../../context/HouseholdContext';
@@ -55,7 +56,7 @@ export function MemberSheet({ memberId, onClose }: { memberId: string | null; on
 
           <ul className="card px-4" aria-label="Discovery progress">
             <Status first done={Boolean(profile)} label="Foundation" detail={profile ? 'Done' : 'Not started'} />
-            <Status done={adv.complete} label="Deeper roots" detail={adv.complete ? 'Done' : adv.done ? `${adv.done} of ${adv.total}` : 'Not started'} />
+            <Status done={adv.complete} part={adv.done / adv.total} label="Deeper roots" detail={adv.complete ? 'Done' : adv.done ? `${adv.done} of ${adv.total}` : 'Not started'} />
           </ul>
 
           {profile && (
@@ -139,16 +140,22 @@ export function MemberSheet({ memberId, onClose }: { memberId: string | null; on
   );
 }
 
-function Status({ first, done, label, detail }: { first?: boolean; done: boolean; label: string; detail: string }) {
+/** A row with a stitched ring that fills with yarn as the part gets done, then turns into a tick. */
+function Status({ first, done, part = 0, label, detail }: { first?: boolean; done: boolean; part?: number; label: string; detail: string }) {
   return (
     <li className="flex items-center gap-3 py-3.5" style={{ borderTop: first ? 0 : '1px solid var(--line)' }}>
-      <span
-        className="w-7 h-7 rounded-full grid place-items-center shrink-0"
-        style={{ background: done ? 'var(--accent)' : 'transparent', color: 'var(--on-accent)', border: done ? 0 : '1.5px dashed var(--line-strong)' }}
-        aria-hidden
-      >
-        {done && <Check size={15} strokeWidth={3} />}
-      </span>
+      {done ? (
+        <span className="w-7 h-7 rounded-full grid place-items-center shrink-0" style={{ background: 'var(--accent)', color: 'var(--on-accent)' }} aria-hidden>
+          <Check size={15} strokeWidth={3} />
+        </span>
+      ) : (
+        <svg width="28" height="28" viewBox="0 0 28 28" className="shrink-0 -rotate-90" aria-hidden>
+          <circle cx="14" cy="14" r="12" fill="none" stroke="var(--line-strong)" strokeWidth="1.5" strokeDasharray="3 3" />
+          {part > 0 && (
+            <motion.circle cx="14" cy="14" r="12" fill="none" stroke="var(--yarn)" strokeWidth="3" strokeLinecap="round" initial={{ pathLength: 0 }} animate={{ pathLength: part }} transition={{ type: 'spring', stiffness: 120, damping: 20 }} />
+          )}
+        </svg>
+      )}
       <span className="flex-1 font-semibold">{label}</span>
       <span className="t-small ink-2">{detail}</span>
     </li>

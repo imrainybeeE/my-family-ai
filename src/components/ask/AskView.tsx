@@ -71,14 +71,14 @@ export function AskView() {
   const scrollDown = () => window.requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }));
 
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, base?: Msg[]) => {
       const q = text.trim();
       if (!q || busy) return;
       const gen = ++genRef.current;
       feel('send');
       setInput('');
       setFollowUps([]);
-      const history: Msg[] = [...messages.filter((m) => !m.error), { id: `u${Date.now()}`, role: 'user', content: q }];
+      const history: Msg[] = [...(base ?? messages).filter((m) => !m.error), { id: `u${Date.now()}`, role: 'user', content: q }];
       const replyId = `a${Date.now()}`;
       setMessages([...history, { id: replyId, role: 'assistant', content: '' }]);
       setBusy(true);
@@ -204,9 +204,19 @@ export function AskView() {
                         <Thinking label="Reading your family’s answers" />
                       )}
                       {m.error && (
-                        <p className="t-small mt-2" style={{ color: 'var(--danger)' }}>
-                          Nothing was sent to your family.
-                        </p>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-soft mt-3"
+                          disabled={busy}
+                          onClick={() => {
+                            // Ask the same question again in place of the failed one, without repeating it.
+                            const at = messages.findIndex((x) => x.id === m.id);
+                            const question = messages[at - 1];
+                            if (question?.role === 'user') send(question.content, messages.slice(0, at - 1));
+                          }}
+                        >
+                          Try again
+                        </button>
                       )}
                     </div>
                   </>
@@ -258,7 +268,7 @@ export function AskView() {
             }
           }}
         />
-        <button type="submit" className="shrink-0 grid place-items-center border-0 rounded-[10px] transition-opacity" style={{ height: 44, width: 44, background: 'var(--accent)', color: 'var(--on-accent)', opacity: busy || !input.trim() ? 0.35 : 1 }} disabled={busy || !input.trim()} aria-label="Send">
+        <button type="submit" className="shrink-0 grid place-items-center border-0 rounded-[10px] transition-opacity" style={busy || !input.trim() ? { height: 44, width: 44, background: 'var(--accent-soft)', color: 'var(--accent-ink)', opacity: 0.7 } : { height: 44, width: 44, background: 'var(--accent)', color: 'var(--on-accent)' }} disabled={busy || !input.trim()} aria-label="Send">
           <ArrowUp size={22} strokeWidth={2.8} />
         </button>
       </form>

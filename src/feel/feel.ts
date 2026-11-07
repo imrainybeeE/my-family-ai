@@ -167,7 +167,8 @@ export function feel(kind: Feel) {
     // Sound is a nicety; never let it break an action.
   }
   const pattern = VIBRATION[kind];
-  if (!pattern) return;
+  // One switch in Settings covers both: "Sounds and haptics".
+  if (!pattern || muted) return;
   try {
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(pattern);
     else if (isIOS) iosHaptic();

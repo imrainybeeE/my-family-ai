@@ -6,7 +6,7 @@ import { useWidth } from './Garland';
  * A strand of yarn that grows across the top as you answer, threaded with a bead at the end of each
  * stage. The beads sit on the curve itself: their centres come from the same path the yarn follows.
  */
-export function YarnProgress({ progress, beads }: { progress: number; beads: number }) {
+export function YarnProgress({ progress, beads, label }: { progress: number; beads: number; label?: string }) {
   const [ref, w] = useWidth<HTMLDivElement>(240);
   const pathRef = useRef<SVGPathElement>(null);
   const [points, setPoints] = useState<{ x: number; y: number }[]>([]);
@@ -25,7 +25,8 @@ export function YarnProgress({ progress, beads }: { progress: number; beads: num
   }, [d, beads]);
 
   return (
-    <div ref={ref} className="flex-1 relative h-11" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)} aria-label="Progress">
+    <div className="flex-1 flex items-center gap-2 min-w-0">
+    <div ref={ref} className="flex-1 relative h-11" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)} aria-valuetext={label ? `Question ${label}` : undefined} aria-label="Progress">
       <svg width={w} height={44} className="absolute inset-0 overflow-visible" aria-hidden>
         <path ref={pathRef} d={d} stroke="var(--line-strong)" strokeWidth="2" fill="none" strokeLinecap="round" strokeDasharray="2 6" />
         <motion.path d={d} stroke="var(--yarn)" strokeWidth="3.4" fill="none" strokeLinecap="round" initial={false} animate={{ pathLength: Math.max(progress, 0.02) }} transition={{ type: 'spring', stiffness: 120, damping: 20 }} />
@@ -47,6 +48,12 @@ export function YarnProgress({ progress, beads }: { progress: number; beads: num
           );
         })}
       </svg>
+    </div>
+      {label && (
+        <span className="shrink-0 tabular-nums ink-2" style={{ fontSize: 13, fontWeight: 600 }} aria-hidden>
+          {label}
+        </span>
+      )}
     </div>
   );
 }

@@ -16,6 +16,7 @@ import { buildBrief } from '../../services/brief';
 import { ai } from '../../services/ai';
 import { feel } from '../../feel/feel';
 import { PetalBurst } from '../art/PetalBurst';
+import { FLOWERS } from '../../data/flowers';
 import { memberName } from '../../utils/member';
 import { BloomNote, DiscoveryProfile, DiscoveryStyleId } from '../../types';
 
@@ -55,6 +56,8 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
   const [note, setNote] = useState<BloomNote | null>(null);
   const [noteState, setNoteState] = useState<'idle' | 'loading' | 'failed'>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [limitNudge, setLimitNudge] = useState(0);
+  useEffect(() => setLimitNudge(0), [index]);
   // Latest answers and the pending auto-advance, so a quick change of mind always wins and
   // Back or Close cancels the move.
   const answersRef = useRef<Answers>({});
@@ -67,14 +70,15 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
   };
   useEffect(() => cancelAdvance, [index, stage, open]);
   // The chime lands as the flower opens.
+  const reduceMotion = useReducedMotion();
+  // Sound isn't motion, so reduced-motion users still hear it, just sooner. Closing cancels it.
   useEffect(() => {
-    if (stage !== 'blooming') return;
-    const t = window.setTimeout(() => feel('bloom'), 1250);
+    if (stage !== 'blooming' || !open) return;
+    const t = window.setTimeout(() => feel('bloom'), reduceMotion ? 250 : 650);
     return () => window.clearTimeout(t);
-  }, [stage]);
+  }, [stage, open, reduceMotion]);
   // The finish run in flight: its reveal timer and bloom-note request. Closing, switching person or
   // starting again ends it, so nothing from it lands on a newer run or another person.
-  const reduceMotion = useReducedMotion();
   const runRef = useRef<{ timer: number | null; abort: AbortController } | null>(null);
   const endRun = () => {
     if (runRef.current?.timer != null) window.clearTimeout(runRef.current.timer);
@@ -148,7 +152,7 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
     if (!live()) return;
     // The bloom is the app's one big moment: the sewn flower spins away, the real one opens and
     // throws its petals, and only then does the result card arrive.
-    run.timer = window.setTimeout(() => live() && setStage('reveal'), Math.max(0, (reduceMotion ? 900 : 3100) - (Date.now() - started)));
+    run.timer = window.setTimeout(() => live() && setStage('reveal'), Math.max(0, (reduceMotion ? 900 : 2300) - (Date.now() - started)));
 
     // Ask the AI for a personal note about this bloom, then keep it with the answers.
     if (!activeMember) return;
@@ -180,7 +184,11 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
       // A bead slides down the yarn when a section is finished.
       if (FOUNDATION_QUESTIONS[index + 1].section !== q.section) feel('bead');
       setIndex((i) => i + 1);
-    } else finish(latest);
+    } else {
+      // A tap you can feel as the flower starts (iOS only plays haptics from a tap).
+      feel('select');
+      finish(latest);
+    }
   };
 
   /** Picks an option. A tap or click on a single-choice question moves on after a beat. */
@@ -189,7 +197,13 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
     if (q.isMultiSelect) {
       const max = q.maxSelections || 2;
       const removing = selected.includes(option);
-      const next = removing ? selected.filter((o) => o !== option) : selected.length >= max ? [...selected.slice(1), option] : [...selected, option];
+      // A full question refuses a third pick (with a nudge) rather than quietly dropping the first.
+      if (!removing && selected.length >= max) {
+        feel('error');
+        setLimitNudge((n) => n + 1);
+        return;
+      }
+      const next = removing ? selected.filter((o) => o !== option) : [...selected, option];
       feel(removing ? 'tap' : 'stitch');
       setAnswers((a) => ({ ...a, [id]: next }));
       return;
@@ -226,7 +240,7 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
             >
               <ChevronLeft size={22} strokeWidth={2.4} />
             </button>
-            <YarnProgress progress={(index + (answered ? 1 : 0)) / FOUNDATION_QUESTIONS.length} beads={FOUNDATION_SECTIONS.length} />
+            <YarnProgress progress={(index + (answered ? 1 : 0)) / FOUNDATION_QUESTIONS.length} beads={FOUNDATION_SECTIONS.length} label={`${index + 1} of ${FOUNDATION_QUESTIONS.length}`} />
           </div>
         ) : undefined
       }
@@ -263,10 +277,20 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
               <h3 ref={headingRef} tabIndex={-1} className="t-title outline-none" style={{ fontSize: '1.375rem', lineHeight: '27px' }}>
                 {q.question}
               </h3>
-              <p className="t-small mt-2 opacity-80">
-                {q.isMultiSelect ? `Pick up to ${q.maxSelections || 2}` : q.subtitle}
+              <motion.p
+                key={limitNudge}
+                className="t-small mt-2 opacity-80"
+                aria-live="polite"
+                animate={limitNudge ? { x: [0, -6, 6, -4, 4, 0] } : undefined}
+                transition={{ duration: 0.36 }}
+              >
+                {q.isMultiSelect
+                  ? selected.length >= (q.maxSelections || 2)
+                    ? `${selected.length} of ${q.maxSelections || 2} picked${limitNudge ? '. Tap one to swap it.' : ''}`
+                    : `Pick up to ${q.maxSelections || 2}`
+                  : q.subtitle}
                 <span className="sr-only">. Question {index + 1} of {FOUNDATION_QUESTIONS.length}.</span>
-              </p>
+              </motion.p>
             </section>
             {saveError && (
               <p role="alert" className="t-small mt-3" style={{ color: 'var(--danger)' }}>
@@ -301,17 +325,23 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
         )}
 
         {stage === 'blooming' && profile && (
-          <motion.div key="blooming" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid place-items-center text-center pt-24 gap-4">
+          <motion.div
+            key="blooming"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="grid place-items-center place-content-center text-center gap-4 min-h-[calc(100dvh-160px-var(--safe-t)-var(--safe-b))]"
+          >
             <div className="relative grid place-items-center" style={{ width: 240, height: 240 }}>
-              <motion.div className="absolute" initial={{ opacity: 1, rotate: 0, scale: 1 }} animate={{ opacity: 0, rotate: 200, scale: 0.6 }} transition={{ duration: 1.1, delay: 0.4, ease: [0.5, 0, 0.3, 1] }}>
+              <motion.div className="absolute" initial={{ opacity: 1, rotate: 0, scale: 1 }} animate={{ opacity: 0, rotate: 200, scale: 0.6 }} transition={{ duration: 0.7, delay: 0.15, ease: [0.5, 0, 0.3, 1] }}>
                 <StitchedFlower petals={petals} size={220} />
               </motion.div>
-              <Flower style={profile.primaryStyle} size={230} bloom delay={1.2} />
-              <PetalBurst styles={[profile.primaryStyle, profile.secondaryStyle]} delay={1.25} />
+              <Flower style={profile.primaryStyle} size={230} bloom delay={0.6} />
+              <PetalBurst styles={[profile.primaryStyle, profile.secondaryStyle]} delay={0.65} />
             </div>
-            <motion.p className="t-head ink-2" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 2.3, duration: 0.4 }}>
-              Your flower is ready
-            </motion.p>
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.4, duration: 0.4 }}>
+              <p className="t-title">{FLOWERS[profile.primaryStyle].flower}</p>
+              <p className="t-body ink-2 mt-1">{profile.primaryStyle}</p>
+            </motion.div>
           </motion.div>
         )}
 

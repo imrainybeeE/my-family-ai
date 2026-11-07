@@ -4,8 +4,8 @@ import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { useHousehold } from '../../context/HouseholdContext';
 import { useUI } from '../../App';
 import { FamilyPerson, useAiResource, useFamily } from '../../hooks/useFamily';
-import { ai, aiErrorMessage, Insights } from '../../services/ai';
-import { generateFamilyProfileReport } from '../../utils/familyProfileAnalysis';
+import { ai, Insights } from '../../services/ai';
+import { sharedHeadline, tastePicks } from '../../../server/claims';
 import { PageHeader } from '../layout/TabBar';
 import { Felt, FELT_FOR_STYLE, FlowerBadge } from '../art/Flower';
 import { Strand, useWidth } from '../art/Garland';
@@ -17,23 +17,31 @@ import { feel } from '../../feel/feel';
 const YARNS = ['#e86f8f', '#648b79', '#5e93d1'];
 
 export function TogetherView() {
-  const { brief, members, responses, myAnswers } = useHousehold();
+  const { brief, myAnswers } = useHousehold();
   const ui = useUI();
   const { people, bloomed, byName } = useFamily();
   const enabled = bloomed.length > 0;
   const insights = useAiResource('insights', brief, (signal) => ai.insights(brief, signal), enabled);
 
+  // Without the helper, Together still shows what is true: the picks two or more people share.
   const fallback = useMemo<Insights | null>(() => {
     if (!insights.error) return null;
-    const r = generateFamilyProfileReport(members, responses);
+    const shared = tastePicks(brief)
+      .filter((p) => p.label !== 'Food they avoid' && p.people.length > 1)
+      .sort((a, b) => b.people.length - a.people.length)
+      .slice(0, 3);
     return {
-      headline: 'What your answers share so far.',
-      together: r.thingsWeEnjoyTogether.slice(0, 3).map((t) => ({ title: t.title, detail: t.detail, members: t.membersInvolved })),
-      differences: r.interestingDifferences.slice(0, 2).map((d) => ({ title: d.title, detail: d.detail, bridge: d.positiveBridge, members: d.membersInvolved })),
-      ideas: r.ideasWorthTrying.slice(0, 3).map((i) => ({ title: i.title, why: i.whyItFits, tip: i.funTip, members: [] })),
+      headline: sharedHeadline(brief),
+      together: shared.map((p) => ({
+        title: p.option.replace(/\s*&\s*/g, ' and ').replace(/\s*\/\s*/g, ' or '),
+        detail: `${p.people.length === 2 ? `${p.people[0]} and ${p.people[1]} both` : p.people.join(', ')} picked this.`,
+        members: p.people,
+      })),
+      differences: [],
+      ideas: [],
       missing: null,
     };
-  }, [insights.error, members, responses]);
+  }, [insights.error, brief]);
   const data = insights.data || fallback;
   const who = (names: string[]) => names.map(byName).filter(Boolean) as FamilyPerson[];
   const links = useMemo(
@@ -73,7 +81,7 @@ export function TogetherView() {
               <p className="t-head mt-2" style={{ fontSize: '1.375rem', lineHeight: '26px' }}>
                 {data.headline}
               </p>
-              {Boolean(insights.error) && <p className="t-small ink-2 mt-2">{aiErrorMessage(insights.error)}</p>}
+              {Boolean(insights.error) && <p className="t-small ink-3 mt-2">From your saved answers while the helper reconnects.</p>}
 
               <SectionTitle>Shared interests</SectionTitle>
               <ul className="card px-4" aria-label="Things you enjoy together">
@@ -98,7 +106,7 @@ export function TogetherView() {
                 </>
               )}
 
-              <SectionTitle>Ideas to try</SectionTitle>
+              {data.ideas.length > 0 && <SectionTitle>Ideas to try</SectionTitle>}
               <IdeaPager count={data.ideas.length}>
                 {(i) => {
                   const idea = data.ideas[i];

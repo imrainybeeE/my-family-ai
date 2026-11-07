@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { breaksSetting, settingOf } from './ai.ts';
+import { breaksSetting, breaksTiming, settingOf, timingOf } from './ai.ts';
 
 test('reads where the family chose to eat', () => {
   assert.equal(settingOf('Order take-out'), 'takeout');
@@ -16,4 +16,11 @@ test('rejects ideas that ignore that choice', () => {
   assert.equal(breaksSetting('Dim sum. Try a dim sum restaurant.', 'home').length, 1);
   assert.deepEqual(breaksSetting('Curry night. Cook a big pot together.', 'home'), []);
   assert.equal(breaksSetting('Pizza night. Bake pizzas in the kitchen.', 'out').length, 1);
+});
+
+test('holds ideas to the chosen time', () => {
+  assert.equal(timingOf('Right now'), 'now');
+  assert.equal(timingOf('This weekend'), 'weekend');
+  assert.equal(breaksTiming('Curry night. A curry this evening.', 'now').length, 1);
+  assert.deepEqual(breaksTiming('Noodle bowls. Quick noodles in twenty minutes.', 'now'), []);
 });

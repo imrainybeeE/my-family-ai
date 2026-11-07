@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { caseTastes, dropFiller, sentenceCase, tidyChatLine } from './ai.ts';
+import { caseTastes, dropFiller, sentenceCase, tidyChatLine, youify } from './ai.ts';
 
 const names = ['Maya', 'Mum', 'Dad', 'Nai Nai', 'Leo', 'The Tan family'];
 
@@ -41,4 +41,19 @@ test('drops decorative adjectives but keeps meaning', () => {
   assert.equal(dropFiller('An amazing evening walk.'), 'An evening walk.');
   assert.equal(dropFiller('Have fun together outside.'), 'Have fun together outside.');
   assert.equal(dropFiller('Fresh fruit and smoothies.'), 'Fresh fruit and smoothies.');
+});
+
+test('re-chooses only the article in front of a removed word', () => {
+  assert.equal(dropFiller('It takes an hour.'), 'It takes an hour.');
+  assert.equal(dropFiller('Try a unique dish and a one-pot meal.'), 'Try a unique dish and a one-pot meal.');
+  assert.equal(dropFiller('Plan A or B.'), 'Plan A or B.');
+  assert.equal(dropFiller('Bake a warm apple pie.'), 'Bake an apple pie.');
+  assert.equal(dropFiller('An amazing picnic.'), 'A picnic.');
+});
+
+test('calls the person asking "you"', () => {
+  assert.equal(youify('Maya and Dad both enjoy walks.', 'Maya'), 'You and Dad both enjoy walks.');
+  assert.equal(youify('- Nai Nai shares noodles with Maya.', 'Maya'), '- Nai Nai shares noodles with you.');
+  assert.equal(youify('Maya likes tacos.', 'Maya'), 'You like tacos.');
+  assert.equal(youify("Try Maya's favourite park.", 'Maya'), 'Try your favourite park.');
 });

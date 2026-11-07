@@ -53,7 +53,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
             ]}
           />
           <label className="card mt-3 flex items-center justify-between gap-3 px-4 min-h-[52px]">
-            <span className="t-body">Sound effects</span>
+            <span className="t-body">Sounds and haptics</span>
             <input
               type="checkbox"
               role="switch"

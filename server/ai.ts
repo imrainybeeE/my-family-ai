@@ -4,7 +4,7 @@ import { ApiError, FinishReason, GoogleGenAI, ThinkingLevel } from '@google/gena
 import type { Content } from '@google/genai';
 import { z } from 'zod';
 import { parseBrief, renderBrief } from './familyBrief.ts';
-import { alignMembers, checkClaims, stripClaims } from './claims.ts';
+import { alignMembers, checkClaims, sharedHeadline, stripClaims } from './claims.ts';
 import type { FamilyBrief } from './familyBrief.ts';
 
 // Every AI feature runs on Gemini Flash-Lite with minimal thinking: about 1.5s a reply and no
@@ -14,10 +14,12 @@ const MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 const FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || 'gemini-3.1-flash-lite';
 const MODELS = [...new Set([MODEL, FALLBACK_MODEL])];
 /** Errors that mean "try the other model" rather than "this request is wrong". */
-const retryable = (err: unknown) => err instanceof ApiError && [429, 500, 503, 504].includes(err.status);
+const retryable = (err: unknown) =>
+  (err instanceof ApiError && [429, 500, 503, 504].includes(err.status)) || /timed? ?out|timeout/i.test(String((err as Error)?.name) + String((err as Error)?.message));
 const THINKING_LEVELS: Record<string, ThinkingLevel> = { minimal: ThinkingLevel.MINIMAL, low: ThinkingLevel.LOW, medium: ThinkingLevel.MEDIUM };
 const THINKING = THINKING_LEVELS[process.env.GEMINI_THINKING || ''] ?? ThinkingLevel.MINIMAL;
-const TIMEOUT_MS = 45_000;
+// Flash-Lite answers in 1.5–3 seconds; a call still waiting at 12 is stuck, so it moves to the backup model.
+const TIMEOUT_MS = 12_000;
 
 let client: GoogleGenAI | null = null;
 function getClient(): GoogleGenAI | null {
@@ -178,17 +180,32 @@ export function caseTastes(text: string, options: string[]): string {
 const FILLER = /\b(fragrant|nourishing|delicious|vibrant|wonderful|amazing|perfect|lovely|tasty|yummy|hearty|scrumptious|cosy|warm|fun|relaxing|exciting)(,)?\s+(?=[a-z])/gi;
 export function dropFiller(text: string): string {
   return text
-    .replace(FILLER, (m, _w, _c, offset: number, all: string) => {
+    .replace(new RegExp(`(\\b(?:a|an|A|An)\\s+)?${FILLER.source}`, 'gi'), (m, article: string | undefined, _w, _c, offset: number, all: string) => {
       // Keep words used as nouns or after verbs that need them ("have fun", "stay warm").
       const before = all.slice(Math.max(0, offset - 8), offset).toLowerCase();
-      return /\b(have|had|for|stay|keep|is|are|was|be)\s+$/.test(before) ? m : '';
+      if (/\b(have|had|for|stay|keep|is|are|was|be)\s+$/.test(before)) return m;
+      if (!article) return '';
+      // Only the article in front of a removed word is re-chosen, from the word that now follows it.
+      const next = all.slice(offset + m.length);
+      const an = /^[aeiou]/i.test(next) && !/^(one|uni|use|eu)/i.test(next);
+      const word = an ? 'an' : 'a';
+      return `${article[0] === 'A' ? word[0].toUpperCase() + word.slice(1) : word} `;
     })
-    .replace(/\b([Aa])n ([bcdfghjklmnpqrstvwxyz])/g, '$1 $2')
-    .replace(/\b([Aa]) ([aeiou])/g, '$1n $2')
     .replace(/^([a-z])/, (c) => c.toUpperCase());
 }
 
 const tasteOptions = (brief: FamilyBrief) => [...new Set(brief.members.flatMap((m) => (m.tastes || []).flatMap((t) => t.a)))];
+
+/** The person asking is "you" in chat, never their own name: "Maya and Dad" becomes "You and Dad". */
+export function youify(text: string, asker: string): string {
+  if (!asker) return text;
+  const name = escapeRe(asker);
+  return text
+    .replace(new RegExp(`\\b${name}'s\\b`, 'g'), 'your')
+    .replace(new RegExp(`\\b${name}\\b`, 'g'), 'you')
+    .replace(/(^|[.!?]\s+|\n-\s+|\n|\*\*\s)(you|your)\b/g, (_m, lead: string, w: string) => lead + w[0].toUpperCase() + w.slice(1))
+    .replace(/\b(you) (likes|loves|enjoys|picks|prefers|wants|avoids|has|is)\b/gi, (_m, you: string, verb: string) => `${you} ${verb === 'has' ? 'have' : verb === 'is' ? 'are' : verb.replace(/s$/, '')}`);
+}
 
 /** Tidies a chat answer: British spelling, taste labels as words, and **bold ideas** in sentence case with "and" for "&". */
 export function tidyChatLine(line: string, names: string[], options: string[] = []): string {
@@ -236,7 +253,7 @@ async function withFallback<R>(call: (model: string) => Promise<R>): Promise<R> 
     } catch (err) {
       if (!retryable(err)) throw err;
       last = err;
-      console.warn(`Gemini ${model} unavailable (${(err as ApiError).status}), trying the next model`);
+      console.warn(`Gemini ${model} unavailable (${(err as ApiError).status ?? "timed out"}), trying the next model`);
     }
   }
   throw last;
@@ -245,6 +262,27 @@ async function withFallback<R>(call: (model: string) => Promise<R>): Promise<R> 
 /** True when Gemini stopped because of its safety filters rather than finishing. */
 function declined(reason: FinishReason | undefined, blocked: unknown): boolean {
   return Boolean(blocked) || reason === FinishReason.SAFETY || reason === FinishReason.PROHIBITED_CONTENT || reason === FinishReason.BLOCKLIST;
+}
+
+/** Removes the list entries that the given validation paths point into. */
+function dropBrokenItems(value: unknown, paths: PropertyKey[][]): unknown {
+  const copy = structuredClone(value) as any;
+  const byList = new Map<any[], Set<number>>();
+  for (const path of paths) {
+    for (let depth = path.length - 1; depth >= 0; depth--) {
+      if (typeof path[depth] !== 'number') continue;
+      let list: any = copy;
+      for (const key of path.slice(0, depth)) list = list?.[key as any];
+      if (Array.isArray(list)) byList.set(list, (byList.get(list) || new Set()).add(path[depth] as number));
+      break;
+    }
+  }
+  for (const [list, drop] of byList) {
+    const keep = list.filter((_, i) => !drop.has(i));
+    list.length = 0;
+    list.push(...keep);
+  }
+  return copy;
 }
 
 type Generated<T> = { ok: true; data: T } | { ok: false; status: number; error: string };
@@ -291,7 +329,14 @@ async function generate<T extends z.ZodType>(
       console.warn('Gemini reply was not JSON', { attempt, reason });
       continue;
     }
-    const parsed = schema.safeParse(tidyReply(raw, brief));
+    let parsed = schema.safeParse(tidyReply(raw, brief));
+    // On the last try, list items that break a limit (one over-long difference) are dropped rather
+    // than failing the whole reply; required fields still have to be right.
+    if (!parsed.success && attempt === 1) {
+      const trimmed = dropBrokenItems(tidyReply(raw, brief), parsed.error.issues.map((i) => i.path));
+      const again = schema.safeParse(trimmed);
+      if (again.success) parsed = again;
+    }
     if (!parsed.success) {
       feedback = parsed.error.issues
         .slice(0, 4)
@@ -316,15 +361,15 @@ async function generate<T extends z.ZodType>(
         .slice(0, 4)
         .map((i) => i.message)
         .join('; ')}. Only say someone likes or avoids something if they picked it`;
-      console.warn('Gemini reply had wrong attributions', { issues: issues.length });
+      console.warn('Gemini reply had wrong attributions', issues.slice(0, 3).map((i) => i.message));
       continue;
     }
     // After the retry, wrong sentences are removed. If that leaves the reply invalid, or anything
     // false survives, nothing is sent: no flagged claim ever reaches the family.
-    const fixed = alignMembers(issues.length ? stripClaims(data, issues) : data, brief);
+    const fixed = alignMembers(issues.length ? stripClaims(data, issues, { headline: sharedHeadline(brief) }) : data, brief);
     const checked = schema.safeParse(fixed);
     if (!checked.success || checkClaims(checked.data, brief).length) {
-      console.warn('Reply still had wrong attributions after a retry; not sent');
+      console.warn('Reply still had wrong attributions after a retry; not sent', checked.success ? checkClaims(checked.data, brief).map((i) => i.message) : checked.error.issues.slice(0, 2).map((i) => `${i.path.join('.')}: ${i.message}`));
       return { ok: false, status: 502, error: 'ai_invalid' };
     }
     if (issues.length) console.warn('Removed wrong attributions', { issues: issues.length });
@@ -413,6 +458,21 @@ export function breaksSetting(idea: string, setting: Setting): string[] {
   return [];
 }
 
+/** When the family said it should happen. Ideas that name a different time are rejected. */
+type Timing = 'now' | 'tonight' | 'weekend';
+const TIMES: Record<Timing, RegExp> = {
+  now: /\b(right now|now|straight away|this afternoon|in an hour)\b/i,
+  tonight: /\b(tonight|this evening|after dinner|evening)\b/i,
+  weekend: /\b(this weekend|weekend|saturday|sunday)\b/i,
+};
+export function timingOf(answers: string): Timing | null {
+  return (Object.keys(TIMES) as Timing[]).find((t) => TIMES[t].test(answers)) || null;
+}
+export function breaksTiming(idea: string, timing: Timing): string[] {
+  const other = (Object.keys(TIMES) as Timing[]).filter((t) => t !== timing && TIMES[t].test(idea));
+  return other.length ? [`must fit "${timing === 'now' ? 'right now' : timing}", but mentions ${other.join(' and ')}`] : [];
+}
+
 const TASKS: Record<string, string> = {
   eat: 'What should we eat?',
   do: 'What should we do together?',
@@ -476,7 +536,7 @@ At most 45 words in total. Call ${asker} "you", never by name, and everyone else
       const total = () => wordCount([answer, ...facts, ...ideas.map((i) => `Idea: ${i}`)].join(' '));
       while (total() > 45 && ideas.length + facts.length > 0) (ideas.length > 1 || !facts.length ? ideas : facts).pop();
       const lines = [answer, ...(facts.length || ideas.length ? [''] : []), ...facts.map((f) => `- ${f}`), ...ideas.map((i) => `- **Idea:** ${i}`)];
-      send({ t: tidyChatLine(lines.join('\n'), [...g.brief.members.map((m) => m.name), g.brief.householdName], tasteOptions(g.brief)) });
+      send({ t: youify(tidyChatLine(lines.join('\n'), [...g.brief.members.map((m) => m.name), g.brief.householdName], tasteOptions(g.brief)), asker) });
       send({ done: true, refused: false });
     }
   } catch (err) {
@@ -499,7 +559,7 @@ aiRouter.post('/suggest', async (req, res) => {
     res,
     g.ai,
     g.brief,
-    `Suggest 3 short questions ${g.brief.asker} could tap to ask the family helper. ${context} Write them as ${g.brief.asker} would type them, in correct grammar: "I" as a subject ("Where could Dad and I walk?"), "me" as an object, never ${g.brief.asker}'s name; other people by name. Each at most 8 words, specific to this family, and answerable from the saved answers or useful for planning time together.`,
+    `Suggest 3 short questions ${g.brief.asker} could tap to ask the family helper. ${context} Write them as ${g.brief.asker} would type them, in correct grammar: "I" as a subject ("Where could Dad and I walk?"), "me" as an object, never ${g.brief.asker}'s name; other people by name. Each at most 8 words, about the family's tastes, time together or each other (never about the app, the quiz, or who hasn't answered), specific to this family, and answerable from the saved answers or useful for planning time together.`,
     'Give the suggestions.',
     SuggestSchema,
   );
@@ -572,7 +632,7 @@ aiRouter.post('/insights', async (req, res) => {
     g.ai,
     g.brief,
     `Write the family profile for the app's Together screen, using only the saved answers.
-- headline: one sentence under 8 words naming one concrete thing most of the family shares (for example "Dinner brings the Tans together").
+- headline: one sentence under 9 words naming one concrete thing two or more people share, and who (for example "Mum and Nai Nai love a good mystery"). Only speak for the whole family when everyone who answered picked it.
 - together: 2–3 things two or more people enjoy or value. title under 5 words; detail is under 12 words saying who, without repeating the title's words (for example title "Mystery shows", detail "Mum and Nai Nai both picked whodunnits."), never "everyone" unless it is true. members: the names involved.
 - differences: 1–2 interesting differences about different things (never two about energy or rest), described neutrally. detail is under 14 words naming who prefers what; bridge is under 12 words with a practical, positive way to enjoy that difference.
 - ideas: exactly 3 things to try together, each grounded in answers. title under 5 words; why is under 12 words; tip is one practical sentence under 12 words. members: who it suits.
@@ -617,6 +677,7 @@ aiRouter.post('/plan/ideas', async (req, res) => {
     .map((a: any) => ({ question: text(a?.question, 120), answer: text(a?.answer, 200) }));
   const practical = practicalAnswers.map((a) => `- ${a.question}: ${a.answer}`).join('\n');
   const setting = settingOf(practicalAnswers.map((a) => a.answer).join(' '));
+  const timing = timingOf(practicalAnswers.map((a) => a.answer).join(' '));
   if (!taskTitle || !who.length) {
     res.status(400).json({ error: 'missing_task' });
     return;
@@ -630,7 +691,7 @@ aiRouter.post('/plan/ideas', async (req, res) => {
     g.ai,
     g.brief,
     `The family wants help with "${taskTitle}". People joining: ${who.join(', ')}.
-Give exactly 3 options that fit these people, using their saved answers and practical answers. Every practical answer is binding for all three options: if they chose take-out, all three are take-out; if they chose at home, all three are at home. Within those limits, make the three clearly different (for example the cuisine, the effort, or who it suits most).
+Give exactly 3 options that fit these people, using their saved answers and practical answers. Every practical answer is binding for all three options: if they chose take-out, all three are take-out; if they chose at home, all three are at home; if they chose right now, none of them is for this evening or the weekend. Within those limits, make the three clearly different (for example the cuisine, the effort, or who it suits most).
 - title: under 5 words.
 - summary: one sentence under 14 words describing the idea, without repeating words from the title.
 - why: one sentence under 18 words on why it fits, naming people and what in their answers points to it.
@@ -640,6 +701,10 @@ Give exactly 3 options that fit these people, using their saved answers and prac
 These are AI ideas: never claim something exists, is open, is available or costs a certain amount. ${watchNote}`,
     `Practical answers:\n${practical || '- none given'}`,
     PlanIdeasSchema,
-    (data) => (setting ? data.ideas.flatMap((idea, i) => breaksSetting(`${idea.title}. ${idea.summary}`, setting).map((why) => `ideas.${i} ${why}`)) : []),
+    (data) =>
+      data.ideas.flatMap((idea, i) => {
+        const text = `${idea.title}. ${idea.summary}`;
+        return [...(setting ? breaksSetting(text, setting) : []), ...(timing ? breaksTiming(text, timing) : [])].map((why) => `ideas.${i} ${why}`);
+      }),
   );
 });
