@@ -53,6 +53,8 @@
   --shadow-paper: 0 0 0 0.5px rgba(30, 42, 68, 0.06), 0 2px 8px rgba(30, 42, 68, 0.08);
   --shadow-lift: 0 1px 2px rgba(30, 42, 68, 0.06), 0 8px 24px -8px rgba(30, 42, 68, 0.22);
   --grain: 0.55;
+  /* Cardstock fibre, shared by the page and the scrims so their grain lines up. */
+  --fibre: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .12 0 0 0 0 .16 0 0 0 0 .27 0 0 0 .08 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
 
   --r-paper: 12px;
   --r-ctl: 14px;
@@ -175,7 +177,8 @@
   z-index: -1;
   pointer-events: none;
   opacity: var(--grain);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .12 0 0 0 0 .16 0 0 0 0 .27 0 0 0 .08 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-image: var(--fibre);
+  background-attachment: fixed;
 }
 
 /* ------------------------------------------------------------------------------------------
@@ -206,10 +209,12 @@
   font-size: 1rem;
   line-height: 24px;
   font-weight: 420;
+  text-wrap: pretty;
 }
 .t-small {
   font-size: 0.9375rem;
   line-height: 1.42;
+  text-wrap: pretty;
 }
 .t-label {
   font-size: 0.875rem;
@@ -268,6 +273,16 @@
   --btn-bg: var(--accent);
   --btn-fg: var(--on-accent);
   --btn-edge: var(--accent-press);
+}
+/* A main action that isn't ready yet sits flat and quiet, without its stitching. */
+.btn-primary:disabled {
+  opacity: 1;
+  background: var(--page-sunk);
+  color: var(--ink-3);
+  box-shadow: none;
+}
+.btn-primary:disabled::after {
+  display: none;
 }
 /* The one stitched control: the main action on a screen. */
 .btn-primary::after {
@@ -599,14 +614,32 @@ textarea.field {
   box-shadow: 0 0 0 0.5px var(--line-strong), var(--shadow-lift);
 }
 /* Page colour under the floating bar, so scrolled text never shows in the gap beneath it. */
+/*
+ * A scrim: page colour that fades in over scrolling content, carrying the same fibre as the page so
+ * it never shows as a lighter band. --scrim-mask sets where it is solid.
+ */
+.scrim {
+  pointer-events: none;
+  isolation: isolate;
+  background: var(--page);
+  -webkit-mask-image: var(--scrim-mask);
+  mask-image: var(--scrim-mask);
+}
+.scrim::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: var(--grain);
+  background-image: var(--fibre);
+  background-attachment: fixed;
+}
 .tabbar-floor {
   position: fixed;
   z-index: 29;
   inset-inline: 0;
   bottom: 0;
   height: calc(40px + var(--safe-b));
-  pointer-events: none;
-  background: linear-gradient(to top, var(--page) 55%, color-mix(in srgb, var(--page) 0%, transparent));
+  --scrim-mask: linear-gradient(to top, #000 55%, transparent);
 }
 .tabbar button {
   position: relative;
@@ -619,7 +652,8 @@ textarea.field {
   border: 0;
   background: transparent;
   color: var(--ink-3);
-  font-size: 0.71875rem;
+  font-size: 0.75rem;
+  line-height: 16px;
   font-weight: 650;
 }
 .tabbar button[aria-selected='true'] {
@@ -704,6 +738,10 @@ textarea.field {
   margin-top: 0.35em;
 }
 /* Bullets are little stitches. */
+/* A chat answer leads with its one-line answer, set a step heavier than the facts below it. */
+.prose-ai.lead > p:first-child {
+  font-weight: 600;
+}
 .prose-ai li::before {
   content: '';
   position: absolute;

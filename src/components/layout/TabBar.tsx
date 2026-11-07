@@ -17,7 +17,7 @@ const TABS: { id: TabType; label: string; Icon: typeof GardenIcon }[] = [
 export function TabBar({ tab, onChange }: { tab: TabType; onChange: (t: TabType) => void }) {
   return (
     <>
-      <div aria-hidden className="tabbar-floor" />
+      <div aria-hidden className="tabbar-floor scrim" />
       <nav className="tabbar" role="tablist" aria-label="Sections" onKeyDown={(e) => onRovingKeyDown(e, 'tab')}>
         {TABS.map(({ id, label, Icon }) => {
           const on = tab === id;

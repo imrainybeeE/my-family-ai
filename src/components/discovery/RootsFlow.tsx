@@ -244,7 +244,7 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
           <motion.div key={`r${q.id}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="grid gap-4 pt-6">
             <section className="stock stock-lilac">
               <h3 className="t-head">{q.question}</h3>
-              <div className="flex items-baseline justify-between gap-3 mt-3">
+              <div className="flex items-center justify-between gap-3 mt-3">
                 <p className="t-hand opacity-75">You said</p>
                 <p className="t-small flex items-center gap-1 opacity-75">
                   <Check size={14} strokeWidth={2.6} aria-hidden /> Answer saved
@@ -270,7 +270,7 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
             {!reflecting && reflection?.followUp && (
               <label className="grid gap-2">
                 <span className="sr-only">{reflection.followUp}</span>
-                <textarea className="field" rows={4} maxLength={600} value={followText} onChange={(e) => setFollowText(e.target.value)} placeholder="Answer if you like" />
+                <textarea className="field" rows={4} maxLength={600} value={followText} onChange={(e) => setFollowText(e.target.value)} placeholder="For example: Dad listened when I needed it" />
               </label>
             )}
             {error && (

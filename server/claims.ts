@@ -31,10 +31,26 @@ function keysOf(option: string): string[] {
   return [...new Set(words(option).filter((w) => w.length >= 4 && !STOP.has(w)))];
 }
 
-/** A keyword matches a word in the text by its first five letters, or exactly (allowing a plural) when shorter. */
+/**
+ * Words are compared by their stem, so plurals and verb forms match ("mysteries" and "mystery",
+ * "baking" and "bake") but different words don't ("animation" and "animals").
+ */
+export function stem(word: string): string {
+  return word
+    .toLowerCase()
+    .replace(/ies$/, 'y')
+    .replace(/(ing|ed|es|s)$/, '')
+    .replace(/e$/, '');
+}
+
+/** True when two texts share a meaningful word (by stem), such as a headline and the row it sums up. */
+export function sharesTopic(a: string, b: string): boolean {
+  const keys = new Set(words(b).filter((w) => w.length >= 4 && !STOP.has(w)).map(stem));
+  return words(a).some((w) => w.length >= 4 && !STOP.has(w) && keys.has(stem(w)));
+}
+
 function hits(key: string, word: string): boolean {
-  if (key.length >= 5) return word.startsWith(key.slice(0, 5));
-  return word === key || word === `${key}s` || word === `${key}es`;
+  return stem(key) === stem(word);
 }
 
 /** Every checked taste pick, with everyone who chose it. */

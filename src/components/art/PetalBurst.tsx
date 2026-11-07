@@ -9,7 +9,7 @@ import { DiscoveryStyleId } from '../../types';
  * A burst of felt petals thrown out from a flower as it opens: the same rendered petals the quiz sews
  * on, arcing out, tumbling and settling with a little gravity. Played once; skipped with reduced motion.
  */
-export function PetalBurst({ styles, count = 14, delay = 0, radius = 170 }: { styles: DiscoveryStyleId[]; count?: number; delay?: number; radius?: number }) {
+export function PetalBurst({ styles, count = 10, delay = 0, radius = 170 }: { styles: DiscoveryStyleId[]; count?: number; delay?: number; radius?: number }) {
   const reduce = useReducedMotion();
   const petals = useMemo(() => {
     const palette = styles.length ? styles : STYLE_ORDER;
@@ -22,7 +22,7 @@ export function PetalBurst({ styles, count = 14, delay = 0, radius = 170 }: { st
         y: Math.sin(angle) * reach * 0.85,
         fall: 40 + ((i * 13) % 4) * 18,
         spin: (i % 2 ? 1 : -1) * (160 + ((i * 31) % 5) * 50),
-        size: 26 + ((i * 5) % 4) * 5,
+        size: 34 + ((i * 5) % 4) * 6,
         style: palette[i % palette.length],
         tilt: (angle * 180) / Math.PI + 90,
       };
@@ -38,7 +38,7 @@ export function PetalBurst({ styles, count = 14, delay = 0, radius = 170 }: { st
           className="absolute"
           style={{ width: p.size, height: p.size, transformPerspective: 400 }}
           initial={{ x: 0, y: 0, opacity: 0, scale: 0.3, rotate: p.tilt, rotateX: 0 }}
-          animate={{ x: [0, p.x, p.x * 1.05], y: [0, p.y, p.y + p.fall], opacity: [0, 1, 1, 0], scale: [0.3, 1, 0.9], rotate: [p.tilt, p.tilt + p.spin], rotateX: [0, 160] }}
+          animate={{ x: [0, p.x, p.x * 1.05], y: [0, p.y, p.y + p.fall], opacity: [0, 1, 1, 0], scale: [0.3, 1, 1], rotate: [p.tilt, p.tilt + p.spin], rotateX: [0, 55] }}
           transition={{ duration: 1.6, delay: delay + (i % 6) * 0.015, ease: [0.2, 0.7, 0.3, 1], times: [0, 0.4, 1], opacity: { duration: 1.6, delay, times: [0, 0.1, 0.7, 1] } }}
         >
           <Felt name={PETAL[p.style]} size={p.size} />

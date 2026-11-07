@@ -4,7 +4,7 @@ import { ApiError, FinishReason, GoogleGenAI, ThinkingLevel } from '@google/gena
 import type { Content } from '@google/genai';
 import { z } from 'zod';
 import { parseBrief, renderBrief } from './familyBrief.ts';
-import { alignMembers, checkClaims, sharedHeadline, stripClaims } from './claims.ts';
+import { alignMembers, checkClaims, sharedHeadline, sharesTopic, stripClaims } from './claims.ts';
 import type { FamilyBrief } from './familyBrief.ts';
 
 // Every AI feature runs on Gemini Flash-Lite with minimal thinking: about 1.5s a reply and no
@@ -15,7 +15,7 @@ const FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || 'gemini-3.1-flash-li
 const MODELS = [...new Set([MODEL, FALLBACK_MODEL])];
 /** Errors that mean "try the other model" rather than "this request is wrong". */
 const retryable = (err: unknown) =>
-  (err instanceof ApiError && [429, 500, 503, 504].includes(err.status)) || /timed? ?out|timeout/i.test(String((err as Error)?.name) + String((err as Error)?.message));
+  (err instanceof ApiError && [429, 500, 503, 504].includes(err.status)) || /timed? ?out|timeout|fetch failed|ECONNRESET|socket hang up|network/i.test(String((err as Error)?.name) + String((err as Error)?.message));
 const THINKING_LEVELS: Record<string, ThinkingLevel> = { minimal: ThinkingLevel.MINIMAL, low: ThinkingLevel.LOW, medium: ThinkingLevel.MEDIUM };
 const THINKING = THINKING_LEVELS[process.env.GEMINI_THINKING || ''] ?? ThinkingLevel.MINIMAL;
 // Flash-Lite answers in 1.5–3 seconds; a call still waiting at 12 is stuck, so it moves to the backup model.
@@ -122,6 +122,12 @@ const BRITISH: [RegExp, string][] = [
   [/\bmovie/g, 'film'],
   [/\bMovie/g, 'Film'],
   [/\benergiz/g, 'energis'],
+  [/\banalyz/g, 'analys'],
+  [/\brealiz/g, 'realis'],
+  [/\bprioritiz/g, 'prioritis'],
+  [/\brecogniz/g, 'recognis'],
+  [/\bapologiz/g, 'apologis'],
+  [/\bcustomiz/g, 'customis'],
 ];
 const british = (s: string) => BRITISH.reduce((t, [from, to]) => t.replace(from, to), s);
 
@@ -229,7 +235,8 @@ function tidyReply<T>(value: T, brief: FamilyBrief): T {
         out[k] = [...new Set(child.map((n) => canonical.get(String(n).trim().toLowerCase())).filter(Boolean))];
       } else if (typeof child === 'string') {
         const text = dropFiller(caseTastes(british(child), options));
-        out[k] = k === 'title' || k === 'headline' ? sentenceCase(text, proper) : text;
+        // Headlines are titles: no closing full stop, so the AI's and the computed one match.
+        out[k] = k === 'headline' ? sentenceCase(text, proper).replace(/\.$/, '') : k === 'title' ? sentenceCase(text, proper) : text;
       } else {
         out[k] = walk(child);
       }
@@ -247,7 +254,14 @@ function logUsage(model: string | undefined, u: { promptTokenCount?: number; tho
 /** Runs a call on the main model, moving to the fallback model when Google is busy or out of quota. */
 async function withFallback<R>(call: (model: string) => Promise<R>): Promise<R> {
   let last: unknown;
-  for (const model of MODELS) {
+  const started = Date.now();
+  // Busy errors come in short bursts: when both models said so quickly, the main one gets one more try.
+  const plan = [...MODELS, MODELS[0]];
+  for (const [i, model] of plan.entries()) {
+    if (i === MODELS.length) {
+      if (Date.now() - started > 6000) break;
+      await new Promise((r) => setTimeout(r, 700));
+    }
     try {
       return await call(model);
     } catch (err) {
@@ -617,10 +631,12 @@ aiRouter.post('/roots', async (req, res) => {
     g.ai,
     g.brief,
     `${member} is answering the Advanced discovery questions, a deeper and optional layer after the Foundation discovery.
-- reflection: one sentence under 16 words, speaking to them as "you", that adds something rather than restating their answer: link it to a specific thing another family member saved, keeping exactly what that person meant, in a plain sentence about them (for example "Mum feels appreciated when someone notices what she does."; never turn it into Mum noticing others), or, if nothing links closely, one small way the family could act on it. Don't judge or analyse them, and no praise words.
+- reflection: one sentence under 16 words, speaking to them as "you", that adds something rather than restating their answer: link it to a specific thing another family member saved, keeping exactly what that person meant and speaking to ${member} as "you" (for example "Like Mum, you feel most appreciated when someone notices the small things."; never turn Mum's wish into Mum noticing others), or, if nothing links closely, one small way the family could act on it. Don't judge or analyse them, and no praise words.
 - followUp: at most one short follow-up question (under 16 words) about something not already in the question or their answer, only when the answer is very short or vague and one more detail would help the family plan together or understand them. Otherwise null. Never follow up on worries, stress, health, or anything they seemed hesitant about.${followUpAnswered ? ' They have already answered a follow-up for this question, so followUp must be null.' : ''}`,
     `Question: "${question}"\n${member}'s answer: "${answer}"`,
     RootsSchema,
+    // The reflection is spoken to the person who answered.
+    (data) => (/\b(you|your)\b/i.test(data.reflection) ? [] : ['reflection: speak to them as "you"']),
   );
 });
 
@@ -632,15 +648,17 @@ aiRouter.post('/insights', async (req, res) => {
     g.ai,
     g.brief,
     `Write the family profile for the app's Together screen, using only the saved answers.
-- headline: one sentence under 9 words naming one concrete thing two or more people share, and who (for example "Mum and Nai Nai love a good mystery"). Only speak for the whole family when everyone who answered picked it.
+- headline: one sentence under 9 words that restates the first "together" item: the thing and who shares it (for example "Mum and Nai Nai love a good mystery"). Only speak for the whole family when everyone who answered picked it.
 - together: 2–3 things two or more people enjoy or value. title under 5 words; detail is under 12 words saying who, without repeating the title's words (for example title "Mystery shows", detail "Mum and Nai Nai both picked whodunnits."), never "everyone" unless it is true. members: the names involved.
 - differences: 1–2 interesting differences about different things (never two about energy or rest), described neutrally. detail is under 14 words naming who prefers what; bridge is under 12 words with a practical, positive way to enjoy that difference.
-- ideas: exactly 3 things to try together, each grounded in answers. title under 5 words; why is under 12 words; tip is one practical sentence under 12 words. members: who it suits.
+- ideas: exactly 3 things to try together, each grounded in answers. Name the thing in every line: never "it", "them" or "this" without saying what. title under 5 words; why is under 12 words; tip is one practical sentence under 12 words. members: who it suits.
 Use the family facts for any numbers. Write for a phone screen: short, concrete, plain. No praise words. Never rank picks ("top", "number one", "most loved"): the answers are unranked lists. Only say "the family", "everyone" or the family's name for something every person who answered picked.
 - missing: if some people haven't answered the Foundation discovery yet, under 8 words naming them (for example "Leo hasn't answered yet"); otherwise null.
 If only one person has answered, stay honest: describe what that person brings and what the family could discover next, and say so in missing.`,
     'Write the family profile.',
     InsightsSchema,
+    // The headline sums up the first shared interest, so the two never disagree.
+    (data) => (data.together[0] && !sharesTopic(data.headline, `${data.together[0].title} ${data.together[0].detail}`) ? ['headline: restate the first "together" item'] : []),
   );
 });
 

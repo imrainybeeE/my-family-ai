@@ -78,10 +78,10 @@ export function TogetherView() {
             </div>
           ) : (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <p className="t-head mt-2" style={{ fontSize: '1.375rem', lineHeight: '26px' }}>
+              <p className="t-head mt-2" style={{ fontSize: '1.375rem', lineHeight: '26px', textWrap: 'balance' }}>
                 {data.headline}
               </p>
-              {Boolean(insights.error) && <p className="t-small ink-3 mt-2">From your saved answers while the helper reconnects.</p>}
+              {data.missing && <p className="t-small ink-2 mt-2">{data.missing}</p>}
 
               <SectionTitle>Shared interests</SectionTitle>
               <ul className="card px-4" aria-label="Things you enjoy together">
@@ -115,9 +115,17 @@ export function TogetherView() {
               </IdeaPager>
 
               <div className="flex items-center justify-between gap-3 mt-2">
-                <p className="t-small ink-3">{data.missing || 'Written by AI from your answers.'}</p>
-                <button type="button" className="icon-btn shrink-0" style={{ background: 'transparent', boxShadow: 'none' }} onClick={insights.refresh} disabled={insights.loading} aria-label="Write it again">
-                  <RefreshCw size={18} strokeWidth={2.2} />
+                <p className="t-small ink-3">{insights.error ? 'From your saved answers.' : 'Written by AI from your answers.'}</p>
+                <button
+                  type="button"
+                  className="btn btn-quiet btn-sm shrink-0 -mr-3"
+                  onClick={() => {
+                    feel('page');
+                    insights.refresh();
+                  }}
+                  disabled={insights.loading}
+                >
+                  <RefreshCw size={16} strokeWidth={2.2} /> {insights.error ? 'Try again' : 'Write again'}
                 </button>
               </div>
             </motion.div>
@@ -189,6 +197,8 @@ function FamilyCircle({ people: given, links, onOpen }: { people: FamilyPerson[]
   return (
     <div ref={ref} className="relative -mx-5 mt-1" style={{ height: H }}>
       <svg className="absolute inset-0 overflow-visible" width={w} height={H} aria-hidden>
+        {/* A faint stitched ring that everyone sits on; the yarn strands lie over it. */}
+        {w > 0 && n > 2 && <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill="none" stroke="var(--line-strong)" strokeWidth={1.5} strokeDasharray="2 6" strokeLinecap="round" />}
         {strands.map((s, i) => (
           <Strand key={s.key} d={s.d} color={s.color} delay={0.2 + i * 0.12} width={3} />
         ))}
@@ -297,7 +307,7 @@ const TAPES = ['tape-sky', '', 'tape-butter'];
 /** An idea as a ticket taped to the page: the title is the thing, the reason stays short. */
 function Ticket({ index, title, why, people, onPlan }: { index: number; title: string; why: string; people: FamilyPerson[]; onPlan: () => void }) {
   return (
-    <article className={`stock ${TICKETS[index % 3]} relative flex flex-col`} style={{ padding: 16, minHeight: 176, transform: `rotate(${index % 2 ? 0.6 : -0.6}deg)` }}>
+    <article className={`stock ${TICKETS[index % 3]} relative flex flex-col`} style={{ padding: 16, minHeight: 176 }}>
       <span className={`tape ${TAPES[index % 3]}`} style={{ top: -10, left: 18, transform: 'rotate(-4deg)' }} aria-hidden />
       <h3 className="t-title mt-1" style={{ fontSize: '1.375rem', lineHeight: '26px' }}>{title}</h3>
       <p className="t-small mt-2 opacity-85">{why}</p>
@@ -307,8 +317,8 @@ function Ticket({ index, title, why, people, onPlan }: { index: number; title: s
             <FlowerBadge key={p.id} style={p.style} size={30} />
           ))}
         </span>
-        <button type="button" className="btn btn-sm btn-soft" onClick={onPlan}>
-          Plan it
+        <button type="button" className="btn btn-sm btn-soft" style={{ ['--btn-bg' as string]: 'var(--card)' }} onClick={onPlan}>
+          Ask about this
         </button>
       </div>
     </article>

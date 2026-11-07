@@ -283,7 +283,8 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
                 <span className="t-label">Anything else?</span>
                 <input className="field" value={extra} onChange={(e) => setExtra(e.target.value)} placeholder={task === 'eat' ? 'Budget or food needs' : 'Time or budget'} />
               </label>
-              <div className="sticky z-10 -mx-5 px-5 pt-4" style={{ bottom: 'calc(var(--tabbar-top) + 4px + var(--safe-b))', background: 'linear-gradient(to bottom, color-mix(in srgb, var(--page) 0%, transparent), var(--page) 16px)' }}>
+              <div className="sticky z-10 -mx-5 px-5 pt-4" style={{ bottom: 'calc(var(--tabbar-top) + 4px + var(--safe-b))' }}>
+                <div aria-hidden className="scrim absolute inset-0 -z-10" style={{ ['--scrim-mask' as string]: 'linear-gradient(to bottom, transparent, #000 16px)' }} />
                 <button type="button" className="btn btn-primary btn-block" onClick={getIdeas}>
                   Get three ideas
                 </button>
@@ -366,8 +367,7 @@ function IdeaCard({ idea, index, chosen, byName, onChoose }: { idea: PlanIdea; i
       </div>
       <div className="px-5 pt-4 pb-3">
         <p className="t-body">{idea.summary}</p>
-        <div className="flex items-center justify-between gap-3 mt-1 -mb-1">
-          <button
+        <button
             type="button"
             className="t-label bg-transparent border-0 p-0 min-h-[44px] flex items-center gap-1"
             style={{ color: 'var(--accent-ink)' }}
@@ -377,15 +377,6 @@ function IdeaCard({ idea, index, chosen, byName, onChoose }: { idea: PlanIdea; i
             {open ? 'Hide details' : 'Why it fits'}
             <ChevronDown size={16} strokeWidth={2.6} style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 180ms' }} />
           </button>
-          {people.length > 0 && (
-            <span className="flex items-center -space-x-2 shrink-0" aria-label={`Suits ${idea.members.join(', ')}`}>
-              {people.slice(0, 3).map((p) => (
-                <FlowerBadge key={p!.id} style={p!.style} size={26} />
-              ))}
-              {people.length > 3 && <span className="t-small ink-2 pl-3">+{people.length - 3}</span>}
-            </span>
-          )}
-        </div>
         {open && (
           <div className="grid gap-2 pb-1">
             <p className="t-small ink-2">{idea.why}</p>
@@ -408,8 +399,17 @@ function IdeaCard({ idea, index, chosen, byName, onChoose }: { idea: PlanIdea; i
             </span>
           </p>
         )}
-        <div className="flex justify-end mt-3">
-        <button type="button" className={`btn btn-sm ${isChosen ? 'btn-primary' : 'btn-soft'}`} aria-pressed={isChosen} onClick={onChoose}>
+        <div className="flex items-center justify-between gap-3 mt-3">
+        {people.length > 0 && (
+            <span className="flex items-center -space-x-2 shrink-0" aria-label={`Suits ${idea.members.join(', ')}`}>
+              {people.slice(0, 3).map((p) => (
+                <FlowerBadge key={p!.id} style={p!.style} size={26} />
+              ))}
+              {people.length > 3 && <span className="t-small ink-2 pl-3">+{people.length - 3}</span>}
+            </span>
+          )}
+
+        <button type="button" className={`btn btn-sm ml-auto ${isChosen ? 'btn-primary' : 'btn-soft'}`} aria-pressed={isChosen} onClick={onChoose}>
           {isChosen ? (
             <>
               <Check size={18} strokeWidth={2.6} /> Chosen

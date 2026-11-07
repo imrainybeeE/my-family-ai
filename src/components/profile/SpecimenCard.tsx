@@ -8,7 +8,11 @@ import { Flower } from '../art/Flower';
  * A scrapbook page for one person: their top style as a big felt flower taped in, their
  * second style pinned beside it, and their name in handwriting. Only these two are shown.
  */
-export function SpecimenCard({ name, top, second, bloom = false }: { name: string; top: DiscoveryStyleId; second: DiscoveryStyleId; bloom?: boolean }) {
+/**
+ * `bloom` animates the card in as a result; `pinOnly` keeps the main flower still (it has just opened
+ * on the screen before) and only pins the second flower on.
+ */
+export function SpecimenCard({ name, top, second, bloom = false, pinOnly = false }: { name: string; top: DiscoveryStyleId; second: DiscoveryStyleId; bloom?: boolean; pinOnly?: boolean }) {
   const f = FLOWERS[top];
   return (
     <div className="relative pt-4">
@@ -16,7 +20,7 @@ export function SpecimenCard({ name, top, second, bloom = false }: { name: strin
       <span className="tape tape-sky" style={{ top: 0, right: 84, transform: 'rotate(6deg)' }} aria-hidden />
       <div className="card overflow-hidden">
         <div className="relative grid place-items-center" style={{ height: 208, background: `color-mix(in srgb, ${f.color} 20%, var(--card))` }}>
-          <Flower style={top} size={168} bloom={bloom} delay={0.15} />
+          <Flower style={top} size={168} bloom={bloom && !pinOnly} delay={0.15} />
           <motion.div
             className="absolute right-3 bottom-2"
             initial={bloom ? { opacity: 0, scale: 0.6 } : false}

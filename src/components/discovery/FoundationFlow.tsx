@@ -216,7 +216,7 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
     if (byPointer) advanceTimer.current = window.setTimeout(goNext, 380);
   };
 
-  const title = stage === 'reveal' ? 'Your flower' : 'Find your flower';
+  const title = stage === 'reveal' || stage === 'blooming' ? 'Your flower' : 'Find your flower';
 
   return (
     <Sheet
@@ -328,7 +328,8 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
           <motion.div
             key="blooming"
             initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            // The opened flower drifts up and shrinks toward its place on the card, so it reads as one flower.
+            exit={{ opacity: 0, scale: 0.73, y: -150, transition: { duration: 0.35, ease: [0.3, 0.7, 0.4, 1] } }}
             className="grid place-items-center place-content-center text-center gap-4 min-h-[calc(100dvh-160px-var(--safe-t)-var(--safe-b))]"
           >
             <div className="relative grid place-items-center" style={{ width: 240, height: 240 }}>
@@ -347,7 +348,7 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
 
         {stage === 'reveal' && profile && (
           <motion.div key="reveal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid gap-5 pt-2">
-            <SpecimenCard name={name} top={profile.primaryStyle} second={profile.secondaryStyle} bloom />
+            <SpecimenCard name={name} top={profile.primaryStyle} second={profile.secondaryStyle} bloom pinOnly />
             <section className="card p-5" aria-live="polite" aria-label="A note for you">
               {noteState === 'loading' && (
                 <div className="mt-2">

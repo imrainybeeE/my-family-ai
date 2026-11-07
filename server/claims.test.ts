@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { alignMembers, checkClaims, sharedHeadline, sharedPickLines, stripClaims } from './claims.ts';
+import { alignMembers, checkClaims, sharedHeadline, sharedPickLines, stem, stripClaims } from './claims.ts';
 import { buildBrief } from '../src/services/brief.ts';
 import { DEMO_HOUSEHOLD, DEMO_MEMBERS, DEMO_RESPONSES, DEMO_ACTIVE_MEMBER } from '../src/data/demoFamily.ts';
 
@@ -69,4 +69,12 @@ test('replaces a false headline with a true one', () => {
   assert.equal(fixed.headline, sharedHeadline(brief));
   assert.deepEqual(checkClaims(fixed, brief), []);
   assert.match(sharedHeadline(brief), /both picked/);
+});
+
+test('matches words by stem, not by their first letters', () => {
+  assert.equal(stem('mysteries'), stem('mystery'));
+  assert.equal(stem('baking'), stem('bake'));
+  assert.equal(stem('walks'), stem('walk'));
+  assert.notEqual(stem('animation'), stem('animals'));
+  assert.deepEqual(checkClaims({ answer: 'Maya likes animation while Dad prefers sports films.' }, brief), []);
 });

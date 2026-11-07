@@ -63,6 +63,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
                 setSoundOn(e.target.checked);
                 setSound(e.target.checked);
                 if (e.target.checked) feel('select');
+                toast(e.target.checked ? 'Sounds and haptics on' : 'Sounds and haptics off');
               }}
             />
           </label>

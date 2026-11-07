@@ -199,7 +199,7 @@ export function AskView() {
                     <HelperAvatar />
                     <div className="card px-4 py-3.5 flex-1 min-w-0" style={{ borderRadius: '6px 20px 20px 20px' }}>
                       {m.content ? (
-                        <AiText text={m.content} className="t-body" />
+                        <AiText text={m.content} className="t-body lead" />
                       ) : (
                         <Thinking label="Reading your family’s answers" />
                       )}
@@ -236,7 +236,7 @@ export function AskView() {
       <div ref={endRef} />
 
       {/* Page behind the composer and tab bar, fading in above them, so nothing shows between them. */}
-      <div aria-hidden className="fixed z-[19] inset-x-0 bottom-0 mx-auto max-w-[460px] pointer-events-none" style={{ height: `calc(var(--tabbar-top) + ${composerH}px + 32px + var(--safe-b))`, background: 'linear-gradient(to bottom, color-mix(in srgb, var(--page) 0%, transparent), var(--page) 24px)' }} />
+      <div aria-hidden className="scrim fixed z-[19] inset-x-0 bottom-0 mx-auto max-w-[460px]" style={{ height: `calc(var(--tabbar-top) + ${composerH}px + 32px + var(--safe-b))`, ['--scrim-mask' as string]: 'linear-gradient(to bottom, transparent, #000 24px)' }} />
       <form
         ref={composerRef}
         className="fixed z-20 left-1/2 -translate-x-1/2 w-[min(420px,calc(100%-32px))] flex items-end gap-2 p-[5px] pl-1 rounded-[14px]"

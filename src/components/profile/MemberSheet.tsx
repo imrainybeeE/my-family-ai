@@ -150,7 +150,7 @@ function Status({ first, done, part = 0, label, detail }: { first?: boolean; don
         </span>
       ) : (
         <svg width="28" height="28" viewBox="0 0 28 28" className="shrink-0 -rotate-90" aria-hidden>
-          <circle cx="14" cy="14" r="12" fill="none" stroke="var(--line-strong)" strokeWidth="1.5" strokeDasharray="3 3" />
+          <circle cx="14" cy="14" r="12" fill="none" stroke="var(--line)" strokeWidth="1.5" />
           {part > 0 && (
             <motion.circle cx="14" cy="14" r="12" fill="none" stroke="var(--yarn)" strokeWidth="3" strokeLinecap="round" initial={{ pathLength: 0 }} animate={{ pathLength: part }} transition={{ type: 'spring', stiffness: 120, damping: 20 }} />
           )}
