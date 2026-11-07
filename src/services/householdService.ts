@@ -10,7 +10,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './firebase';
-import { Household, HouseholdMember, MemberRole, UserSession, MemberTasteAnswers, DiscoveryProfile } from '../types';
+import { Household, HouseholdMember, MemberRole, UserSession, MemberTasteAnswers } from '../types';
 import { AVATAR_PALETTE } from '../utils/familyCode';
 
 export interface CreateHouseholdParams {
@@ -254,9 +254,10 @@ export function subscribeToMembers(
 }
 
 /**
- * Saves taste survey responses for a household member
+ * Saves a member's full answers document. Callers merge with existing answers first so that
+ * saving one part (tastes, Foundation, Advanced) never wipes another.
  */
-export async function saveMemberTasteAnswers(
+export async function saveMemberAnswers(
   code: string,
   memberId: string,
   answers: MemberTasteAnswers
@@ -266,35 +267,8 @@ export async function saveMemberTasteAnswers(
     const responseRef = doc(db, 'households', code, 'responses', memberId);
     await setDoc(responseRef, {
       memberId,
-      answers,
-      updatedAt: new Date().toISOString(),
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
-  }
-}
-
-/**
- * Saves Foundation Discovery responses and computed discovery profile for a member
- */
-export async function saveMemberFoundationAnswers(
-  code: string,
-  memberId: string,
-  foundationAnswers: Record<string, string | string[]>,
-  discoveryProfile: DiscoveryProfile,
-  existingAnswers?: MemberTasteAnswers
-): Promise<void> {
-  const path = `households/${code}/responses/${memberId}`;
-  try {
-    const responseRef = doc(db, 'households', code, 'responses', memberId);
-    const updatedAnswers: MemberTasteAnswers = {
-      ...(existingAnswers || {}),
-      foundationAnswers,
-      discoveryProfile,
-    };
-    await setDoc(responseRef, {
-      memberId,
-      answers: updatedAnswers,
+      // Firestore rejects undefined values; JSON round-trip drops them.
+      answers: JSON.parse(JSON.stringify(answers)),
       updatedAt: new Date().toISOString(),
     });
   } catch (error) {

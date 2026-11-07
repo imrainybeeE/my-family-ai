@@ -2,18 +2,34 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>My Family AI</title>
-    <meta name="description" content="A school AI project app that helps household members understand each other and find things to enjoy together." />
+    <meta name="description" content="A student-built family app: everyone finds their flower, the family garden grows, and an AI helper plans meals, days out and better conversations from your answers." />
+    <meta name="theme-color" content="#e4ecf5" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Family AI" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <meta property="og:title" content="My Family AI" />
-    <meta property="og:description" content="A school AI project app that helps household members understand each other and find things to enjoy together." />
+    <meta property="og:description" content="Find out how each of you blooms, and what you love doing together." />
     <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Shantell+Sans:wght@500;600&display=swap" rel="stylesheet" />
+    <script>
+      // Paint the right theme before React loads, so dark mode never flashes white.
+      try {
+        var m = localStorage.getItem('myfamilyai_theme');
+        var p = new URLSearchParams(location.search).get('theme');
+        var dark = p ? p === 'dark' : m === 'dark' || ((!m || m === 'system') && matchMedia('(prefers-color-scheme: dark)').matches);
+        if (dark) document.documentElement.classList.add('dark');
+      } catch (e) {}
+    </script>
   </head>
-  <body class="bg-slate-100 text-slate-900 antialiased selection:bg-indigo-100 selection:text-indigo-900">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

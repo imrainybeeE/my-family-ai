@@ -1,6 +1,5 @@
 {
   "name": "My Family AI",
-  "description": "A school AI project app that helps household members understand each other and find things to enjoy together.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "description": "A student-built family app for Axcel International School: everyone finds their flower, the family garden grows, and an AI helper uses the family's answers to plan meals, days out and better conversations.",
+  "requestFramePermissions": []
 }

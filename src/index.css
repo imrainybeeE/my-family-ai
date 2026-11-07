@@ -2,24 +2,984 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-@layer base {
-  body {
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    -webkit-tap-highlight-color: transparent;
-    transition: background-color 0.2s ease, color 0.2s ease;
+@theme {
+  --font-sans: 'Bricolage Grotesque', ui-sans-serif, sans-serif;
+  --font-hand: 'Shantell Sans', 'Bricolage Grotesque', cursive;
+}
+
+/* ------------------------------------------------------------------------------------------
+   Tokens. A family scrapbook: sky-blue cardstock pages, white paper, coloured card stock,
+   washi tape and yarn. The felt art is rendered, so it reads the same on both pages; only
+   paper, ink and card stock change at night.
+   ------------------------------------------------------------------------------------------ */
+:root {
+  color-scheme: light;
+  --page: #e4ecf5;
+  --page-sunk: #d8e2ee;
+  --card: #ffffff;
+  --card-2: #f3f6fb;
+  --ink: #1e2a44;
+  --ink-2: #55617a;
+  --ink-3: #5b677f;
+  --line: #d6deea;
+  --line-strong: #bcc8d9;
+
+  --accent: #24345e;
+  --accent-press: #121c38;
+  --accent-soft: #dfe6f5;
+  --accent-ink: #24345e;
+  --on-accent: #ffffff;
+
+  --yarn: #e86f8f;
+  --yarn-deep: #b9476a;
+
+  --stock-pink: #f8d7e2;
+  --stock-pink-ink: #5a1f36;
+  --stock-butter: #fbe9b7;
+  --stock-butter-ink: #4a3605;
+  --stock-mint: #d5ecdc;
+  --stock-mint-ink: #173d26;
+  --stock-lilac: #e5ddfa;
+  --stock-lilac-ink: #2f2066;
+  --stock-sky: #cfe1f5;
+  --stock-sky-ink: #12324f;
+  --stock-coral: #fbd8cc;
+  --stock-coral-ink: #561e0d;
+
+  --danger: #b4291f;
+  --danger-soft: #fbe3e0;
+  --focus: #24345e;
+
+  --shadow-paper: 0 0 0 0.5px rgba(30, 42, 68, 0.06), 0 2px 8px rgba(30, 42, 68, 0.08);
+  --shadow-lift: 0 1px 2px rgba(30, 42, 68, 0.06), 0 8px 24px -8px rgba(30, 42, 68, 0.22);
+  --grain: 0.55;
+  /* Cardstock fibre, shared by the page and the scrims so their grain lines up. */
+  --fibre: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .12 0 0 0 0 .16 0 0 0 0 .27 0 0 0 .08 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+
+  --r-paper: 12px;
+  --r-ctl: 14px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+  /* Glass for the floating layer, and the tab bar's lens. */
+  --glass-top: rgb(255 255 255 / 0.78);
+  --glass-bottom: rgb(255 255 255 / 0.64);
+  --glass-solid: rgb(250 251 253 / 0.97);
+  --glass-rim: inset 0 0.5px 0 rgb(255 255 255 / 0.7), inset 0 -0.5px 0 rgb(255 255 255 / 0.2), inset 0 0 0 0.5px rgb(30 42 68 / 0.06);
+  --glass-shadow: 0 2px 8px rgb(30 42 68 / 0.08);
+  --lg-tint: rgb(255 255 255 / 0.5);
+  --lg-shadow: inset 0 0 0 0.5px rgb(30 42 68 / 0.08), 0 2px 8px rgb(30 42 68 / 0.08);
+  --lens: rgb(36 52 94 / 0.1);
+  --press-glow: rgb(255 255 255 / 0.6);
+  --tabbar-lift: 0 2px 8px rgb(30 42 68 / 0.08), 0 18px 36px -18px rgb(30 42 68 / 0.4);
+  --tabbar-h: 62px;
+  /* Springs, as linear() curves; --motion scales every movement and is 0 with reduced motion. */
+  --motion: 1;
+  --spring-smooth: linear(0, 0.041, 0.135, 0.25, 0.366, 0.475, 0.572, 0.655, 0.725, 0.782, 0.829, 0.866, 0.896, 0.92, 0.938, 0.952, 0.963, 0.972, 0.979, 0.984, 0.988, 0.991, 0.993, 0.995, 1);
+  --spring-snappy: linear(0, 0.037, 0.127, 0.241, 0.362, 0.479, 0.585, 0.678, 0.757, 0.821, 0.871, 0.911, 0.941, 0.963, 0.979, 0.99, 0.997, 1.002, 1.005, 1.006, 1.006, 1.006, 1.006, 1.005, 1);
+  --spring-bouncy: linear(0, 0.038, 0.131, 0.254, 0.389, 0.521, 0.642, 0.748, 0.836, 0.905, 0.958, 0.996, 1.021, 1.037, 1.044, 1.046, 1.044, 1.039, 1.034, 1.028, 1.021, 1.016, 1.011, 1.007, 1);
+  --spring-lens: linear(0, 0.039, 0.134, 0.258, 0.392, 0.524, 0.643, 0.747, 0.833, 0.9, 0.951, 0.988, 1.013, 1.028, 1.036, 1.038, 1.037, 1.034, 1.029, 1.024, 1.019, 1.014, 1.01, 1.007, 1);
+  --dur-spring-smooth: 490ms;
+  --dur-spring-snappy: 370ms;
+  --dur-spring-bouncy: 460ms;
+  --dur-spring-lens: 420ms;
+  /* The floating dock: the tab bar is 62px tall and 12px off the bottom; the Ask composer sits 10px above it. */
+  --tabbar-top: 84px;
+}
+
+.dark {
+  color-scheme: dark;
+  --page: #131b2c;
+  --page-sunk: #0d1422;
+  --card: #1c263b;
+  --card-2: #232e47;
+  --ink: #eef2fa;
+  --ink-2: #aab5cb;
+  --ink-3: #9aa7c0;
+  --line: #2b3650;
+  --line-strong: #3d4a68;
+
+  --accent: #e6ecf8;
+  --accent-press: #aebbd6;
+  --accent-soft: #2a3653;
+  --accent-ink: #cfdaf2;
+  --on-accent: #151d33;
+
+  --yarn: #f08aa6;
+  --yarn-deep: #c95d7c;
+
+  --stock-pink: color-mix(in srgb, #f08aa6 14%, var(--card));
+  --stock-pink-ink: #ffd9e4;
+  /* Yellow over navy turns olive, so at night butter stock borrows the lilac tint. */
+  --stock-butter: var(--stock-lilac);
+  --stock-butter-ink: var(--stock-lilac-ink);
+  --stock-mint: color-mix(in srgb, #7fc49a 18%, var(--card));
+  --stock-mint-ink: #cdf0da;
+  --stock-lilac: color-mix(in srgb, #b8a3ee 22%, var(--card));
+  --stock-lilac-ink: #e6ddff;
+  --stock-sky: color-mix(in srgb, #8cc4e8 20%, var(--card));
+  --stock-sky-ink: #d6eafb;
+  --stock-coral: color-mix(in srgb, #f08aa6 14%, var(--card-2));
+  --stock-coral-ink: #ffd8cb;
+
+  --danger: #ff8a7d;
+  --danger-soft: #3a1a17;
+  --focus: #e6ecf8;
+
+  --shadow-paper: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 2px 8px rgba(0, 0, 0, 0.28);
+  --shadow-lift: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+  --grain: 0.3;
+  --glass-top: rgb(44 54 80 / 0.74);
+  --glass-bottom: rgb(34 44 68 / 0.7);
+  --glass-solid: rgb(28 38 59 / 0.97);
+  --glass-rim: inset 0 0.5px 0 rgb(255 255 255 / 0.07), inset 0 0 0 0.5px rgb(255 255 255 / 0.05);
+  --glass-shadow: 0 1px 2px rgb(0 0 0 / 0.12), 0 4px 12px rgb(0 0 0 / 0.12);
+  --lg-tint: rgb(40 50 76 / 0.46);
+  --lg-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.05), 0 1px 2px rgb(0 0 0 / 0.12), 0 4px 12px rgb(0 0 0 / 0.12);
+  --lens: rgb(255 255 255 / 0.08);
+  --press-glow: rgb(255 255 255 / 0.22);
+  --tabbar-lift: 0 1px 2px rgb(0 0 0 / 0.12), 0 4px 12px rgb(0 0 0 / 0.12);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion: 0;
+    --spring-smooth: linear;
+    --spring-snappy: linear;
+    --spring-bouncy: linear;
+    --spring-lens: linear;
+    --dur-spring-smooth: 150ms;
+    --dur-spring-snappy: 150ms;
+    --dur-spring-bouncy: 150ms;
+    --dur-spring-lens: 150ms;
   }
 }
 
-.font-mono-code {
-  font-family: 'Space Mono', monospace, ui-monospace;
+/* ------------------------------------------------------------------------------------------
+   Base
+   ------------------------------------------------------------------------------------------ */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    background: var(--page-sunk);
+  }
+  body {
+    margin: 0;
+    background: var(--page-sunk);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-optical-sizing: auto;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    text-rendering: optimizeLegibility;
+  }
+  button {
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+  }
+  button:disabled {
+    cursor: default;
+  }
+  img {
+    -webkit-user-drag: none;
+    user-select: none;
+  }
+  :focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 3px;
+    border-radius: 10px;
+  }
+  ::selection {
+    background: var(--accent-soft);
+  }
+  /* Page titles are balanced so a word never sits alone on their last line. */
+  h1 {
+    text-wrap: balance;
+  }
 }
 
-/* Hide scrollbar for Chrome, Safari and Opera */
+/* Component classes sit in the components layer so Tailwind utilities can still adjust them. */
+@layer components {
+/* The app column: one cardstock page, centred on larger screens. */
+.app-column {
+  position: relative;
+  max-width: 460px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  background: var(--page);
+  isolation: isolate;
+  overflow-x: clip;
+}
+@media (min-width: 520px) {
+  .app-column {
+    box-shadow: 0 0 0 1px var(--line), 0 30px 80px -40px rgba(0, 0, 0, 0.35);
+  }
+}
+/* Cardstock fibre. */
+.app-column::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--grain);
+  background-image: var(--fibre);
+  background-attachment: fixed;
+}
+
+/* ------------------------------------------------------------------------------------------
+   Type
+   ------------------------------------------------------------------------------------------ */
+.t-display {
+  font-size: 2rem;
+  line-height: 35px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variation-settings: 'opsz' 96;
+}
+.t-title {
+  font-size: 1.5rem;
+  line-height: 28px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  font-variation-settings: 'opsz' 72;
+}
+.t-head {
+  font-size: 1.125rem;
+  line-height: 23px;
+  font-weight: 650;
+  letter-spacing: -0.012em;
+  font-variation-settings: 'opsz' 40;
+}
+.t-body {
+  font-size: 1rem;
+  line-height: 24px;
+  font-weight: 420;
+  text-wrap: pretty;
+}
+.t-small {
+  font-size: 0.9375rem;
+  line-height: 1.42;
+  text-wrap: pretty;
+}
+/* Short headings and one-line questions are balanced so they never end on a lone word. */
+.t-title,
+.t-head,
+button .font-semibold {
+  text-wrap: balance;
+}
+.prose-ai p,
+.prose-ai li {
+  text-wrap: pretty;
+}
+.t-label {
+  font-size: 0.875rem;
+  line-height: 1.3;
+  font-weight: 650;
+}
+.t-hand {
+  font-family: var(--font-hand);
+  font-size: 0.9375rem;
+  line-height: 20px;
+  font-weight: 600;
+}
+.ink-2 {
+  color: var(--ink-2);
+}
+.ink-3 {
+  color: var(--ink-3);
+}
+
+/* ------------------------------------------------------------------------------------------
+   Buttons. Rounded rectangles with a little thickness, like a mounted card; they press in.
+   ------------------------------------------------------------------------------------------ */
+.btn {
+  --depth: 2px;
+  --btn-bg: var(--card);
+  --btn-fg: var(--ink);
+  --btn-edge: var(--line-strong);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 52px;
+  padding: 0 1.25rem;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-weight: 650;
+  font-size: 1.0625rem;
+  letter-spacing: -0.005em;
+  box-shadow: 0 var(--depth) 0 var(--btn-edge);
+  transform: translateY(0);
+  transition: transform 120ms cubic-bezier(0.3, 0.7, 0.4, 1), box-shadow 120ms cubic-bezier(0.3, 0.7, 0.4, 1), opacity 160ms;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.btn:active:not(:disabled) {
+  transform: translateY(calc(var(--depth) - 1px));
+  box-shadow: 0 1px 0 var(--btn-edge);
+}
+.btn:disabled {
+  opacity: 0.45;
+}
+.btn-primary {
+  --btn-bg: var(--accent);
+  --btn-fg: var(--on-accent);
+  --btn-edge: var(--accent-press);
+}
+/* A main action that isn't ready yet sits flat and quiet, without its stitching. */
+.btn-primary:disabled {
+  opacity: 1;
+  background: var(--page-sunk);
+  color: var(--ink-3);
+  box-shadow: none;
+}
+.btn-primary:disabled::after {
+  display: none;
+}
+/* The one stitched control: the main action on a screen. */
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 10px;
+  border: 1px dashed color-mix(in srgb, var(--on-accent) 25%, transparent);
+  pointer-events: none;
+}
+.btn-quiet {
+  --depth: 0px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--accent-ink);
+}
+.btn-quiet:active:not(:disabled) {
+  transform: scale(0.97);
+  box-shadow: none;
+  background: var(--accent-soft);
+}
+/* An on/off switch, drawn as a felt toggle: a stitched track and a round button that slides. */
+.switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 32px;
+  border-radius: 16px;
+  background: var(--line-strong);
+  transition: background 200ms;
+  cursor: pointer;
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(30, 42, 68, 0.3);
+  transition: transform 260ms cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.switch:checked {
+  background: var(--yarn);
+}
+.switch:checked::after {
+  transform: translateX(20px);
+}
+
+/* A secondary choice inside a card: a tinted surface with a hairline, no depth. */
+.btn-soft {
+  --depth: 0px;
+  --btn-bg: var(--accent-soft);
+  --btn-fg: var(--accent-ink);
+  border: 1px solid color-mix(in srgb, var(--accent-ink) 18%, transparent);
+  border-radius: 12px;
+}
+.btn-soft:active:not(:disabled) {
+  transform: scale(0.98);
+  box-shadow: none;
+}
+.btn-sm {
+  min-height: 44px;
+  padding: 0 1rem;
+  font-size: 0.9375rem;
+}
+.btn-sm.btn-primary::after {
+  inset: 4px;
+  border-radius: 10px;
+}
+.btn-block {
+  width: 100%;
+}
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-ctl);
+  border: 0;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 2px 0 var(--line-strong);
+  transition: transform 120ms;
+}
+.icon-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 0 0 var(--line-strong);
+}
+
+/* ------------------------------------------------------------------------------------------
+   Paper
+   ------------------------------------------------------------------------------------------ */
+.card {
+  position: relative;
+  background: var(--card);
+  border-radius: var(--r-paper);
+  box-shadow: var(--shadow-paper);
+}
+/* Coloured card stock, used for one feature card at a time. */
+.stock {
+  position: relative;
+  border-radius: var(--r-paper);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-paper);
+}
+.stock-pink {
+  background: var(--stock-pink);
+  color: var(--stock-pink-ink);
+}
+.stock-butter {
+  background: var(--stock-butter);
+  color: var(--stock-butter-ink);
+}
+.stock-mint {
+  background: var(--stock-mint);
+  color: var(--stock-mint-ink);
+}
+.stock-lilac {
+  background: var(--stock-lilac);
+  color: var(--stock-lilac-ink);
+}
+.stock-sky {
+  background: var(--stock-sky);
+  color: var(--stock-sky-ink);
+}
+.stock-coral {
+  background: var(--stock-coral);
+  color: var(--stock-coral-ink);
+}
+/* Washi tape: a translucent paper strip with torn ends. Colour comes from --tape. */
+.tape {
+  --tape: rgba(232, 111, 143, 0.5);
+  position: absolute;
+  z-index: 2;
+  width: 76px;
+  height: 22px;
+  background: var(--tape);
+  clip-path: polygon(0 10%, 5% 0, 10% 12%, 15% 0, 85% 0, 90% 12%, 95% 0, 100% 10%, 100% 90%, 95% 100%, 90% 88%, 85% 100%, 15% 100%, 10% 88%, 5% 100%, 0 90%);
+  pointer-events: none;
+}
+.tape-sky {
+  --tape: rgba(120, 166, 222, 0.45);
+}
+.tape-butter {
+  --tape: rgba(244, 197, 66, 0.5);
+}
+.tape-mint {
+  --tape: rgba(111, 174, 123, 0.42);
+}
+.dark .tape {
+  --tape: rgba(244, 160, 186, 0.72);
+}
+.dark .tape-sky {
+  --tape: rgba(150, 190, 236, 0.66);
+}
+.dark .tape-butter {
+  --tape: rgba(246, 210, 110, 0.7);
+}
+.dark .tape-mint {
+  --tape: rgba(140, 200, 152, 0.62);
+}
+
+/* A paper name tag in handwriting. */
+.tag {
+  display: inline-block;
+  padding: 3px 10px 2px;
+  background: #ffffff;
+  color: #1e2a44;
+  border-radius: 3px;
+  font-family: var(--font-hand);
+  font-weight: 600;
+  font-size: 0.875rem;
+  line-height: 1.25;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(30, 42, 68, 0.18), 0 4px 8px -4px rgba(30, 42, 68, 0.3);
+}
+.dark .tag {
+  background: #f4f6fb;
+}
+
+/* Rendered felt pieces carry their own soft shadow. */
+.felt {
+  display: block;
+  flex: none;
+  max-width: none;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------------------------------
+   Controls
+   ------------------------------------------------------------------------------------------ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 44px;
+  padding: 0 0.95rem;
+  border-radius: var(--r-ctl);
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  transition: transform 120ms, background-color 160ms, border-color 160ms, color 160ms;
+}
+.chip:active {
+  transform: scale(0.97);
+}
+.chip[aria-pressed='true'],
+.chip[aria-checked='true'] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  width: 100%;
+  min-height: 60px;
+  padding: 0.8rem 1rem;
+  text-align: left;
+  border-radius: var(--r-ctl);
+  border: 1.5px solid transparent;
+  background: var(--card);
+  box-shadow: var(--shadow-paper);
+  font-size: 1rem;
+  line-height: 1.35;
+  font-weight: 500;
+  transition: transform 140ms, border-color 160ms, background-color 160ms;
+}
+.option:active {
+  transform: scale(0.985);
+}
+.option[aria-checked='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+/* The check is a sewing button: four holes, then a cross of thread when picked. */
+.option .seed {
+  flex: none;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  background: var(--card-2);
+  color: var(--on-accent);
+  transition: background-color 160ms, border-color 160ms;
+}
+.option[aria-checked='true'] .seed {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.field {
+  width: 100%;
+  min-height: 54px;
+  padding: 0.85rem 1rem;
+  border-radius: var(--r-ctl);
+  border: 1.5px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  font-size: 1.0625rem;
+  line-height: 1.4;
+  transition: border-color 160ms, box-shadow 160ms;
+}
+.field::placeholder {
+  color: var(--ink-3);
+}
+.field:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+textarea.field {
+  resize: none;
+}
+
+.segmented {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--r-ctl);
+  background: var(--page-sunk);
+}
+.segmented button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  font-weight: 650;
+  font-size: 0.9375rem;
+  color: var(--ink-2);
+}
+.segmented button[aria-checked='true'] {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 1px 0 var(--line-strong), 0 6px 12px -8px rgba(0, 0, 0, 0.35);
+}
+
+/* ------------------------------------------------------------------------------------------
+   Tab bar: a floating strip of paper.
+   ------------------------------------------------------------------------------------------ */
+/* The floating layer is glass: real refraction where the browser can (liquidGlass.js), frosted elsewhere. */
+.glass {
+  background: var(--glass-solid);
+  box-shadow: var(--glass-rim), var(--glass-shadow);
+}
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .glass {
+    background: color-mix(in srgb, var(--glass-top) 50%, var(--glass-bottom));
+    -webkit-backdrop-filter: blur(18px) saturate(180%);
+    backdrop-filter: blur(18px) saturate(180%);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    background: var(--glass-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+[data-lg].glass {
+  background: var(--lg-tint);
+  box-shadow: var(--lg-shadow);
+}
+
+/* Tab bar: a floating glass capsule with a lens under the chosen tab. The lens lands with a small
+   overshoot and stretches the way it travels; press and slide across the bar and it follows the
+   finger; scroll down and the bar closes into one circle holding the current tab. */
+.tabbar {
+  --cell: calc((100% - 8px) / 4);
+  position: fixed;
+  z-index: 30;
+  inset-inline: 0;
+  bottom: calc(12px + var(--safe-b));
+  width: min(420px, calc(100% - 32px));
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  height: var(--tabbar-h);
+  padding: 4px;
+  border-radius: 31px;
+  clip-path: inset(0 0 0 0 round 31px);
+  transition: clip-path var(--dur-spring-smooth) var(--spring-smooth);
+  touch-action: pan-y;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  container-type: inline-size;
+}
+.tabbar[data-min] {
+  clip-path: inset(0 calc(100% - var(--tabbar-h)) 0 0 round 31px);
+}
+.tabbar[data-min] .tab[aria-selected='true'] {
+  transform: translateX(calc(var(--tabbar-h) / 2 - 4px - (var(--i) + 0.5) * 25cqw));
+}
+.tabbar[data-min] .tab:not([aria-selected='true']) {
+  opacity: 0;
+  transform: scale(0.6);
+  pointer-events: none;
+}
+.tabbar[data-min] .tabbar-lens-fill,
+.tabbar[data-min] .tab-label {
+  opacity: 0;
+}
+.tabbar[data-min] .tab-plate {
+  transform: translateY(7px);
+}
+/* The capsule clips itself, so its lift lives on a shadow-only twin that closes with it. */
+.tabbar-shade {
+  position: fixed;
+  z-index: 30;
+  pointer-events: none;
+  bottom: calc(12px + var(--safe-b));
+  height: var(--tabbar-h);
+  --w: min(420px, calc(100% - 32px));
+  left: calc((100% - var(--w)) / 2);
+  width: var(--w);
+  border-radius: 31px;
+  box-shadow: var(--tabbar-lift);
+  transition: width var(--dur-spring-smooth) var(--spring-smooth);
+}
+.tabbar-shade[data-min] {
+  width: var(--tabbar-h);
+}
+.tabbar-lens {
+  position: absolute;
+  z-index: 0;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: var(--cell);
+  transform: translateX(calc(var(--i) * 100%));
+  transition: transform var(--dur-spring-lens) var(--spring-lens);
+}
+.tabbar[data-dragging] .tabbar-lens {
+  transform: translateX(var(--lens-x));
+  transition: none;
+}
+.tabbar-lens-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 27px;
+  background: var(--lens);
+  transition: transform var(--dur-spring-snappy) var(--spring-snappy), background-color 200ms ease, box-shadow 200ms ease, opacity 200ms ease;
+}
+/* Pressed, the lens swells into lifted clear glass under the finger. */
+.tabbar[data-pressing] .tabbar-lens-fill {
+  transform: scale(calc(1 + 0.18 * var(--motion)), calc(1 + 0.32 * var(--motion)));
+  background: rgb(255 255 255 / 0.42);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.95), inset 0 -1px 0 rgb(255 255 255 / 0.35), 0 10px 24px rgb(20 30 50 / 0.16), 0 2px 6px rgb(20 30 50 / 0.08);
+}
+.dark .tabbar[data-pressing] .tabbar-lens-fill {
+  background: rgb(255 255 255 / 0.16);
+}
+.tabbar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(90px circle at var(--px, 50%) 50%, var(--press-glow), transparent 70%);
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+.tabbar[data-pressing]::before {
+  opacity: 1;
+  transition-duration: 80ms;
+}
+/* Page colour under the floating bar, so scrolled text never shows in the gap beneath it. */
+/*
+ * A scrim: page colour that fades in over scrolling content, carrying the same fibre as the page so
+ * it never shows as a lighter band. --scrim-mask sets where it is solid.
+ */
+.scrim {
+  pointer-events: none;
+  isolation: isolate;
+  background: var(--page);
+  -webkit-mask-image: var(--scrim-mask);
+  mask-image: var(--scrim-mask);
+}
+.scrim::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: var(--grain);
+  background-image: var(--fibre);
+  background-attachment: fixed;
+}
+.tabbar-floor {
+  position: fixed;
+  z-index: 29;
+  inset-inline: 0;
+  bottom: 0;
+  height: calc(40px + var(--safe-b));
+  --scrim-mask: linear-gradient(to top, #000 55%, transparent);
+}
+.tab {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-height: 0;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 0.75rem;
+  line-height: 16px;
+  font-weight: 650;
+  transition: opacity 200ms ease, transform var(--dur-spring-smooth) var(--spring-smooth), color 200ms ease;
+}
+.tab[aria-selected='true'] {
+  color: var(--accent-ink);
+}
+.tab-plate {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 28px;
+  transition: transform var(--dur-spring-smooth) var(--spring-smooth);
+}
+.tab:active .tab-plate {
+  transform: scale(calc(1 - 0.08 * var(--motion)));
+  transition-duration: 90ms;
+}
+/* The chosen icon gives one bounce: down to .82, then a single spring home. */
+.tabbar[data-ready] .tab[aria-selected='true'] .tab-plate svg {
+  animation: icon-bounce var(--dur-spring-bouncy) var(--spring-bouncy);
+}
+@keyframes icon-bounce {
+  from {
+    transform: scale(calc(1 - 0.18 * var(--motion)));
+  }
+}
+.tab-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: opacity 200ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .tab:not([aria-selected='true']):hover {
+    color: var(--accent-ink);
+  }
+}
+
+.page {
+  padding: calc(18px + var(--safe-t)) 20px calc(120px + var(--safe-b));
+}
+
+/* ------------------------------------------------------------------------------------------
+   Sheets
+   ------------------------------------------------------------------------------------------ */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(13, 20, 34, 0.42);
+}
+.sheet {
+  position: fixed;
+  z-index: 41;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  bottom: 0;
+  width: min(460px, 100%);
+  max-height: calc(100dvh - 24px - var(--safe-t));
+  display: flex;
+  flex-direction: column;
+  background: var(--page);
+  border-radius: 28px 28px 0 0;
+  box-shadow: 0 -20px 60px -20px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.sheet-full {
+  top: 0;
+  max-height: none;
+  height: 100dvh;
+  border-radius: 0;
+}
+@media (min-width: 520px) {
+  .sheet-full {
+    top: 16px;
+    height: calc(100dvh - 16px);
+    border-radius: 28px 28px 0 0;
+  }
+}
+.sheet-grab {
+  width: 40px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--line-strong);
+  margin: 8px auto 2px;
+}
+.sheet-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px 20px calc(24px + var(--safe-b));
+}
+
+/* Rich text from the AI helper. */
+.prose-ai p + p,
+.prose-ai p + ul,
+.prose-ai ul + p {
+  margin-top: 0.6em;
+}
+.prose-ai ul {
+  padding-left: 0;
+  list-style: none;
+}
+.prose-ai li {
+  position: relative;
+  padding-left: 1.1em;
+  margin-top: 0.35em;
+}
+/* A chat answer leads with its one-line answer, set a step heavier than the facts below it. */
+.prose-ai.lead > p:first-child {
+  font-weight: 600;
+}
+/* Bullets are little stitches. */
+.prose-ai li::before {
+  content: '';
+  position: absolute;
+  left: 0.1em;
+  top: 0.68em;
+  width: 9px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--yarn);
+  transform: rotate(-20deg);
+}
+.prose-ai strong {
+  font-weight: 700;
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
-/* Hide scrollbar for IE, Edge and Firefox */
 .no-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  scrollbar-width: none;
+}
+
+.skeleton {
+  background: color-mix(in srgb, currentColor 9%, transparent);
+  border-radius: 8px;
+  animation: breathe 1.4s infinite ease-in-out;
+}
+}
+
+@keyframes breathe {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

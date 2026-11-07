@@ -1,63 +1,65 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 
-export type ThemeMode = 'light' | 'dark';
+export type ThemeMode = 'light' | 'dark' | 'system';
 
 interface ThemeContextType {
-  theme: ThemeMode;
+  mode: ThemeMode;
   isDark: boolean;
-  toggleTheme: () => void;
-  setTheme: (mode: ThemeMode) => void;
+  setMode: (mode: ThemeMode) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+const KEY = 'myfamilyai_theme';
+const query = () => window.matchMedia('(prefers-color-scheme: dark)');
+
+function readMode(): ThemeMode {
+  try {
+    const param = new URLSearchParams(window.location.search).get('theme');
+    if (param === 'light' || param === 'dark') return param;
+    const stored = localStorage.getItem(KEY);
+    if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
+  } catch {
+    // ignore
+  }
+  return 'system';
+}
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<ThemeMode>(() => {
-    try {
-      const stored = localStorage.getItem('myfamilyai_theme');
-      if (stored === 'dark' || stored === 'light') return stored;
-      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    } catch {
-      return 'light';
-    }
-  });
+  const [mode, setModeState] = useState<ThemeMode>(readMode);
+  const [systemDark, setSystemDark] = useState(() => query().matches);
 
   useEffect(() => {
+    const mq = query();
+    const onChange = () => setSystemDark(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  const isDark = mode === 'dark' || (mode === 'system' && systemDark);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('dark', isDark);
+    root.dataset.theme = isDark ? 'dark' : 'light';
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', isDark ? '#131b2c' : '#e4ecf5');
+  }, [isDark]);
+
+  const setMode = (next: ThemeMode) => {
+    setModeState(next);
     try {
-      localStorage.setItem('myfamilyai_theme', theme);
+      localStorage.setItem(KEY, next);
     } catch {
       // ignore
     }
-
-    const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-      root.setAttribute('data-theme', 'dark');
-    } else {
-      root.classList.remove('dark');
-      root.setAttribute('data-theme', 'light');
-    }
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setThemeState((prev) => (prev === 'light' ? 'dark' : 'light'));
   };
 
-  const setTheme = (mode: ThemeMode) => {
-    setThemeState(mode);
-  };
-
-  return (
-    <ThemeContext.Provider value={{ theme, isDark: theme === 'dark', toggleTheme, setTheme }}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  return <ThemeContext.Provider value={{ mode, isDark, setMode }}>{children}</ThemeContext.Provider>;
 };
 
 export function useTheme() {
   const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error('useTheme must be used within a ThemeProvider');
-  }
+  if (!context) throw new Error('useTheme must be used within a ThemeProvider');
   return context;
 }

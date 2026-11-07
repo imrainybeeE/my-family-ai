@@ -1,154 +1,165 @@
-import React, { useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { HouseholdProvider, useHousehold } from './context/HouseholdContext';
 import { ThemeProvider } from './context/ThemeContext';
-import { MobileShell } from './components/layout/MobileShell';
-import { Header } from './components/layout/Header';
-import { BottomNav } from './components/layout/BottomNav';
-import { WelcomeScreen } from './components/welcome/WelcomeScreen';
-import { CreateHouseholdModal } from './components/onboarding/CreateHouseholdModal';
-import { JoinHouseholdModal } from './components/onboarding/JoinHouseholdModal';
-import { HomeView } from './components/views/HomeView';
-import { DiscoverView } from './components/views/DiscoverView';
-import { FamilyView } from './components/views/FamilyView';
-import { AskAiView } from './components/views/AskAiView';
-import { SettingsView } from './components/views/SettingsView';
-import { TasteSurveyModal } from './components/survey/TasteSurveyModal';
-import { FoundationModal } from './components/foundation/FoundationModal';
-import { TabType } from './types';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { ToastProvider } from './components/ui/bits';
+import { TabBar } from './components/layout/TabBar';
+import { Welcome } from './components/welcome/Welcome';
+import { GardenView } from './components/home/GardenView';
+import { TogetherView } from './components/together/TogetherView';
+import { PlanView } from './components/plan/PlanView';
+import { AskView } from './components/ask/AskView';
+import { MemberSheet } from './components/profile/MemberSheet';
+import { SettingsSheet } from './components/settings/SettingsSheet';
+import { FoundationFlow } from './components/discovery/FoundationFlow';
+import { RootsFlow } from './components/discovery/RootsFlow';
+import { TastesSheet } from './components/discovery/TastesSheet';
+import { Flower } from './components/art/Flower';
+import { PlanTask, TabType } from './types';
 
-function HouseholdApp() {
-  const { household, isLoading, error, clearError } = useHousehold();
+interface UI {
+  tab: TabType;
+  goTab: (tab: TabType) => void;
+  planTask: PlanTask | null;
+  startPlan: (task: PlanTask) => void;
+  askPrefill: string | null;
+  askAbout: (question: string) => void;
+  consumeAsk: () => void;
+  openMember: (id: string) => void;
+  openSettings: () => void;
+  openFoundation: () => void;
+  openRoots: () => void;
+  openTastes: () => void;
+}
 
-  // Navigation tab state
-  const [activeTab, setActiveTab] = useState<TabType>('home');
+const UIContext = createContext<UI | null>(null);
+export function useUI() {
+  const ui = useContext(UIContext);
+  if (!ui) throw new Error('useUI must be used inside the app shell');
+  return ui;
+}
 
-  // Onboarding & Survey modals
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isJoinOpen, setIsJoinOpen] = useState(false);
-  const [isSurveyOpen, setIsSurveyOpen] = useState(false);
-  const [isFoundationOpen, setIsFoundationOpen] = useState(false);
-  const [foundationShowResult, setFoundationShowResult] = useState(false);
+const TABS: TabType[] = ['garden', 'together', 'plan', 'ask'];
+const tabFromHash = (): TabType => {
+  const h = window.location.hash.replace('#', '') as TabType;
+  return TABS.includes(h) ? h : 'garden';
+};
 
-  const handleOpenFoundation = (showResult = false) => {
-    setFoundationShowResult(showResult);
-    setIsFoundationOpen(true);
-  };
+function Shell() {
+  const { household, isLoading, activeMember } = useHousehold();
+  const [tab, setTab] = useState<TabType>(tabFromHash);
+  const [planTask, setPlanTask] = useState<PlanTask | null>(null);
+  const [askPrefill, setAskPrefill] = useState<string | null>(null);
+  const [memberId, setMemberId] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [foundationOpen, setFoundationOpen] = useState(false);
+  const [rootsOpen, setRootsOpen] = useState(false);
+  const [tastesOpen, setTastesOpen] = useState(false);
 
-  // Initial loading state
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-slate-100 dark:bg-slate-950 flex items-center justify-center p-4">
-        <div className="text-center space-y-2.5">
-          <Loader2 className="w-6 h-6 animate-spin text-slate-700 dark:text-slate-300 mx-auto" />
-          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Connecting to household...</p>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    const onHash = () => setTab(tabFromHash());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
 
-  // Not connected to a household yet -> Show Welcome Screen
-  if (!household) {
-    return (
-      <MobileShell>
-        {error && (
-          <div className="m-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs rounded-xl flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
-              <span>{error}</span>
-            </div>
-            <button
-              onClick={clearError}
-              className="text-[11px] font-semibold text-rose-700 dark:text-rose-400 hover:text-rose-900 ml-2 cursor-pointer"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
+  const goTab = useCallback((next: TabType) => {
+    setTab(next);
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${next}`);
+    window.scrollTo({ top: 0 });
+  }, []);
 
-        <WelcomeScreen
-          onCreateHousehold={() => setIsCreateOpen(true)}
-          onJoinHousehold={() => setIsJoinOpen(true)}
-        />
+  const ui = useMemo<UI>(
+    () => ({
+      tab,
+      goTab,
+      planTask,
+      startPlan: (task) => {
+        setPlanTask(task);
+        goTab('plan');
+      },
+      askPrefill,
+      askAbout: (q) => {
+        setAskPrefill(q);
+        goTab('ask');
+      },
+      consumeAsk: () => setAskPrefill(null),
+      openMember: (id) => setMemberId(id),
+      openSettings: () => setSettingsOpen(true),
+      openFoundation: () => {
+        setMemberId(null);
+        setFoundationOpen(true);
+      },
+      openRoots: () => {
+        setMemberId(null);
+        setRootsOpen(true);
+      },
+      openTastes: () => {
+        setMemberId(null);
+        setTastesOpen(true);
+      },
+    }),
+    [tab, goTab, planTask, askPrefill]
+  );
 
-        {isCreateOpen && (
-          <CreateHouseholdModal onClose={() => setIsCreateOpen(false)} />
-        )}
+  if (isLoading) return <Loading />;
+  if (!household) return <Welcome />;
 
-        {isJoinOpen && (
-          <JoinHouseholdModal onClose={() => setIsJoinOpen(false)} />
-        )}
-      </MobileShell>
-    );
-  }
-
-  // Connected to a household -> Main App Shell
   return (
-    <MobileShell
-      header={
-        <Header
-          onOpenFamily={() => setActiveTab('family')}
-          onOpenSettings={() => setActiveTab('settings')}
-        />
-      }
-      bottomNav={
-        <BottomNav
-          activeTab={activeTab}
-          onChangeTab={(t) => setActiveTab(t)}
-        />
-      }
-    >
-      {error && (
-        <div className="m-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs rounded-xl flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
-            <span>{error}</span>
-          </div>
-          <button
-            onClick={clearError}
-            className="text-[11px] font-semibold text-rose-700 dark:text-rose-400 hover:text-rose-900 ml-2 cursor-pointer"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
+    <UIContext.Provider value={ui}>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.main
+          id="main"
+          role="tabpanel"
+          aria-label={tab}
+          key={tab}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+        >
+          {tab === 'garden' && <GardenView />}
+          {tab === 'together' && <TogetherView />}
+          {tab === 'plan' && <PlanView initialTask={planTask} onConsumeTask={() => setPlanTask(null)} />}
+          {/* A fresh chat per person: switching profile never carries someone else's conversation. */}
+          {tab === 'ask' && <AskView key={activeMember?.id || 'none'} />}
+        </motion.main>
+      </AnimatePresence>
+      <TabBar tab={tab} onChange={goTab} />
 
-      {activeTab === 'home' && (
-        <HomeView
-          onNavigateTab={(t) => setActiveTab(t)}
-          onOpenSurvey={() => setIsSurveyOpen(true)}
-          onOpenFoundation={handleOpenFoundation}
-        />
-      )}
-      {activeTab === 'discover' && (
-        <DiscoverView onOpenSurvey={() => setIsSurveyOpen(true)} />
-      )}
-      {activeTab === 'family' && (
-        <FamilyView onOpenFoundation={handleOpenFoundation} />
-      )}
-      {activeTab === 'ask-ai' && <AskAiView />}
-      {activeTab === 'settings' && <SettingsView />}
+      <MemberSheet memberId={memberId} onClose={() => setMemberId(null)} />
+      <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <FoundationFlow open={foundationOpen} onClose={() => setFoundationOpen(false)} />
+      <RootsFlow open={rootsOpen} onClose={() => setRootsOpen(false)} />
+      <TastesSheet open={tastesOpen} onClose={() => setTastesOpen(false)} />
+    </UIContext.Provider>
+  );
+}
 
-      {isSurveyOpen && (
-        <TasteSurveyModal onClose={() => setIsSurveyOpen(false)} />
-      )}
-
-      {isFoundationOpen && (
-        <FoundationModal
-          initialShowResult={foundationShowResult}
-          onClose={() => setIsFoundationOpen(false)}
-        />
-      )}
-    </MobileShell>
+function Loading() {
+  return (
+    <div className="min-h-[100dvh] grid place-items-center" role="status">
+      <div className="flex flex-col items-center gap-3">
+        <motion.div animate={{ rotate: [0, 8, 0, -8, 0] }} transition={{ duration: 2.4, repeat: Infinity }}>
+          <Flower style="Connector" size={64} />
+        </motion.div>
+        <p className="t-label ink-2">Opening your garden</p>
+      </div>
+    </div>
   );
 }
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <HouseholdProvider>
-        <HouseholdApp />
-      </HouseholdProvider>
-    </ThemeProvider>
+    <MotionConfig reducedMotion="user">
+      <ThemeProvider>
+        <ToastProvider>
+          <HouseholdProvider>
+            <div className="app-column">
+              <Shell />
+            </div>
+          </HouseholdProvider>
+        </ToastProvider>
+      </ThemeProvider>
+    </MotionConfig>
   );
 }

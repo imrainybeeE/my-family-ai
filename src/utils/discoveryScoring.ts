@@ -71,3 +71,19 @@ export function scoreDiscoveryProfile(
     completedAt: new Date().toISOString(),
   };
 }
+
+/**
+ * The petals sewn so far: for each answered question in order, one petal per style its
+ * picked options lean towards. Drives the flower that grows during the Foundation questions.
+ */
+export function petalsFor(answers: Record<number | string, string | string[]>): DiscoveryStyleId[] {
+  const petals: DiscoveryStyleId[] = [];
+  for (const q of FOUNDATION_QUESTIONS) {
+    const raw = answers[q.id] || answers[String(q.id)];
+    if (!raw) continue;
+    for (const opt of Array.isArray(raw) ? raw : [raw]) {
+      for (const style of STYLE_MAPPING_CONFIG[q.id]?.[opt] || []) petals.push(style);
+    }
+  }
+  return petals;
+}

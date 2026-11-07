@@ -1,9 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  ensureAnonymousUser,
-  testConnection,
-  AppUser,
-} from '../services/firebase';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { ensureAnonymousUser, testConnection, AppUser } from '../services/firebase';
 import {
   createHouseholdAtomic,
   getHousehold,
@@ -12,13 +8,19 @@ import {
   subscribeToMembers,
   subscribeToResponses,
   addMemberToHousehold,
-  saveMemberTasteAnswers,
-  saveMemberFoundationAnswers,
+  saveMemberAnswers,
   saveUserSession,
   getUserSession,
   clearUserSession,
 } from '../services/householdService';
-import { Household, HouseholdMember, MemberRole, MemberTasteAnswers, DiscoveryProfile } from '../types';
+import { buildBrief, FamilyBrief } from '../services/brief';
+import { DEMO_ACTIVE_MEMBER, DEMO_HOUSEHOLD, DEMO_MEMBERS, DEMO_RESPONSES } from '../data/demoFamily';
+import { AVATAR_PALETTE } from '../utils/familyCode';
+import { mergeAnswers, rollbackAnswers } from '../utils/member';
+import { Household, HouseholdMember, MemberRole, MemberTasteAnswers } from '../types';
+
+const SESSION_KEY = 'myfamilyai_last_session';
+const DEMO_KEY = 'myfamilyai_demo';
 
 interface HouseholdContextType {
   user: AppUser | null;
@@ -26,6 +28,11 @@ interface HouseholdContextType {
   members: HouseholdMember[];
   activeMember: HouseholdMember | null;
   responses: Record<string, MemberTasteAnswers>;
+  /** The active member's own answers (never undefined). */
+  myAnswers: MemberTasteAnswers;
+  /** Family data in the shape the AI receives, from the active member's point of view. */
+  brief: FamilyBrief;
+  isDemo: boolean;
   isLoading: boolean;
   error: string | null;
   clearError: () => void;
@@ -35,18 +42,36 @@ interface HouseholdContextType {
     members: Array<{ role: MemberRole; nickname?: string; avatarColor?: string }>,
     selectedMemberIndex: number
   ) => Promise<void>;
-  joinWithCode: (code: string) => Promise<HouseholdMember[]>;
-  selectActiveMember: (memberId: string) => Promise<void>;
-  addMember: (role: MemberRole, nickname?: string) => Promise<void>;
-  saveMyTasteAnswers: (answers: MemberTasteAnswers) => Promise<void>;
-  saveMyFoundationAnswers: (
-    foundationAnswers: Record<string, string | string[]>,
-    discoveryProfile: DiscoveryProfile
+  /** Looks a family up by code without joining it. */
+  lookupFamily: (code: string) => Promise<{ household: Household; members: HouseholdMember[] }>;
+  /** Joins a looked-up family as an existing member, or as a new one. */
+  joinFamily: (
+    found: { household: Household; members: HouseholdMember[] },
+    who: { memberId: string } | { role: MemberRole; nickname?: string }
   ) => Promise<void>;
+  selectActiveMember: (memberId: string) => Promise<void>;
+  addMember: (role: MemberRole, nickname?: string) => Promise<HouseholdMember | undefined>;
+  /** Merges a patch into the active member's answers and saves the whole document. */
+  updateMyAnswers: (patch: Partial<MemberTasteAnswers>) => Promise<void>;
+  startDemo: () => void;
   leaveHousehold: () => Promise<void>;
 }
 
 const HouseholdContext = createContext<HouseholdContextType | undefined>(undefined);
+
+function remember(householdCode: string, memberId: string) {
+  try {
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify({ householdCode, memberId }));
+  } catch {
+    // Storage can be unavailable (private mode); the Firestore session still restores.
+  }
+}
+
+function errorText(err: unknown, fallback: string): string {
+  if (!(err instanceof Error)) return fallback;
+  // Firestore errors arrive as JSON blobs; show people something readable instead.
+  return err.message.startsWith('{') ? fallback : err.message;
+}
 
 export function HouseholdProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
@@ -54,155 +79,127 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
   const [members, setMembers] = useState<HouseholdMember[]>([]);
   const [activeMemberId, setActiveMemberId] = useState<string | null>(null);
   const [responses, setResponses] = useState<Record<string, MemberTasteAnswers>>({});
+  const [isDemo, setIsDemo] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const responsesRef = useRef(responses);
+  responsesRef.current = responses;
 
   const clearError = useCallback(() => setError(null), []);
 
-  // Initial boot: anonymous auth, Firestore connection check, restore session
+  const loadDemo = useCallback(() => {
+    setHousehold(DEMO_HOUSEHOLD);
+    setMembers(DEMO_MEMBERS);
+    setResponses(DEMO_RESPONSES);
+    setActiveMemberId(DEMO_ACTIVE_MEMBER);
+    setIsDemo(true);
+  }, []);
+
+  // Boot: demo link or saved demo, else restore the saved household session.
   useEffect(() => {
-    let isMounted = true;
-
-    async function initApp() {
+    let alive = true;
+    async function init() {
+      const params = new URLSearchParams(window.location.search);
+      let demoSaved = false;
       try {
-        setIsLoading(true);
-        // Test firestore connection per skill instructions
+        demoSaved = window.localStorage.getItem(DEMO_KEY) === '1';
+      } catch {
+        // ignore
+      }
+      if (params.has('demo') || demoSaved) {
+        loadDemo();
+        setIsLoading(false);
+        return;
+      }
+      try {
         await testConnection();
-
-        // Ensure anonymous user session
         const authUser = await ensureAnonymousUser();
-        if (!isMounted) return;
+        if (!alive) return;
         setUser(authUser);
 
-        // Check local storage redundancy first for instant restoration
-        let targetCode = '';
-        let targetMemberId = '';
-
+        let code = '';
+        let memberId = '';
         try {
-          const localStored = window.localStorage.getItem('myfamilyai_last_session');
-          if (localStored) {
-            const parsed = JSON.parse(localStored);
-            if (parsed && typeof parsed.householdCode === 'string') {
-              targetCode = parsed.householdCode;
-              targetMemberId = parsed.memberId || '';
-            }
+          const saved = JSON.parse(window.localStorage.getItem(SESSION_KEY) || 'null');
+          if (saved && typeof saved.householdCode === 'string') {
+            code = saved.householdCode;
+            memberId = saved.memberId || '';
           }
         } catch {
           // ignore
         }
-
-        // Check user session in Firestore if not found locally
-        if (!targetCode) {
+        if (!code) {
           const session = await getUserSession(authUser.uid);
-          if (session && session.householdCode) {
-            targetCode = session.householdCode;
-            targetMemberId = session.memberId || '';
+          if (session?.householdCode) {
+            code = session.householdCode;
+            memberId = session.memberId || '';
           }
         }
-
-        if (targetCode) {
-          const hh = await getHousehold(targetCode);
-          if (hh && isMounted) {
+        if (code) {
+          const hh = await getHousehold(code);
+          if (hh && alive) {
+            const list = await getHouseholdMembers(code);
+            if (!alive) return;
             setHousehold(hh);
-            const mList = await getHouseholdMembers(targetCode);
-            if (isMounted) {
-              setMembers(mList);
-              const validMemberId =
-                targetMemberId && mList.some((m) => m.id === targetMemberId)
-                  ? targetMemberId
-                  : mList[0]?.id || null;
-              setActiveMemberId(validMemberId);
-            }
+            setMembers(list);
+            setActiveMemberId(list.some((m) => m.id === memberId) ? memberId : list[0]?.id || null);
           }
         }
       } catch (err) {
         console.error('Initialization error:', err);
-        if (isMounted) {
-          setError('Could not connect to database. Please refresh or check connection.');
-        }
+        if (alive) setError('Couldn’t reach your family’s data. Check your connection, then reload.');
       } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        if (alive) setIsLoading(false);
       }
     }
-
-    initApp();
-
+    init();
     return () => {
-      isMounted = false;
+      alive = false;
     };
-  }, []);
+  }, [loadDemo]);
 
-  // Real-time synchronization when a household is active
+  // Live sync with Firestore (not in demo mode).
   useEffect(() => {
-    if (!household?.code) return;
+    if (!household?.code || isDemo) return;
+    const note = (what: string) => (err: unknown) => console.warn(`Realtime ${what} sync note:`, err);
+    const unsubs = [
+      subscribeToHousehold(household.code, (hh) => hh && setHousehold(hh), note('household')),
+      subscribeToMembers(
+        household.code,
+        (list) => list.length && setMembers(Array.from(new Map(list.map((m) => [m.id, m])).values())),
+        note('members')
+      ),
+      subscribeToResponses(household.code, (r) => setResponses(r), note('responses')),
+    ];
+    return () => unsubs.forEach((u) => u());
+  }, [household?.code, isDemo]);
 
-    const unsubHousehold = subscribeToHousehold(
-      household.code,
-      (updatedHh) => {
-        if (updatedHh) {
-          setHousehold(updatedHh);
-        }
-      },
-      (err) => {
-        console.warn('Realtime household sync note:', err);
-      }
-    );
+  const activeMember = useMemo(
+    () => members.find((m) => m.id === activeMemberId) || null,
+    [activeMemberId, members]
+  );
 
-    const unsubMembers = subscribeToMembers(
-      household.code,
-      (updatedMembers) => {
-        if (updatedMembers && updatedMembers.length > 0) {
-          const map = new Map(updatedMembers.map((m) => [m.id, m]));
-          setMembers(Array.from(map.values()));
-        }
-      },
-      (err) => {
-        console.warn('Realtime members sync note:', err);
-      }
-    );
+  const myAnswers = useMemo(
+    () => (activeMember ? responses[activeMember.id] || {} : {}),
+    [activeMember, responses]
+  );
 
-    const unsubResponses = subscribeToResponses(
-      household.code,
-      (updatedResponses) => {
-        if (updatedResponses) {
-          setResponses(updatedResponses);
-        }
-      },
-      (err) => {
-        console.warn('Realtime responses sync note:', err);
-      }
-    );
+  const brief = useMemo(
+    () => buildBrief(household?.name, members, responses, activeMember?.id),
+    [household?.name, members, responses, activeMember?.id]
+  );
 
-    return () => {
-      unsubHousehold();
-      unsubMembers();
-      unsubResponses();
-    };
-  }, [household?.code]);
+  const ensureUser = useCallback(async () => {
+    if (user) return user;
+    const u = await ensureAnonymousUser();
+    setUser(u);
+    return u;
+  }, [user]);
 
-  // Derive active member object
-  const activeMember = useMemo(() => {
-    if (!activeMemberId || members.length === 0) return null;
-    return members.find((m) => m.id === activeMemberId) || null;
-  }, [activeMemberId, members]);
-
-  // Create household action
-  const createHousehold = useCallback(
-    async (
-      code: string,
-      name: string | undefined,
-      memberList: Array<{ role: MemberRole; nickname?: string; avatarColor?: string }>,
-      selectedMemberIndex: number
-    ) => {
+  const createHousehold = useCallback<HouseholdContextType['createHousehold']>(
+    async (code, name, memberList, selectedMemberIndex) => {
       setError(null);
-      let currentUser = user;
-      if (!currentUser) {
-        currentUser = await ensureAnonymousUser();
-        setUser(currentUser);
-      }
-
+      const currentUser = await ensureUser();
       try {
         const result = await createHouseholdAtomic({
           code,
@@ -211,170 +208,146 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
           members: memberList,
           selectedMemberIndex,
         });
-
+        setIsDemo(false);
         setHousehold(result.household);
         setMembers(result.members);
+        setResponses({});
         setActiveMemberId(result.activeMemberId);
-
-        try {
-          window.localStorage.setItem(
-            'myfamilyai_last_session',
-            JSON.stringify({
-              householdCode: result.household.code,
-              memberId: result.activeMemberId,
-            })
-          );
-        } catch {
-          // ignore
-        }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Failed to create household.';
-        setError(msg);
-        throw err;
+        remember(result.household.code, result.activeMemberId);
+      } catch (err) {
+        throw new Error(errorText(err, 'Couldn’t create your family. Check your connection and try again.'));
       }
     },
-    [user]
+    [ensureUser]
   );
 
-  // Join existing household by Family Code (returns members so user can pick their profile)
-  const joinWithCode = useCallback(
-    async (code: string): Promise<HouseholdMember[]> => {
+  const lookupFamily = useCallback(
+    async (code: string) => {
       setError(null);
-      let currentUser = user;
-      if (!currentUser) {
-        currentUser = await ensureAnonymousUser();
-        setUser(currentUser);
+      await ensureUser();
+      let hh: Household | null;
+      try {
+        hh = await getHousehold(code);
+      } catch (err) {
+        throw new Error(errorText(err, 'Couldn’t look up that code. Check your connection and try again.'));
       }
-
-      const hh = await getHousehold(code);
-      if (!hh) {
-        const notFoundErr = `No household found with code "${code}". Please check for typos.`;
-        setError(notFoundErr);
-        throw new Error(notFoundErr);
-      }
-
-      const mList = await getHouseholdMembers(code);
-      setHousehold(hh);
-      setMembers(mList);
-      return mList;
+      if (!hh) throw new Error(`No family uses ${code}. Check the letters and numbers with whoever shared it.`);
+      const list = await getHouseholdMembers(code);
+      return { household: hh, members: list };
     },
-    [user]
+    [ensureUser]
   );
 
-  // Select profile on device
+  const joinFamily = useCallback<HouseholdContextType['joinFamily']>(
+    async (found, who) => {
+      setError(null);
+      const currentUser = await ensureUser();
+      const code = found.household.code;
+      let list = found.members;
+      let memberId: string;
+      try {
+        if ('memberId' in who) {
+          memberId = who.memberId;
+        } else {
+          const added = await addMemberToHousehold(code, who.role, who.nickname);
+          list = [...list, added];
+          memberId = added.id;
+        }
+        await saveUserSession(currentUser.uid, code, memberId);
+      } catch (err) {
+        throw new Error(errorText(err, 'Couldn’t join. Check your connection and try again.'));
+      }
+      setIsDemo(false);
+      setResponses({});
+      setMembers(list);
+      setActiveMemberId(memberId);
+      setHousehold(found.household);
+      remember(code, memberId);
+    },
+    [ensureUser]
+  );
+
   const selectActiveMember = useCallback(
     async (memberId: string) => {
       setError(null);
-      if (!household || !user) return;
-
-      try {
-        await saveUserSession(user.uid, household.code, memberId);
+      if (!household) return;
+      if (isDemo) {
         setActiveMemberId(memberId);
-        try {
-          window.localStorage.setItem(
-            'myfamilyai_last_session',
-            JSON.stringify({
-              householdCode: household.code,
-              memberId,
-            })
-          );
-        } catch {
-          // ignore
-        }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Failed to select member profile.';
-        setError(msg);
-        throw err;
+        return;
       }
+      const currentUser = await ensureUser();
+      try {
+        await saveUserSession(currentUser.uid, household.code, memberId);
+      } catch (err) {
+        throw new Error(errorText(err, 'Couldn’t switch profiles. Try again.'));
+      }
+      setActiveMemberId(memberId);
+      remember(household.code, memberId);
     },
-    [household, user]
+    [household, isDemo, ensureUser]
   );
 
-  // Add new member to active household
   const addMember = useCallback(
     async (role: MemberRole, nickname?: string) => {
       setError(null);
-      if (!household) return;
-
+      if (!household) return undefined;
+      if (isDemo) {
+        const m: HouseholdMember = {
+          id: `demo_${Date.now()}`,
+          role,
+          nickname: nickname?.trim() || undefined,
+          avatarColor: AVATAR_PALETTE[members.length % AVATAR_PALETTE.length],
+        };
+        setMembers((prev) => [...prev, m]);
+        return m;
+      }
       try {
-        const newMem = await addMemberToHousehold(household.code, role, nickname);
-        setMembers((prev) => {
-          const map = new Map(prev.map((m) => [m.id, m]));
-          map.set(newMem.id, newMem);
-          return Array.from(map.values());
-        });
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Failed to add member.';
-        setError(msg);
-        throw err;
+        const m = await addMemberToHousehold(household.code, role, nickname);
+        setMembers((prev) => Array.from(new Map([...prev, m].map((x) => [x.id, x])).values()));
+        return m;
+      } catch (err) {
+        throw new Error(errorText(err, 'Couldn’t add that person. Try again.'));
       }
     },
-    [household]
+    [household, isDemo, members.length]
   );
 
-  // Save taste survey responses for active member
-  const saveMyTasteAnswers = useCallback(
-    async (answers: MemberTasteAnswers) => {
-      setError(null);
+  const updateMyAnswers = useCallback(
+    async (patch: Partial<MemberTasteAnswers>) => {
       if (!household || !activeMember) return;
-
+      const id = activeMember.id;
+      const previous = responsesRef.current[id];
+      const merged = mergeAnswers(previous, patch);
+      // Show the change straight away; put it back if the save fails, so the screen and the
+      // AI only ever reflect answers that were actually saved.
+      responsesRef.current = { ...responsesRef.current, [id]: merged };
+      setResponses((prev) => ({ ...prev, [id]: merged }));
+      if (isDemo) return;
       try {
-        await saveMemberTasteAnswers(household.code, activeMember.id, answers);
-        setResponses((prev) => ({
-          ...prev,
-          [activeMember.id]: answers,
-        }));
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Failed to save taste answers.';
+        await saveMemberAnswers(household.code, id, merged);
+      } catch (err) {
+        responsesRef.current = rollbackAnswers(responsesRef.current, id, merged, previous);
+        setResponses((prev) => rollbackAnswers(prev, id, merged, previous));
+        const msg = errorText(err, 'Couldn’t save your answers. Check your connection and try again.');
         setError(msg);
-        throw err;
+        throw new Error(msg);
       }
     },
-    [household, activeMember]
+    [household, activeMember, isDemo]
   );
 
-  // Save Foundation Discovery responses & profile for active member
-  const saveMyFoundationAnswers = useCallback(
-    async (
-      foundationAnswers: Record<string, string | string[]>,
-      discoveryProfile: DiscoveryProfile
-    ) => {
-      setError(null);
-      if (!household || !activeMember) return;
+  const startDemo = useCallback(() => {
+    try {
+      window.localStorage.setItem(DEMO_KEY, '1');
+    } catch {
+      // ignore
+    }
+    loadDemo();
+  }, [loadDemo]);
 
-      try {
-        const existingAnswers = responses[activeMember.id] || {};
-        await saveMemberFoundationAnswers(
-          household.code,
-          activeMember.id,
-          foundationAnswers,
-          discoveryProfile,
-          existingAnswers
-        );
-        setResponses((prev) => ({
-          ...prev,
-          [activeMember.id]: {
-            ...existingAnswers,
-            foundationAnswers,
-            discoveryProfile,
-          },
-        }));
-      } catch (err: unknown) {
-        const msg =
-          err instanceof Error
-            ? err.message
-            : 'Failed to save Foundation Discovery answers.';
-        setError(msg);
-        throw err;
-      }
-    },
-    [household, activeMember, responses]
-  );
-
-  // Disconnect/Leave household
   const leaveHousehold = useCallback(async () => {
     setError(null);
-    if (user) {
+    if (!isDemo && user) {
       try {
         await clearUserSession(user.uid);
       } catch (err) {
@@ -382,15 +355,20 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
       }
     }
     try {
-      window.localStorage.removeItem('myfamilyai_last_session');
+      window.localStorage.removeItem(SESSION_KEY);
+      window.localStorage.removeItem(DEMO_KEY);
     } catch {
       // ignore
     }
+    if (isDemo && window.location.search.includes('demo')) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+    setIsDemo(false);
     setHousehold(null);
     setMembers([]);
     setResponses({});
     setActiveMemberId(null);
-  }, [user]);
+  }, [user, isDemo]);
 
   const value = useMemo(
     () => ({
@@ -399,15 +377,19 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
       members,
       activeMember,
       responses,
+      myAnswers,
+      brief,
+      isDemo,
       isLoading,
       error,
       clearError,
       createHousehold,
-      joinWithCode,
+      lookupFamily,
+      joinFamily,
       selectActiveMember,
       addMember,
-      saveMyTasteAnswers,
-      saveMyFoundationAnswers,
+      updateMyAnswers,
+      startDemo,
       leaveHousehold,
     }),
     [
@@ -416,15 +398,19 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
       members,
       activeMember,
       responses,
+      myAnswers,
+      brief,
+      isDemo,
       isLoading,
       error,
       clearError,
       createHousehold,
-      joinWithCode,
+      lookupFamily,
+      joinFamily,
       selectActiveMember,
       addMember,
-      saveMyTasteAnswers,
-      saveMyFoundationAnswers,
+      updateMyAnswers,
+      startDemo,
       leaveHousehold,
     ]
   );
@@ -434,8 +420,6 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
 
 export function useHousehold() {
   const context = useContext(HouseholdContext);
-  if (!context) {
-    throw new Error('useHousehold must be used within a HouseholdProvider');
-  }
+  if (!context) throw new Error('useHousehold must be used within a HouseholdProvider');
   return context;
 }
