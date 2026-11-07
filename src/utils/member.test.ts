@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeAnswers, rollbackAnswers, uniqueNames } from './member';
+import { mergeAnswers, noLoneWord, rollbackAnswers, uniqueNames } from './member';
 
 test('uniqueNames numbers repeated names so two unnamed grandparents stay distinct', () => {
   const names = uniqueNames([
@@ -35,4 +35,10 @@ test('rollbackAnswers leaves newer answers alone', () => {
   const newer = { favoriteCuisines: ['B'] };
   const current = { m1: newer };
   assert.equal(rollbackAnswers(current, 'm1', failed, undefined), current);
+});
+
+test('the last two short words stay together', () => {
+  assert.equal(noLoneWord('What should we try next?'), 'What should we try\u00a0next?');
+  assert.equal(noLoneWord('Serve mushrooms and seafood.'), 'Serve mushrooms and\u00a0seafood.');
+  assert.equal(noLoneWord('Pizza'), 'Pizza');
 });

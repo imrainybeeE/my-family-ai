@@ -58,12 +58,19 @@ const switchTo = async (page, who) => {
   await page.getByRole('dialog').waitFor({ state: 'detached' });
 };
 
+/** The brief's six questions sit under "More questions" on an empty chat. */
+const askGuided = async (page, question) => {
+  const more = page.getByRole('button', { name: 'More questions' });
+  if ((await more.getAttribute('aria-expanded')) !== 'true') await more.click();
+  await page.getByRole('button', { name: question }).click();
+};
+
 await check('chat stays with the person who had it', async (page) => {
   await page.goto(`${base}/?demo=1#ask`);
-  await page.getByRole('button', { name: 'What do we have in common?' }).click();
+  await askGuided(page, 'What do we have in common?');
   await page.getByText('Mock answer for Maya.').waitFor();
   await switchTo(page, 'Mum');
-  await page.getByText('Good questions to start with').waitFor();
+  await page.getByText('Try asking').waitFor();
   assert.equal(await page.getByText('Mock answer for Maya.').count(), 0, 'Mum sees Maya’s chat');
   await switchTo(page, 'Maya');
   await page.getByText('Mock answer for Maya.').waitFor();
@@ -71,10 +78,10 @@ await check('chat stays with the person who had it', async (page) => {
 
 await check('a follow-up from an old chat never lands after New chat', async (page) => {
   await page.goto(`${base}/?demo=1#ask`);
-  await page.getByRole('button', { name: 'What do we have in common?' }).click();
+  await askGuided(page, 'What do we have in common?');
   await page.getByText('Mock answer for Maya.').waitFor();
   await page.getByRole('button', { name: 'New chat' }).click();
-  await page.getByRole('button', { name: 'Where are we different?' }).click();
+  await askGuided(page, 'Where are we different?');
   await page.getByText('Follow-up to: Where are we different?').waitFor();
   await page.waitForTimeout(1200);
   assert.equal(await page.getByText('Follow-up to: What do we have in common?').count(), 0, 'old follow-up appeared in the new chat');
@@ -114,6 +121,29 @@ await check(
     assert.notEqual(await sheet.locator('textarea').inputValue(), 'Being asked about my day', 'the last answer leaked into the next question');
   },
   { roots: 900 }
+);
+
+await check(
+  'closing the quiz before the reveal leaves nothing behind',
+  async (page) => {
+    await page.goto(`${base}/?demo=1#garden`);
+    await switchTo(page, 'Leo');
+    await page.getByRole('button', { name: 'Start', exact: true }).first().click();
+    const sheet = page.getByRole('dialog');
+    await sheet.getByRole('button', { name: 'Start', exact: true }).click();
+    for (let i = 0; i < 18; i++) {
+      await sheet.getByText(`Question ${i + 1} of 18`).waitFor();
+      const multi = (await sheet.getByRole('checkbox').count()) > 0;
+      await sheet.getByRole(multi ? 'checkbox' : 'radio').first().click();
+      if (multi || i === 17) await sheet.getByRole('button', { name: i === 17 ? 'See my flower' : 'Next', exact: true }).click();
+    }
+    await page.keyboard.press('Escape');
+    await sheet.waitFor({ state: 'detached' });
+    await page.waitForTimeout(2200);
+    assert.equal(await page.getByRole('dialog').count(), 0, 'the reveal reopened the sheet');
+    assert.equal(await page.getByText('Mock note.').count(), 0, 'a stale bloom note appeared');
+  },
+  { bloom: 900 }
 );
 
 await check('sheets keep keyboard focus inside and make the app inert', async (page) => {

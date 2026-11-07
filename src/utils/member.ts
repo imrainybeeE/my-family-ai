@@ -75,3 +75,29 @@ export function rollbackAnswers(
   else delete next[memberId];
   return next;
 }
+
+/**
+ * Keeps each multi-word name on one line ("Nai Nai"), using non-breaking spaces inside the names,
+ * so a line never ends in the middle of a person.
+ */
+export function keepNames(text: string, names: string[]): string {
+  return names
+    .filter((n) => n.includes(' '))
+    .reduce((t, n) => t.split(n).join(n.replace(/ /g, '\u00a0')), text);
+}
+
+/**
+ * Joins the last two words when together they are short (24 characters or fewer, punctuation
+ * included), so a line of copy never ends on one lone word; longer endings wrap normally.
+ */
+export function noLoneWord(text: string): string {
+  const last = text.lastIndexOf(' ');
+  if (last < 0) return text;
+  const before = text.lastIndexOf(' ', last - 1);
+  return text.length - (before + 1) <= 24 ? `${text.slice(0, last)}\u00a0${text.slice(last + 1)}` : text;
+}
+
+/** Ready-to-show AI text: names kept whole and no lone last word. */
+export function tidyLine(text: string, names: string[]): string {
+  return noLoneWord(keepNames(text, names));
+}

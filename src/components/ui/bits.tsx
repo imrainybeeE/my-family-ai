@@ -1,7 +1,8 @@
 import React, { createContext, useCallback, useContext, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { onRovingKeyDown, rovingTabIndex } from './roving';
-import { AnimatePresence, motion } from 'motion/react';
+import { noLoneWord } from '../../utils/member';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Check, Copy } from 'lucide-react';
 
 /* ---------- Toast: a paper slip that drops in from the top ---------- */
@@ -71,11 +72,11 @@ export function AiText({ text, className = '' }: { text: string; className?: str
   for (const raw of text.split('\n')) {
     const line = raw.trim();
     if (/^([-*•]|\d+\.)\s+/.test(line)) {
-      list.push(line.replace(/^([-*•]|\d+\.)\s+/, ''));
+      list.push(noLoneWord(line.replace(/^([-*•]|\d+\.)\s+/, '')));
       continue;
     }
     flush();
-    if (line) blocks.push(<p key={`p${blocks.length}`}>{inline(line.replace(/^#+\s*/, ''))}</p>);
+    if (line) blocks.push(<p key={`p${blocks.length}`}>{inline(noLoneWord(line.replace(/^#+\s*/, '')))}</p>);
   }
   flush();
   return <div className={`prose-ai ${className}`}>{blocks}</div>;
@@ -103,21 +104,23 @@ export function CopyButton({ value, label = 'Copy', className = 'btn btn-sm' }: 
   );
 }
 
-/* ---------- Thinking dots for AI waits ---------- */
+/* ---------- Thinking: a running stitch being sewn while the AI works ---------- */
 export function Thinking({ label = 'Thinking' }: { label?: string }) {
+  const reduce = useReducedMotion();
   return (
     <span className="inline-flex items-center gap-2 ink-2 t-small" role="status">
-      <span className="inline-flex gap-1" aria-hidden>
-        {[0, 1, 2].map((i) => (
-          <motion.span
-            key={i}
-            className="w-2 h-2 rounded-full"
-            style={{ background: 'var(--accent)' }}
-            animate={{ y: [0, -5, 0], opacity: [0.4, 1, 0.4] }}
-            transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.15 }}
-          />
-        ))}
-      </span>
+      <svg width="30" height="12" viewBox="0 0 30 12" aria-hidden className="shrink-0">
+        <motion.path
+          d="M2 6 C 8 2, 12 10, 18 6 S 26 2, 28 6"
+          fill="none"
+          stroke="var(--yarn)"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          strokeDasharray="4 4"
+          animate={reduce ? undefined : { strokeDashoffset: [0, -16] }}
+          transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+        />
+      </svg>
       {label}
     </span>
   );

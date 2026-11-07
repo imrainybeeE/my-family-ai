@@ -59,7 +59,8 @@ export function AskIcon({ size = 26, className, active }: P) {
   );
 }
 
+/* The four plan pieces differ in silhouette, so each gets a small optical correction to look the same size. */
 export const EatArt = ({ size = 72 }: { size?: number }) => <Felt name="eat" size={size} />;
-export const DoArt = ({ size = 72 }: { size?: number }) => <Felt name="do" size={size} />;
-export const WatchArt = ({ size = 72 }: { size?: number }) => <Felt name="watch" size={size} />;
-export const TravelArt = ({ size = 72 }: { size?: number }) => <Felt name="travel" size={size} />;
+export const DoArt = ({ size = 72 }: { size?: number }) => <Felt name="do" size={size} style={{ transform: 'scale(0.95) translateY(4px)' }} />;
+export const WatchArt = ({ size = 72 }: { size?: number }) => <Felt name="watch" size={size} style={{ transform: 'scale(1.1)' }} />;
+export const TravelArt = ({ size = 72 }: { size?: number }) => <Felt name="travel" size={size} style={{ transform: 'scale(0.92)' }} />;

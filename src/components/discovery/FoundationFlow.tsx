@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { ChevronLeft } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
 import { Thinking } from '../ui/bits';
@@ -14,6 +14,9 @@ import { petalsFor, scoreDiscoveryProfile } from '../../utils/discoveryScoring';
 import { PetalMark, StitchedFlower } from '../art/StitchedFlower';
 import { buildBrief } from '../../services/brief';
 import { ai } from '../../services/ai';
+import { feel } from '../../feel/feel';
+import { PetalBurst } from '../art/PetalBurst';
+import { FLOWERS } from '../../data/flowers';
 import { memberName } from '../../utils/member';
 import { BloomNote, DiscoveryProfile, DiscoveryStyleId } from '../../types';
 
@@ -53,6 +56,8 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
   const [note, setNote] = useState<BloomNote | null>(null);
   const [noteState, setNoteState] = useState<'idle' | 'loading' | 'failed'>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [limitNudge, setLimitNudge] = useState(0);
+  useEffect(() => setLimitNudge(0), [index]);
   // Latest answers and the pending auto-advance, so a quick change of mind always wins and
   // Back or Close cancels the move.
   const answersRef = useRef<Answers>({});
@@ -64,6 +69,14 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
     advanceTimer.current = null;
   };
   useEffect(() => cancelAdvance, [index, stage, open]);
+  // The chime lands as the flower opens.
+  const reduceMotion = useReducedMotion();
+  // Sound isn't motion, so reduced-motion users still hear it, just sooner. Closing cancels it.
+  useEffect(() => {
+    if (stage !== 'blooming' || !open) return;
+    const t = window.setTimeout(() => feel('bloom'), reduceMotion ? 150 : 650);
+    return () => window.clearTimeout(t);
+  }, [stage, open, reduceMotion]);
   // The finish run in flight: its reveal timer and bloom-note request. Closing, switching person or
   // starting again ends it, so nothing from it lands on a newer run or another person.
   const runRef = useRef<{ timer: number | null; abort: AbortController } | null>(null);
@@ -137,7 +150,9 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
       return;
     }
     if (!live()) return;
-    run.timer = window.setTimeout(() => live() && setStage('reveal'), Math.max(0, 1700 - (Date.now() - started)));
+    // The bloom is the app's one big moment: the sewn flower spins away, the real one opens and
+    // throws its petals, and only then does the result card arrive.
+    run.timer = window.setTimeout(() => live() && setStage('reveal'), Math.max(0, (reduceMotion ? 900 : 2300) - (Date.now() - started)));
 
     // Ask the AI for a personal note about this bloom, then keep it with the answers.
     if (!activeMember) return;
@@ -165,8 +180,15 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
     const latest = answersRef.current;
     const v = latest[String(q.id)];
     if (!(Array.isArray(v) ? v.length : v)) return;
-    if (index < FOUNDATION_QUESTIONS.length - 1) setIndex((i) => i + 1);
-    else finish(latest);
+    if (index < FOUNDATION_QUESTIONS.length - 1) {
+      // A bead slides down the yarn when a section is finished.
+      if (FOUNDATION_QUESTIONS[index + 1].section !== q.section) feel('bead');
+      setIndex((i) => i + 1);
+    } else {
+      // A tap you can feel as the flower starts (iOS only plays haptics from a tap).
+      feel('select');
+      finish(latest);
+    }
   };
 
   /** Picks an option. A tap or click on a single-choice question moves on after a beat. */
@@ -174,10 +196,19 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
     const id = String(q.id);
     if (q.isMultiSelect) {
       const max = q.maxSelections || 2;
-      const next = selected.includes(option) ? selected.filter((o) => o !== option) : selected.length >= max ? [...selected.slice(1), option] : [...selected, option];
+      const removing = selected.includes(option);
+      // A full question refuses a third pick (with a nudge) rather than quietly dropping the first.
+      if (!removing && selected.length >= max) {
+        feel('error');
+        setLimitNudge((n) => n + 1);
+        return;
+      }
+      const next = removing ? selected.filter((o) => o !== option) : [...selected, option];
+      feel(removing ? 'tap' : 'stitch');
       setAnswers((a) => ({ ...a, [id]: next }));
       return;
     }
+    if (answersRef.current[id] !== option) feel('stitch');
     const next = { ...answersRef.current, [id]: option };
     answersRef.current = next;
     setAnswers(next);
@@ -185,7 +216,7 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
     if (byPointer) advanceTimer.current = window.setTimeout(goNext, 380);
   };
 
-  const title = stage === 'reveal' ? 'Your flower' : 'Find your flower';
+  const title = stage === 'reveal' || stage === 'blooming' ? 'Your flower' : 'Find your flower';
 
   return (
     <Sheet
@@ -209,7 +240,7 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
             >
               <ChevronLeft size={22} strokeWidth={2.4} />
             </button>
-            <YarnProgress progress={(index + (answered ? 1 : 0)) / FOUNDATION_QUESTIONS.length} beads={FOUNDATION_SECTIONS.length} />
+            <YarnProgress progress={(index + (answered ? 1 : 0)) / FOUNDATION_QUESTIONS.length} beads={FOUNDATION_SECTIONS.length} label={`${index + 1} of ${FOUNDATION_QUESTIONS.length}`} />
           </div>
         ) : undefined
       }
@@ -246,10 +277,20 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
               <h3 ref={headingRef} tabIndex={-1} className="t-title outline-none" style={{ fontSize: '1.375rem', lineHeight: '27px' }}>
                 {q.question}
               </h3>
-              <p className="t-small mt-2 opacity-80">
-                {q.isMultiSelect ? `Pick up to ${q.maxSelections || 2}` : q.subtitle}
+              <motion.p
+                key={limitNudge}
+                className="t-small mt-2 opacity-80"
+                aria-live="polite"
+                animate={limitNudge ? { x: [0, -6, 6, -4, 4, 0] } : undefined}
+                transition={{ duration: 0.36 }}
+              >
+                {q.isMultiSelect
+                  ? selected.length >= (q.maxSelections || 2)
+                    ? `${selected.length} of ${q.maxSelections || 2} picked${limitNudge ? '. Tap one to swap it.' : ''}`
+                    : `Pick up to ${q.maxSelections || 2}`
+                  : q.subtitle}
                 <span className="sr-only">. Question {index + 1} of {FOUNDATION_QUESTIONS.length}.</span>
-              </p>
+              </motion.p>
             </section>
             {saveError && (
               <p role="alert" className="t-small mt-3" style={{ color: 'var(--danger)' }}>
@@ -284,20 +325,38 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
         )}
 
         {stage === 'blooming' && profile && (
-          <motion.div key="blooming" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid place-items-center text-center pt-24 gap-4">
+          <motion.div
+            key="blooming"
+            initial={{ opacity: 1 }}
+            // The opened flower drifts up and shrinks toward its place on the card, so it reads as one flower.
+            exit={{ opacity: 0, scale: 0.73, y: -150, transition: { duration: 0.35, ease: [0.3, 0.7, 0.4, 1] } }}
+            className="grid place-items-center place-content-center text-center gap-4 min-h-[calc(100dvh-160px-var(--safe-t)-var(--safe-b))]"
+          >
             <div className="relative grid place-items-center" style={{ width: 240, height: 240 }}>
-              <motion.div className="absolute" initial={{ opacity: 1, rotate: 0, scale: 1 }} animate={{ opacity: 0, rotate: 200, scale: 0.6 }} transition={{ duration: 1.1, delay: 0.4, ease: [0.5, 0, 0.3, 1] }}>
+              <motion.div
+                className="absolute"
+                initial={{ opacity: 1, rotate: 0, scale: 1 }}
+                animate={reduceMotion ? { opacity: 0 } : { opacity: 0, rotate: 160, scale: 0.85 }}
+                transition={reduceMotion ? { duration: 0.15 } : { duration: 0.6, delay: 0.1, ease: [0.5, 0, 0.3, 1] }}
+              >
                 <StitchedFlower petals={petals} size={220} />
               </motion.div>
-              <Flower style={profile.primaryStyle} size={230} bloom delay={1.2} />
+              {/* The petals fly out from under the flower's rim once it is mostly open. */}
+              <PetalBurst styles={[profile.primaryStyle, profile.secondaryStyle]} delay={0.55} />
+              <div className="relative">
+                <Flower style={profile.primaryStyle} size={230} bloom delay={reduceMotion ? 0.15 : 0.35} />
+              </div>
             </div>
-            <p className="t-head ink-2">Your flower is ready</p>
+            <motion.div initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduceMotion ? 0.25 : 1.4, duration: reduceMotion ? 0.2 : 0.4 }}>
+              <p className="t-title">{FLOWERS[profile.primaryStyle].flower}</p>
+              <p className="t-body ink-2 mt-1">{profile.primaryStyle}</p>
+            </motion.div>
           </motion.div>
         )}
 
         {stage === 'reveal' && profile && (
           <motion.div key="reveal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid gap-5 pt-2">
-            <SpecimenCard name={name} top={profile.primaryStyle} second={profile.secondaryStyle} bloom />
+            <SpecimenCard name={name} top={profile.primaryStyle} second={profile.secondaryStyle} bloom pinOnly />
             <section className="card p-5" aria-live="polite" aria-label="A note for you">
               {noteState === 'loading' && (
                 <div className="mt-2">

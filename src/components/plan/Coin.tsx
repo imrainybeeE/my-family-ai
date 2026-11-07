@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { Felt } from '../art/Flower';
+import { feel } from '../../feel/feel';
 
 /** Flip a sewing button: yellow side up for the first choice, pink for the second. */
 export function Coin() {
@@ -9,6 +10,10 @@ export function Coin() {
   const [turns, setTurns] = useState(0);
   const [landed, setLanded] = useState<'a' | 'b' | null>(null);
   const [flipping, setFlipping] = useState(false);
+  const landTimer = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (landTimer.current !== null) window.clearTimeout(landTimer.current);
+  }, []);
 
   const flip = () => {
     if (!a.trim() || !b.trim() || flipping) return;
@@ -18,9 +23,11 @@ export function Coin() {
     setTurns(base + (side === 'b' ? 180 : 0));
     setLanded(null);
     setFlipping(true);
-    window.setTimeout(() => {
+    feel('flip');
+    landTimer.current = window.setTimeout(() => {
       setLanded(side);
       setFlipping(false);
+      feel('land');
     }, 1450);
   };
 
@@ -46,15 +53,21 @@ export function Coin() {
       </div>
 
       <div className="flex flex-col items-center mt-4" style={{ perspective: 700 }}>
-        <motion.div
-          className="relative"
+        <motion.button
+          type="button"
+          className="relative bg-transparent border-0 p-0 rounded-full"
+          // A second, bigger target for a finger; the labelled button below is the one for keyboards and screen readers.
+          aria-hidden
+          tabIndex={-1}
+          disabled={flipping || !a.trim() || !b.trim()}
+          onClick={flip}
           style={{ width: 132, height: 132, transformStyle: 'preserve-3d' }}
           animate={{ rotateY: turns, y: flipping ? [0, -96, 0] : 0 }}
           transition={{ rotateY: { duration: 1.4, ease: [0.2, 0.7, 0.3, 1] }, y: { duration: 1.4, ease: 'easeOut' } }}
         >
           <Face name="coin-heads" />
           <Face name="coin-tails" back />
-        </motion.div>
+        </motion.button>
         <p className="t-title mt-2 min-h-[1.4em] text-center" aria-live="polite">
           {winner ? `${winner}!` : flipping ? '' : ' '}
         </p>

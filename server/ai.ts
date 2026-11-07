@@ -4,7 +4,7 @@ import { ApiError, FinishReason, GoogleGenAI, ThinkingLevel } from '@google/gena
 import type { Content } from '@google/genai';
 import { z } from 'zod';
 import { parseBrief, renderBrief } from './familyBrief.ts';
-import { alignMembers, checkClaims, stripClaims } from './claims.ts';
+import { alignMembers, checkClaims, sharedHeadline, sharedOnly, sharesTopic, stripClaims } from './claims.ts';
 import type { FamilyBrief } from './familyBrief.ts';
 
 // Every AI feature runs on Gemini Flash-Lite with minimal thinking: about 1.5s a reply and no
@@ -14,10 +14,12 @@ const MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 const FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || 'gemini-3.1-flash-lite';
 const MODELS = [...new Set([MODEL, FALLBACK_MODEL])];
 /** Errors that mean "try the other model" rather than "this request is wrong". */
-const retryable = (err: unknown) => err instanceof ApiError && [429, 500, 503, 504].includes(err.status);
+const retryable = (err: unknown) =>
+  (err instanceof ApiError && [429, 500, 503, 504].includes(err.status)) || /timed? ?out|timeout|fetch failed|ECONNRESET|socket hang up|network/i.test(String((err as Error)?.name) + String((err as Error)?.message));
 const THINKING_LEVELS: Record<string, ThinkingLevel> = { minimal: ThinkingLevel.MINIMAL, low: ThinkingLevel.LOW, medium: ThinkingLevel.MEDIUM };
 const THINKING = THINKING_LEVELS[process.env.GEMINI_THINKING || ''] ?? ThinkingLevel.MINIMAL;
-const TIMEOUT_MS = 45_000;
+// Flash-Lite answers in 1.5–3 seconds; a call still waiting at 12 is stuck, so it moves to the backup model.
+const TIMEOUT_MS = 12_000;
 
 let client: GoogleGenAI | null = null;
 function getClient(): GoogleGenAI | null {
@@ -120,6 +122,12 @@ const BRITISH: [RegExp, string][] = [
   [/\bmovie/g, 'film'],
   [/\bMovie/g, 'Film'],
   [/\benergiz/g, 'energis'],
+  [/\banalyz/g, 'analys'],
+  [/\brealiz/g, 'realis'],
+  [/\bprioritiz/g, 'prioritis'],
+  [/\brecogniz/g, 'recognis'],
+  [/\bapologiz/g, 'apologis'],
+  [/\bcustomiz/g, 'customis'],
 ];
 const british = (s: string) => BRITISH.reduce((t, [from, to]) => t.replace(from, to), s);
 
@@ -154,7 +162,9 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  */
 export function caseTastes(text: string, options: string[]): string {
   let out = text;
-  for (const option of options) {
+  // Whole labels first, then their parts ("Asian Stir Fry" from "Asian Stir Fry & Noodles").
+  const parts = options.flatMap((o) => o.split(/\s*[&/]\s*/)).filter((p) => p.split(/\s+/).filter((w) => /^[A-Z]/.test(w)).length >= 2);
+  for (const option of [...options, ...parts]) {
     const tokens = option.split(/\s+/).filter(Boolean);
     if (tokens.filter((t) => /^[A-Z]/.test(t)).length < 2) continue;
     const re = new RegExp(`\\b${tokens.map((t) => (t === '&' ? '(?:&|and)' : escapeRe(t))).join('\\s+')}(?![A-Za-z])`, 'gi');
@@ -171,11 +181,47 @@ export function caseTastes(text: string, options: string[]): string {
   return out;
 }
 
+/**
+ * Decorative adjectives the model leans on ("a warm, fragrant curry"). They are removed in code,
+ * since the prompt alone doesn't stop them. Only adjectives that read fine when dropped are listed.
+ */
+const FILLER = /\b(fragrant|nourishing|delicious|vibrant|wonderful|amazing|perfect|lovely|tasty|yummy|hearty|scrumptious|cosy|warm|fun|relaxing|exciting)(,)?\s+(?=[a-z])/gi;
+export function dropFiller(text: string): string {
+  // A run of decorative adjectives ("warm, fragrant") goes in one piece, so the article in front of
+  // it is chosen once, from the word that is left.
+  const run = new RegExp(`(\\b(?:a|an|A|An)\\s+)?((?:${FILLER.source})+)`, 'gi');
+  return text
+    .replace(run, (m, article: string | undefined, _seq: string, ...rest: unknown[]) => {
+      const offset = rest[rest.length - 2] as number;
+      const all = rest[rest.length - 1] as string;
+      // Keep words used as nouns or after verbs that need them ("have fun", "stay warm").
+      const before = all.slice(Math.max(0, offset - 8), offset).toLowerCase();
+      if (/\b(have|had|for|stay|keep|is|are|was|be)\s+$/.test(before)) return m;
+      if (!article) return '';
+      const next = all.slice(offset + m.length);
+      const an = /^[aeiou]/i.test(next) && !/^(one|uni|use|eu)/i.test(next);
+      const word = an ? 'an' : 'a';
+      return `${article[0] === 'A' ? word[0].toUpperCase() + word.slice(1) : word} `;
+    })
+    .replace(/^([a-z])/, (c) => c.toUpperCase());
+}
+
 const tasteOptions = (brief: FamilyBrief) => [...new Set(brief.members.flatMap((m) => (m.tastes || []).flatMap((t) => t.a)))];
+
+/** The person asking is "you" in chat, never their own name: "Maya and Dad" becomes "You and Dad". */
+export function youify(text: string, asker: string): string {
+  if (!asker) return text;
+  const name = escapeRe(asker);
+  return text
+    .replace(new RegExp(`\\b${name}['’]s\\b`, 'g'), 'your')
+    .replace(new RegExp(`\\b${name}\\b`, 'g'), 'you')
+    .replace(/(^|[.!?]\s+|\n-\s+|\n|\*\*\s)(you|your)\b/g, (_m, lead: string, w: string) => lead + w[0].toUpperCase() + w.slice(1))
+    .replace(/\b(you) (likes|loves|enjoys|picks|prefers|wants|avoids|has|is)\b/gi, (_m, you: string, verb: string) => `${you} ${verb === 'has' ? 'have' : verb === 'is' ? 'are' : verb.replace(/s$/, '')}`);
+}
 
 /** Tidies a chat answer: British spelling, taste labels as words, and **bold ideas** in sentence case with "and" for "&". */
 export function tidyChatLine(line: string, names: string[], options: string[] = []): string {
-  return caseTastes(british(line), options).replace(/\*\*([^*]+)\*\*/g, (_, idea: string) => `**${sentenceCase(idea.replace(/\s*&\s*/g, ' and '), names)}**`);
+  return dropFiller(caseTastes(british(line), options)).replace(/\*\*([^*]+)\*\*/g, (_, idea: string) => `**${sentenceCase(idea.replace(/\s*&\s*/g, ' and '), names)}**`);
 }
 
 /**
@@ -187,15 +233,16 @@ function tidyReply<T>(value: T, brief: FamilyBrief): T {
   const canonical = new Map(brief.members.map((m) => [m.name.toLowerCase(), m.name]));
   const options = tasteOptions(brief);
   const walk = (v: unknown): unknown => {
-    if (Array.isArray(v)) return v.map((x) => (typeof x === 'string' ? caseTastes(british(x), options) : walk(x)));
+    if (Array.isArray(v)) return v.map((x) => (typeof x === 'string' ? dropFiller(caseTastes(british(x), options)) : walk(x)));
     if (!v || typeof v !== 'object') return v;
     const out: Record<string, unknown> = {};
     for (const [k, child] of Object.entries(v)) {
       if (k === 'members' && Array.isArray(child)) {
         out[k] = [...new Set(child.map((n) => canonical.get(String(n).trim().toLowerCase())).filter(Boolean))];
       } else if (typeof child === 'string') {
-        const text = caseTastes(british(child), options);
-        out[k] = k === 'title' || k === 'headline' ? sentenceCase(text, proper) : text;
+        const text = dropFiller(caseTastes(british(child), options));
+        // Headlines are titles: no closing full stop, so the AI's and the computed one match.
+        out[k] = k === 'headline' ? sentenceCase(text, proper).replace(/\.$/, '') : k === 'title' ? sentenceCase(text, proper) : text;
       } else {
         out[k] = walk(child);
       }
@@ -213,13 +260,20 @@ function logUsage(model: string | undefined, u: { promptTokenCount?: number; tho
 /** Runs a call on the main model, moving to the fallback model when Google is busy or out of quota. */
 async function withFallback<R>(call: (model: string) => Promise<R>): Promise<R> {
   let last: unknown;
-  for (const model of MODELS) {
+  const started = Date.now();
+  // Busy errors come in short bursts: when both models said so quickly, the main one gets one more try.
+  const plan = [...MODELS, MODELS[0]];
+  for (const [i, model] of plan.entries()) {
+    if (i === MODELS.length) {
+      if (Date.now() - started > 6000) break;
+      await new Promise((r) => setTimeout(r, 700));
+    }
     try {
       return await call(model);
     } catch (err) {
       if (!retryable(err)) throw err;
       last = err;
-      console.warn(`Gemini ${model} unavailable (${(err as ApiError).status}), trying the next model`);
+      console.warn(`Gemini ${model} unavailable (${(err as ApiError).status ?? "timed out"}), trying the next model`);
     }
   }
   throw last;
@@ -229,6 +283,28 @@ async function withFallback<R>(call: (model: string) => Promise<R>): Promise<R> 
 function declined(reason: FinishReason | undefined, blocked: unknown): boolean {
   return Boolean(blocked) || reason === FinishReason.SAFETY || reason === FinishReason.PROHIBITED_CONTENT || reason === FinishReason.BLOCKLIST;
 }
+
+/** Removes the list entries that the given validation paths point into. */
+function dropBrokenItems(value: unknown, paths: PropertyKey[][]): unknown {
+  const copy = structuredClone(value) as any;
+  const byList = new Map<any[], Set<number>>();
+  for (const path of paths) {
+    for (let depth = path.length - 1; depth >= 0; depth--) {
+      if (typeof path[depth] !== 'number') continue;
+      let list: any = copy;
+      for (const key of path.slice(0, depth)) list = list?.[key as any];
+      if (Array.isArray(list)) byList.set(list, (byList.get(list) || new Set()).add(path[depth] as number));
+      break;
+    }
+  }
+  for (const [list, drop] of byList) {
+    const keep = list.filter((_, i) => !drop.has(i));
+    list.length = 0;
+    list.push(...keep);
+  }
+  return copy;
+}
+
 
 type Generated<T> = { ok: true; data: T } | { ok: false; status: number; error: string };
 
@@ -274,7 +350,14 @@ async function generate<T extends z.ZodType>(
       console.warn('Gemini reply was not JSON', { attempt, reason });
       continue;
     }
-    const parsed = schema.safeParse(tidyReply(raw, brief));
+    let parsed = schema.safeParse(tidyReply(raw, brief));
+    // On the last try, list items that break a limit (one over-long difference) are dropped rather
+    // than failing the whole reply; required fields still have to be right.
+    if (!parsed.success && attempt === 1) {
+      const trimmed = dropBrokenItems(tidyReply(raw, brief), parsed.error.issues.map((i) => i.path));
+      const again = schema.safeParse(trimmed);
+      if (again.success) parsed = again;
+    }
     if (!parsed.success) {
       feedback = parsed.error.issues
         .slice(0, 4)
@@ -299,15 +382,15 @@ async function generate<T extends z.ZodType>(
         .slice(0, 4)
         .map((i) => i.message)
         .join('; ')}. Only say someone likes or avoids something if they picked it`;
-      console.warn('Gemini reply had wrong attributions', { issues: issues.length });
+      console.warn('Gemini reply had wrong attributions', issues.slice(0, 3).map((i) => i.message));
       continue;
     }
     // After the retry, wrong sentences are removed. If that leaves the reply invalid, or anything
     // false survives, nothing is sent: no flagged claim ever reaches the family.
-    const fixed = alignMembers(issues.length ? stripClaims(data, issues) : data, brief);
+    const fixed = sharedOnly(alignMembers(issues.length ? stripClaims(data, issues, { headline: sharedHeadline(brief) }) : data, brief), brief);
     const checked = schema.safeParse(fixed);
-    if (!checked.success || checkClaims(checked.data, brief).length) {
-      console.warn('Reply still had wrong attributions after a retry; not sent');
+    if (!checked.success || checkClaims(checked.data, brief).length || (rules?.(checked.data) || []).length) {
+      console.warn('Reply still had wrong attributions after a retry; not sent', checked.success ? checkClaims(checked.data, brief).map((i) => i.message) : checked.error.issues.slice(0, 2).map((i) => `${i.path.join('.')}: ${i.message}`));
       return { ok: false, status: 502, error: 'ai_invalid' };
     }
     if (issues.length) console.warn('Removed wrong attributions', { issues: issues.length });
@@ -333,7 +416,7 @@ const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 /** A line with a word limit as well as a character limit; the words are counted after tidying. */
 const words = (maxWords: number, maxChars: number) => line(maxChars).refine((s) => wordCount(s) <= maxWords, `at most ${maxWords} words`);
 
-const SparkSchema = z.object({ question: words(11, 110), why: line(80), members: people });
+const SparkSchema = z.object({ question: words(10, 110), why: line(80), members: people });
 
 const BloomSchema = z.object({ note: line(160), tryThis: line(100) });
 
@@ -341,10 +424,10 @@ const RootsSchema = z.object({ reflection: line(90), followUp: line(110).nullabl
 
 const InsightsSchema = z.object({
   headline: line(60),
-  together: z.array(z.object({ title: line(44), detail: line(110), members: people })).min(1).max(3),
-  differences: z.array(z.object({ title: line(44), detail: line(110), bridge: line(90), members: people })).max(2),
+  // Up to three shared rows; none when nobody shares a pick yet (the screen says so).
+  together: z.array(z.object({ title: line(44), detail: line(110), members: people })).max(3),
+  differences: z.array(z.object({ title: line(44), detail: words(10, 110), bridge: words(10, 90), members: people })).max(2),
   ideas: z.array(z.object({ title: line(44), why: line(100), tip: line(90), members: people })).min(1).max(3),
-  missing: line(70).nullable(),
 });
 
 const PlanAskSchema = z.object({
@@ -373,27 +456,87 @@ const PlanIdeasSchema = z.object({
 const SuggestSchema = z.object({ suggestions: z.array(words(9, 80)).min(1).max(4) });
 
 // Only the opening sentence fails a reply for length; a long fact or idea line is dropped instead.
-const ChatSchema = z.object({ answer: words(16, 120), facts: z.array(line(120)).max(3), ideas: z.array(line(120)).max(3) });
+const ChatSchema = z.object({ answer: words(14, 120), facts: z.array(line(120)).max(3), ideas: z.array(line(120)).max(3) });
 
 /** Where the family said they'd eat or be: at home, out, or take-out. */
 type Setting = 'home' | 'out' | 'takeout';
 const TAKEOUT = /\b(take-?out|takeaway|delivery|deliver|order(ing)? in|order(ing)? food)\b/i;
+/** Places that mean leaving home, used when checking ideas against "at home". */
+const OUT_PLACES = /\b(restaurant|eat(ing)? out|go(ing)? out|dine out|dining out|café|cafe|hawker|food court|cinema|venue|park|picnic|museum|beach|zoo|mall|market|trip)\b/i;
 const OUT = /\b(restaurant|eat(ing)? out|go(ing)? out|dine out|dining out|café|cafe|hawker|food court|cinema|venue)\b/i;
-const HOME = /\b(at home|home|cook|cooking|bake|baking|kitchen|homemade|make your own|build your own)\b/i;
+const HOME = /\b(at home|home|stay in|staying in|in tonight|cook|cooking|bake|baking|kitchen|homemade|make your own|build your own)\b/i;
 export function settingOf(answers: string): Setting | null {
   if (TAKEOUT.test(answers)) return 'takeout';
+  if (/\bstay(ing)? in\b/i.test(answers)) return 'home';
   if (OUT.test(answers) || /\bout\b/i.test(answers)) return 'out';
   if (HOME.test(answers)) return 'home';
   return null;
 }
+/** Drops negated mentions ("no restaurant trip needed") so only what an idea proposes is checked. */
+const affirmed = (idea: string) =>
+  idea.replace(/\b(no|not|without|instead of|skip|skipping|rather than|no need for)\b.*?(?=[.,;:\u2013\u2014]|\s-\s|\s(?:but|so|then|just)\s|$)/gi, '');
+
 export function breaksSetting(idea: string, setting: Setting): string[] {
-  const takeout = TAKEOUT.test(idea);
-  const out = OUT.test(idea);
-  const home = HOME.test(idea) && !takeout;
+  const text = affirmed(idea);
+  const takeout = TAKEOUT.test(text);
+  const out = OUT_PLACES.test(text);
+  const home = HOME.test(text) && !takeout;
   if (setting === 'home' && (takeout || out)) return ['must be at home: they chose to stay in'];
   if (setting === 'takeout' && (home || out) && !takeout) return ['must be take-out: they chose to order in'];
   if (setting === 'out' && home && !out) return ['must be out: they chose to go out'];
   return [];
+}
+
+/** When the family said it should happen. Ideas that name a different time are rejected. */
+type Timing = 'now' | 'tonight' | 'weekend';
+const TIMES: Record<Timing, RegExp> = {
+  now: /\b(right now|now|straight away|this afternoon)\b/i,
+  tonight: /\b(tonight|this evening|after dinner|evening)\b/i,
+  weekend: /\b(this weekend|weekend|saturday|sunday)\b/i,
+};
+const NOW_SCHEDULED = /\b(right now|straight away|this afternoon)\b/i;
+export function timingOf(answers: string): Timing | null {
+  return (Object.keys(TIMES) as Timing[]).find((t) => TIMES[t].test(answers)) || null;
+}
+const DISHES = ['noodle', 'rice', 'curry', 'pizza', 'taco', 'dumpling', 'soup', 'salad', 'burger', 'bbq', 'barbecue', 'pasta', 'sushi', 'pancake', 'sandwich', 'stir fry', 'roast'];
+
+const CUISINES = ['asian', 'chinese', 'malay', 'indian', 'japanese', 'korean', 'thai', 'italian', 'mexican', 'western'];
+const mentions = (text: string, term: string) => new RegExp(`\\b${term.replace(/[- ]/g, '[- ]?')}e?s?\\b`, 'i').test(text);
+
+/** The dishes or cuisines the family chose in the plan's practical answers ("Asian stir fry"). */
+export function chosenMeal(answers: string): string[] {
+  return [...DISHES, ...CUISINES].filter((t) => mentions(answers, t));
+}
+
+/** Every idea must stay within the meal the family chose. */
+export function leavesChosenMeal(ideas: string[], chosen: string[]): string[] {
+  if (!chosen.length) return [];
+  return ideas.flatMap((text, i) => (chosen.some((t) => mentions(text, t)) ? [] : [`ideas.${i} must be ${chosen.join(' ')}: they chose it`]));
+}
+
+/**
+ * Three ideas should be three different dishes: flags any idea built on the same main dish as an
+ * earlier one. A dish the family chose is shared on purpose, so only the other dishes must differ.
+ */
+export function repeatedDishes(ideas: string[], chosen: string[] = []): string[] {
+  const dishOf = (text: string) => DISHES.filter((d) => !chosen.includes(d) && mentions(text, d));
+  const seen = new Map<string, number>();
+  const out: string[] = [];
+  ideas.forEach((text, i) => {
+    for (const d of dishOf(text)) {
+      if (seen.has(d)) out.push(`ideas.${i} repeats the ${d} of ideas.${seen.get(d)}; pick a different dish`);
+      else seen.set(d, i);
+    }
+  });
+  return out;
+}
+
+export function breaksTiming(idea: string, timing: Timing): string[] {
+  const text = affirmed(idea);
+  if (timing !== 'weekend' && /\b(tomorrow|next week|next month)\b/i.test(text)) return [`must fit "${timing === 'now' ? 'right now' : timing}", but is for later`];
+  // Only times an idea is scheduled for count; a bare "now" inside a step ("start the rice now") doesn't.
+  const other = (Object.keys(TIMES) as Timing[]).filter((t) => t !== timing && (t === 'now' ? NOW_SCHEDULED : TIMES[t]).test(text));
+  return other.length ? [`must fit "${timing === 'now' ? 'right now' : timing}", but mentions ${other.join(' and ')}`] : [];
 }
 
 const TASKS: Record<string, string> = {
@@ -451,14 +594,15 @@ At most 45 words in total. Call ${asker} "you", never by name, and everyone else
       else send({ error: 'ai_error' });
     } else {
       const { answer } = out.data;
-      const short = (l: string) => wordCount(l) <= 12;
+      const short = (l: string) => wordCount(l) <= 10;
       const facts = out.data.facts.filter(short).slice(0, 2);
       const ideas = out.data.ideas.filter(short).slice(0, 2);
       // 45 words at most: the last idea goes first, then the last fact.
-      const total = () => wordCount([answer, ...facts, ...ideas].join(' '));
+      // Counted as shown, with each "Idea:" label.
+      const total = () => wordCount([answer, ...facts, ...ideas.map((i) => `Idea: ${i}`)].join(' '));
       while (total() > 45 && ideas.length + facts.length > 0) (ideas.length > 1 || !facts.length ? ideas : facts).pop();
       const lines = [answer, ...(facts.length || ideas.length ? [''] : []), ...facts.map((f) => `- ${f}`), ...ideas.map((i) => `- **Idea:** ${i}`)];
-      send({ t: tidyChatLine(lines.join('\n'), [...g.brief.members.map((m) => m.name), g.brief.householdName], tasteOptions(g.brief)) });
+      send({ t: youify(tidyChatLine(lines.join('\n'), [...g.brief.members.map((m) => m.name), g.brief.householdName], tasteOptions(g.brief)), asker) });
       send({ done: true, refused: false });
     }
   } catch (err) {
@@ -481,7 +625,7 @@ aiRouter.post('/suggest', async (req, res) => {
     res,
     g.ai,
     g.brief,
-    `Suggest 3 short questions ${g.brief.asker} could tap to ask the family helper. ${context} Write them as ${g.brief.asker} would type them: "I", "me" and "we" for ${g.brief.asker}, never their name; other people by name. Each at most 8 words, specific to this family, and answerable from the saved answers or useful for planning time together.`,
+    `Suggest 3 short questions ${g.brief.asker} could tap to ask the family helper. ${context} Write them as ${g.brief.asker} would type them, in correct grammar: "I" as a subject ("Where could Dad and I walk?"), "me" as an object, never ${g.brief.asker}'s name; other people by name. Each at most 8 words, about the family's tastes, time together or each other (never about the app, the quiz, or who hasn't answered), specific to this family, and answerable from the saved answers or useful for planning time together.`,
     'Give the suggestions.',
     SuggestSchema,
   );
@@ -495,7 +639,7 @@ aiRouter.post('/spark', async (req, res) => {
     res,
     g.ai,
     g.brief,
-    `Write one dinner-table conversation question for tonight that fits this family. Ground it in something from their answers: a shared interest, a difference worth exploring, or a tradition someone mentioned. It must be easy for kids and adults to answer, open-ended and warm, and never about worries or sensitive topics. Keep the question to at most 10 words, in plain words a seven-year-old knows. "why" is under 10 words naming whose answers inspired it. "members" lists those people's names.${recent.length ? `\nDon't repeat or closely echo these recent questions:\n- ${recent.join('\n- ')}` : ''}`,
+    `Write one dinner-table conversation question for tonight that fits this family. Ground it in something from their answers: a shared interest, a difference worth exploring, or a tradition someone mentioned. It must be easy for kids and adults to answer, open-ended and warm, and never about worries or sensitive topics. Keep the question to at most 10 words, in plain words a seven-year-old knows, with no padding words ("go explore together next" is just "explore"). "why" is under 10 words naming whose answers inspired it. "members" lists those people's names.${recent.length ? `\nDon't repeat or closely echo these recent questions:\n- ${recent.join('\n- ')}` : ''}`,
     'Write tonight\'s question.',
     SparkSchema,
   );
@@ -539,10 +683,12 @@ aiRouter.post('/roots', async (req, res) => {
     g.ai,
     g.brief,
     `${member} is answering the Advanced discovery questions, a deeper and optional layer after the Foundation discovery.
-- reflection: one sentence under 16 words, speaking to them as "you", that adds something rather than restating their answer: link it to a specific thing another family member saved, keeping exactly what that person meant (if Mum wants her own effort noticed, don't turn it into Mum noticing others), or, if nothing links closely, one small way the family could act on it. Don't judge or analyse them, and no praise words.
+- reflection: one sentence under 16 words, speaking to them as "you", that adds something rather than restating their answer: link it to a specific thing another family member saved, keeping exactly what that person meant and speaking to ${member} as "you" (for example "Like Mum, you feel most appreciated when someone notices the small things."; never turn Mum's wish into Mum noticing others), or, if nothing links closely, one small way the family could act on it. Don't judge or analyse them, and no praise words.
 - followUp: at most one short follow-up question (under 16 words) about something not already in the question or their answer, only when the answer is very short or vague and one more detail would help the family plan together or understand them. Otherwise null. Never follow up on worries, stress, health, or anything they seemed hesitant about.${followUpAnswered ? ' They have already answered a follow-up for this question, so followUp must be null.' : ''}`,
     `Question: "${question}"\n${member}'s answer: "${answer}"`,
     RootsSchema,
+    // The reflection is spoken to the person who answered.
+    (data) => (/\b(you|your)\b/i.test(data.reflection) ? [] : ['reflection: speak to them as "you"']),
   );
 });
 
@@ -554,15 +700,26 @@ aiRouter.post('/insights', async (req, res) => {
     g.ai,
     g.brief,
     `Write the family profile for the app's Together screen, using only the saved answers.
-- headline: one sentence under 8 words naming one concrete thing most of the family shares (for example "Dinner brings the Tans together").
+- headline: one sentence under 9 words that restates the first "together" item: the thing and who shares it (for example "Mum and Nai Nai love a good mystery"). Only speak for the whole family when everyone who answered picked it.
 - together: 2–3 things two or more people enjoy or value. title under 5 words; detail is under 12 words saying who, without repeating the title's words (for example title "Mystery shows", detail "Mum and Nai Nai both picked whodunnits."), never "everyone" unless it is true. members: the names involved.
-- differences: 1–2 interesting differences, described neutrally. detail is under 14 words naming who prefers what; bridge is under 12 words with a practical, positive way to enjoy that difference.
-- ideas: exactly 3 things to try together, each grounded in answers. title under 5 words; why is under 12 words; tip is one practical sentence under 12 words. members: who it suits.
-Use the family facts for any numbers. Write for a phone screen: short, concrete, plain. No praise words.
-- missing: if some people haven't answered the Foundation discovery yet, under 8 words naming them (for example "Leo hasn't answered yet"); otherwise null.
-If only one person has answered, stay honest: describe what that person brings and what the family could discover next, and say so in missing.`,
+- differences: 1–2 interesting differences about different things (never two about energy or rest), described neutrally. detail is under 14 words naming who prefers what; title in plain words (for example "Food to skip", never abstract nouns like "avoidances"); bridge is one concrete action under 10 words that doesn't repeat the observation (for example "Serve mushrooms and seafood on the side").
+- ideas: exactly 3 things to try together, each grounded in answers. Name the thing in every line: never "it", "them" or "this" without saying what. title under 5 words; why is under 12 words; tip is one practical sentence under 12 words. members: the two or more people it suits.
+Use the family facts for any numbers. Write for a phone screen: short, concrete, plain. No praise words. Never rank picks ("top", "number one", "most loved"): the answers are unranked lists. Only say "the family", "everyone" or the family's name for something every person who answered picked.
+If only one person has answered, stay honest: describe what that person brings and what the family could discover next.`,
     'Write the family profile.',
     InsightsSchema,
+    // The headline sums up the first shared interest, so the two never disagree.
+    (data) => {
+      const first = data.together[0];
+      if (!first) return [];
+      const names = g.brief.members.map((m) => m.name);
+      // Same thing, without counting names as the topic, and the same people.
+      const sameThing = sharesTopic(data.headline, `${first.title} ${first.detail}`, names);
+      const named = names.filter((n) => new RegExp(`\\b${escapeRe(n)}\\b`).test(data.headline));
+      const forEveryone = /\b(everyone|the family|all of us)\b/i.test(data.headline) && first.members.length >= 3;
+      const samePeople = forEveryone || (named.length === first.members.length && named.every((n) => first.members.includes(n)));
+      return sameThing && samePeople ? [] : ['headline: restate the first "together" item: the same thing and the same people'];
+    },
   );
 });
 
@@ -599,6 +756,8 @@ aiRouter.post('/plan/ideas', async (req, res) => {
     .map((a: any) => ({ question: text(a?.question, 120), answer: text(a?.answer, 200) }));
   const practical = practicalAnswers.map((a) => `- ${a.question}: ${a.answer}`).join('\n');
   const setting = settingOf(practicalAnswers.map((a) => a.answer).join(' '));
+  const timing = timingOf(practicalAnswers.map((a) => a.answer).join(' '));
+  const meal = taskKey === 'eat' ? chosenMeal(practicalAnswers.map((a) => a.answer).join(' ')) : [];
   if (!taskTitle || !who.length) {
     res.status(400).json({ error: 'missing_task' });
     return;
@@ -612,7 +771,7 @@ aiRouter.post('/plan/ideas', async (req, res) => {
     g.ai,
     g.brief,
     `The family wants help with "${taskTitle}". People joining: ${who.join(', ')}.
-Give exactly 3 options that fit these people, using their saved answers and practical answers. Every practical answer is binding for all three options: if they chose take-out, all three are take-out; if they chose at home, all three are at home. Within those limits, make the three clearly different (for example the cuisine, the effort, or who it suits most).
+Give exactly 3 options that fit these people, using their saved answers and practical answers. Every practical answer is binding for all three options: if they chose take-out, all three are take-out; if they chose at home, all three are at home; if they chose right now, none of them is for this evening or the weekend. Within those limits, make the three clearly different: for food, three different cuisines drawn from different people's picks (never two dishes of the same kind); otherwise different activities. Keep them the same kind of thing: for "What should we eat?", three dinners unless the practical answers ask for snacks or another meal. Each summary names the actual food or activity (not "a rice dish"). If a kind of meal was chosen, give three different dishes within it.
 - title: under 5 words.
 - summary: one sentence under 14 words describing the idea, without repeating words from the title.
 - why: one sentence under 18 words on why it fits, naming people and what in their answers points to it.
@@ -622,6 +781,13 @@ Give exactly 3 options that fit these people, using their saved answers and prac
 These are AI ideas: never claim something exists, is open, is available or costs a certain amount. ${watchNote}`,
     `Practical answers:\n${practical || '- none given'}`,
     PlanIdeasSchema,
-    (data) => (setting ? data.ideas.flatMap((idea, i) => breaksSetting(`${idea.title}. ${idea.summary}`, setting).map((why) => `ideas.${i} ${why}`)) : []),
+    (data) => [
+      ...data.ideas.flatMap((idea, i) => {
+        const text = `${idea.title}. ${idea.summary} ${idea.tradeoff}`;
+        return [...(setting ? breaksSetting(text, setting) : []), ...(timing ? breaksTiming(text, timing) : [])].map((why) => `ideas.${i} ${why}`);
+      }),
+      ...leavesChosenMeal(data.ideas.map((idea) => `${idea.title}. ${idea.summary}`), meal),
+      ...repeatedDishes(data.ideas.map((idea) => `${idea.title}. ${idea.summary}`), meal),
+    ],
   );
 });

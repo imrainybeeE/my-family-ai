@@ -50,8 +50,10 @@ export function Welcome() {
         <h1 className="t-display" style={{ fontSize: '2.75rem', lineHeight: '46px' }}>
           My Family AI
         </h1>
-        <p className="t-body ink-2 mt-3" style={{ fontSize: '1.125rem', lineHeight: '26px', textWrap: 'balance' }}>
-          Find your flower. Plan things everyone loves.
+        <p className="t-body ink-2 mt-3" style={{ fontSize: '1.125rem', lineHeight: '26px' }}>
+          Find your flower.
+          <br />
+          Plan things everyone loves.
         </p>
 
         {error && (

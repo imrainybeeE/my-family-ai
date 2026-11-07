@@ -31,10 +31,27 @@ function keysOf(option: string): string[] {
   return [...new Set(words(option).filter((w) => w.length >= 4 && !STOP.has(w)))];
 }
 
-/** A keyword matches a word in the text by its first five letters, or exactly (allowing a plural) when shorter. */
+/**
+ * Words are compared by their stem, so plurals and verb forms match ("mysteries" and "mystery",
+ * "baking" and "bake") but different words don't ("animation" and "animals").
+ */
+export function stem(word: string): string {
+  return word
+    .toLowerCase()
+    .replace(/ies$/, 'y')
+    .replace(/(ing|ed|es|s)$/, '')
+    .replace(/e$/, '');
+}
+
+/** True when two texts share a meaningful word (by stem), such as a headline and the row it sums up. */
+export function sharesTopic(a: string, b: string, names: string[] = []): boolean {
+  const skip = new Set([...STOP, ...names.flatMap((n) => words(n))]);
+  const keys = new Set(words(b).filter((w) => w.length >= 4 && !skip.has(w)).map(stem));
+  return words(a).some((w) => w.length >= 4 && !skip.has(w) && keys.has(stem(w)));
+}
+
 function hits(key: string, word: string): boolean {
-  if (key.length >= 5) return word.startsWith(key.slice(0, 5));
-  return word === key || word === `${key}s` || word === `${key}es`;
+  return stem(key) === stem(word);
 }
 
 /** Every checked taste pick, with everyone who chose it. */
@@ -52,6 +69,17 @@ export function tastePicks(brief: FamilyBrief): Pick[] {
     }
   }
   return [...map.values()].filter((p) => p.keys.length);
+}
+
+/** A true headline from the saved picks: the pick the most people share, said plainly. */
+export function sharedHeadline(brief: FamilyBrief): string {
+  const top = tastePicks(brief)
+    .filter((p) => p.label !== 'Food they avoid' && p.people.length > 1)
+    .sort((a, b) => b.people.length - a.people.length)[0];
+  if (!top) return 'No shared picks yet';
+  const who = top.people.length === 2 ? `${top.people[0]} and ${top.people[1]} both` : `${top.people.slice(0, -1).join(', ')} and ${top.people[top.people.length - 1]}`;
+  const option = top.option.replace(/\s*&\s*/g, ' and ').toLowerCase().replace(/\b(asian|italian|mexican)\b/g, (w) => w[0].toUpperCase() + w.slice(1));
+  return `${who} picked ${option}`;
 }
 
 /** Lines for the prompt: who shares each pick, so the model never has to work it out. */
@@ -74,6 +102,7 @@ export function sentences(text: string): string[] {
 /** Fields that state facts. Suggestions (ideas, tips, titles, questions) are not checked. */
 const FACT_KEYS = new Set(['answer', 'facts', 'detail', 'why', 'known', 'headline', 'note', 'reflection']);
 const NEGATIVE = /\b(avoid|avoids|avoiding|skip|skips|dislike|dislikes|hate|hates|no|not|never|without|won't|doesn't|don't|isn't|aren't|can't)\b/i;
+const POSITIVE = /\b(like|likes|liked|love|loves|loved|enjoy|enjoys|enjoyed|pick|picks|picked|prefer|prefers|chose|choose|share|shares|want|wants)\b/i;
 const EVERYONE = /\b(everyone|everybody|whole family|all of you|the family)\b/i;
 const AVOID_LABEL = 'Food they avoid';
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -104,7 +133,9 @@ function claimsIn(sentence: string, names: string[], asker: string): { people: s
       last.end = m.end;
     } else groups.push({ people: [m.name], start: m.start, end: m.end });
   }
-  const clauses = (t: string) => t.split(/[,;:]|\b(?:so|but|while|whereas|then|which|unlike)\b/i);
+  // A claim runs to the next clause word or semicolon. Commas and colons stay inside it, so lists
+  // ("tacos, curry and rice") and labels ("Maya: curry and rice") are checked whole.
+  const clauses = (t: string) => t.split(/;|\b(?:so|but|while|whereas|then|which|unlike)\b/i);
   const clause = (t: string) => clauses(t)[0];
   return groups.map((g, i) => {
     const after = clause(sentence.slice(g.end, groups[i + 1]?.start ?? sentence.length));
@@ -127,8 +158,14 @@ export function checkClaims(value: unknown, brief: FamilyBrief): ClaimIssue[] {
     const problems: string[] = [];
     const claims = claimsIn(sentence, names, brief.asker);
     for (const { people, about } of claims) {
-      const negative = NEGATIVE.test(about);
-      for (const p of picksIn(about, picks)) {
+      // Each comma part is a like or an avoid: "no" carries on through a list until a liking verb.
+      let negative = false;
+      const parts = about.split(',').map((part) => {
+        if (NEGATIVE.test(part)) negative = true;
+        else if (POSITIVE.test(part)) negative = false;
+        return { part, negative };
+      });
+      for (const { part, negative } of parts) for (const p of picksIn(part, picks)) {
         const avoid = p.label === AVOID_LABEL;
         for (const person of people) {
           const made = p.people.includes(person);
@@ -137,7 +174,8 @@ export function checkClaims(value: unknown, brief: FamilyBrief): ClaimIssue[] {
         }
       }
     }
-    if (!claims.length && familyWide.test(sentence)) {
+    // "Everyone" is checked even when names come with it ("Mum and everyone love curry").
+    if (familyWide.test(sentence)) {
       for (const p of picksIn(sentence, picks)) {
         if (p.label !== AVOID_LABEL && tasters.some((n) => !p.people.includes(n))) problems.push(`only ${p.people.join(', ')} picked "${p.option}", not the whole family`);
       }
@@ -145,17 +183,22 @@ export function checkClaims(value: unknown, brief: FamilyBrief): ClaimIssue[] {
     return problems.length ? `"${sentence}": ${[...new Set(problems)].join('; ')}` : null;
   };
 
-  const walk = (v: unknown, path: (string | number)[], key: string) => {
+  const walk = (v: unknown, path: (string | number)[], key: string, title?: string) => {
     if (typeof v === 'string') {
       if (!FACT_KEYS.has(key)) return;
       for (const sentence of sentences(v)) {
-        const message = checkSentence(sentence);
+        // A row's detail often points back at its title ("both picked this"): read it with the title in place.
+        const read = title ? sentence.replace(/\b(this|these|it|them)\b/i, title) : sentence;
+        const message = checkSentence(read);
         if (message) issues.push({ path, sentence, message });
       }
       return;
     }
     if (Array.isArray(v)) return v.forEach((x, i) => walk(x, [...path, i], key));
-    if (v && typeof v === 'object') for (const [k, child] of Object.entries(v)) walk(child, [...path, k], k);
+    if (v && typeof v === 'object') {
+      const rowTitle = typeof (v as { title?: unknown }).title === 'string' ? (v as { title: string }).title : undefined;
+      for (const [k, child] of Object.entries(v)) walk(child, [...path, k], k, k === 'detail' ? rowTitle : undefined);
+    }
   };
   walk(value, [], '');
   return issues;
@@ -165,7 +208,7 @@ export function checkClaims(value: unknown, brief: FamilyBrief): ClaimIssue[] {
  * Removes flagged sentences. A field left empty drops its whole list item when the item sits in
  * a list (a "together" row, a known fact); otherwise the field keeps its other sentences.
  */
-export function stripClaims<T>(value: T, issues: ClaimIssue[]): T {
+export function stripClaims<T>(value: T, issues: ClaimIssue[], fill: Record<string, string> = {}): T {
   const copy = structuredClone(value) as any;
   const drop: { list: any[]; index: number }[] = [];
   for (const issue of issues) {
@@ -174,9 +217,10 @@ export function stripClaims<T>(value: T, issues: ClaimIssue[]): T {
     const last = issue.path[issue.path.length - 1];
     if (!parent || typeof parent[last] !== 'string') continue;
     const kept = sentences(parent[last]).filter((s) => s !== issue.sentence).join(' ');
-    // An emptied field stays empty: validation then rejects the reply rather than keep a false claim.
-    parent[last] = kept;
-    if (kept) continue;
+    // An emptied field takes a computed, true replacement when there is one (the headline); otherwise
+    // it stays empty and validation rejects the reply rather than keep a false claim.
+    parent[last] = kept || (typeof last === 'string' && fill[last]) || '';
+    if (parent[last]) continue;
     // Find the nearest list above this field and drop that entry.
     for (let depth = issue.path.length - 1; depth >= 0; depth--) {
       if (typeof issue.path[depth] !== 'number') continue;
@@ -218,3 +262,28 @@ export function alignMembers<T>(value: T, brief: FamilyBrief): T {
   };
   return walk(value);
 }
+
+/**
+ * Together's rows and ideas are about what people share. A row about a saved pick is pinned to
+ * one exact option two or more people chose, and its people become exactly that group, so a row
+ * can never merge different people's picks (Mum's curry with Dad's pizza). A row about a pick
+ * nobody shares goes, as does any row or idea left with fewer than two people. With no shared
+ * rows left, the headline says so.
+ */
+export function sharedOnly<T>(value: T, brief: FamilyBrief): T {
+  const v = value as { headline?: string; together?: { title: string; members: string[] }[]; ideas?: { members: string[] }[] };
+  if (!Array.isArray(v?.together)) return value;
+  const picks = tastePicks(brief);
+  const together = v.together.flatMap((row) => {
+    const about = picksIn(row.title, picks);
+    if (!about.length) return row.members.length >= 2 ? [row] : [];
+    const shared = about
+      .filter((p) => p.people.length >= 2)
+      .sort((a, b) => overlap(b.people, row.members) - overlap(a.people, row.members) || b.people.length - a.people.length)[0];
+    return shared ? [{ ...row, members: [...shared.people] }] : [];
+  });
+  const ideas = Array.isArray(v.ideas) ? v.ideas.filter((idea) => idea.members.length >= 2) : v.ideas;
+  return { ...value, together, ...(ideas ? { ideas } : {}), ...(together.length ? {} : { headline: 'No shared picks yet' }) } as T;
+}
+
+const overlap = (a: string[], b: string[]) => a.filter((x) => b.includes(x)).length;

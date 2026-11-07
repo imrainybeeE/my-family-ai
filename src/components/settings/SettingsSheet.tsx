@@ -9,6 +9,7 @@ import { FlowerBadge } from '../art/Flower';
 import { ALLOWED_ROLES, validateMemberInput } from '../../utils/familyCode';
 import { uniqueNames } from '../../utils/member';
 import { MemberRole } from '../../types';
+import { feel, setSoundOn, soundOn } from '../../feel/feel';
 
 export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { household, members, responses, activeMember, selectActiveMember, addMember, leaveHousehold, isDemo } = useHousehold();
@@ -19,6 +20,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
   const [nickname, setNickname] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [sound, setSound] = useState(soundOn);
   const names = uniqueNames(members);
 
   const add = async () => {
@@ -50,6 +52,21 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
               { value: 'system', label: 'Automatic' },
             ]}
           />
+          <label className="card mt-3 flex items-center justify-between gap-3 px-4 min-h-[52px]">
+            <span className="t-body">Sounds and haptics</span>
+            <input
+              type="checkbox"
+              role="switch"
+              className="switch"
+              checked={sound}
+              onChange={(e) => {
+                setSoundOn(e.target.checked);
+                setSound(e.target.checked);
+                if (e.target.checked) feel('select');
+                toast(e.target.checked ? 'Sounds and haptics on' : 'Sounds and haptics off');
+              }}
+            />
+          </label>
         </section>
 
         <section>

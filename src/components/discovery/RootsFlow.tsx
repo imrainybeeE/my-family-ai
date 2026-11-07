@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ChevronLeft } from 'lucide-react';
+import { Check, ChevronLeft } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
 import { Thinking } from '../ui/bits';
 import { onRovingKeyDown, rovingTabIndex } from '../ui/roving';
@@ -11,6 +11,7 @@ import { ADVANCED_QUESTIONS } from '../../data/advancedQuestions';
 import { ai } from '../../services/ai';
 import { memberName } from '../../utils/member';
 import { AdvancedAnswer } from '../../types';
+import { feel } from '../../feel/feel';
 
 type Stage = 'intro' | 'ask' | 'reflect' | 'done';
 
@@ -99,11 +100,13 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
       if (!c.signal.aborted) setSaving(false);
     }
     if (c.signal.aborted) return;
+    feel('stitch');
     setStage('reflect');
     setReflecting(true);
     try {
       const r = await ai.roots(brief, name, q.question, answer, false, c.signal);
       if (c.signal.aborted) return;
+      feel('arrive');
       setReflection({ text: r.reflection, followUp: r.followUp });
       await write(q.id, { ...entry, reflection: r.reflection });
     } catch {
@@ -144,12 +147,15 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
       leading={
         stage === 'ask' || stage === 'reflect' ? (
           <div className="flex-1 flex items-center gap-2">
-            {stage === 'ask' && (
+            {stage === 'ask' ? (
               <button type="button" className="icon-btn" aria-label="Previous question" disabled={saving} onClick={() => (index === 0 ? setStage('intro') : setIndex((i) => i - 1))}>
                 <ChevronLeft size={22} strokeWidth={2.4} />
               </button>
+            ) : (
+              // Holds the back button's place, so the yarn doesn't jump between a question and its reflection.
+              <span className="w-11 h-11 shrink-0" aria-hidden />
             )}
-            <YarnProgress progress={(index + (stage === 'reflect' ? 1 : 0)) / ADVANCED_QUESTIONS.length} beads={4} />
+            <YarnProgress progress={(index + (stage === 'reflect' ? 1 : 0)) / ADVANCED_QUESTIONS.length} beads={4} label={`${index + 1} of ${ADVANCED_QUESTIONS.length}`} />
           </div>
         ) : undefined
       }
@@ -165,7 +171,7 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
           </div>
         ) : stage === 'reflect' && !reflecting ? (
           <button type="button" className="btn btn-primary btn-block" disabled={saving} onClick={reflection?.followUp && followText.trim() ? submitFollowUp : next}>
-            {reflection?.followUp ? (followText.trim() ? 'Save and continue' : 'Skip') : index === ADVANCED_QUESTIONS.length - 1 ? 'Finish' : 'Next question'}
+            {reflection?.followUp && followText.trim() ? 'Save and continue' : index === ADVANCED_QUESTIONS.length - 1 ? 'Finish' : 'Continue'}
           </button>
         ) : undefined
       }
@@ -241,10 +247,16 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
           <motion.div key={`r${q.id}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="grid gap-4 pt-6">
             <section className="stock stock-lilac">
               <h3 className="t-head">{q.question}</h3>
-              <p className="t-body mt-1.5 opacity-80">{text.trim()}</p>
+              <div className="flex items-center justify-between gap-3 mt-3">
+                <p className="t-hand opacity-75">You said</p>
+                <p className="t-small flex items-center gap-1 opacity-75">
+                  <Check size={14} strokeWidth={2.6} aria-hidden /> Answer saved
+                </p>
+              </div>
+              <p className="t-body mt-1">{text.trim()}</p>
             </section>
             <div className="flex gap-2.5 items-start">
-              <span className="shrink-0 w-9 h-9 grid place-items-center -mt-0.5" aria-hidden>
+              <span className="shrink-0 w-9 h-9 grid place-items-center -mt-0.5 mr-1.5" aria-hidden>
                 <Felt name="yarnball" size={52} />
               </span>
               <div className="card px-4 py-3.5 flex-1" style={{ borderRadius: '6px 20px 20px 20px' }} aria-live="polite">
@@ -261,7 +273,7 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
             {!reflecting && reflection?.followUp && (
               <label className="grid gap-2">
                 <span className="sr-only">{reflection.followUp}</span>
-                <textarea className="field" rows={3} maxLength={600} value={followText} onChange={(e) => setFollowText(e.target.value)} placeholder="Answer if you like" />
+                <textarea className="field" rows={4} maxLength={600} value={followText} onChange={(e) => setFollowText(e.target.value)} placeholder="For example: Dad listened when I needed it" />
               </label>
             )}
             {error && (
