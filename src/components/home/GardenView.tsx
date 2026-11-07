@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { feel } from '../../feel/feel';
 import { motion } from 'motion/react';
 import { RefreshCw, Share2 } from 'lucide-react';
 import { useHousehold } from '../../context/HouseholdContext';
@@ -122,6 +123,7 @@ function TableQuestion() {
           disabled={spark.loading}
           onClick={() => {
             if (spark.data) setRecent((r) => [spark.data!.question, ...r].slice(0, 6));
+            feel('page');
             spark.refresh();
           }}
         >
@@ -131,7 +133,7 @@ function TableQuestion() {
         </button>
       </div>
       {data && !spark.loading ? (
-        <motion.p key={data.question} className="t-title mt-1" style={{ fontSize: '1.375rem', lineHeight: '26px' }} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
+        <motion.p key={data.question} className="t-title mt-1" initial={{ opacity: 0, rotateX: -70, transformPerspective: 600 }} animate={{ opacity: 1, rotateX: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 22 }} style={{ fontSize: '1.375rem', lineHeight: '26px', transformOrigin: '50% 0%' }}>
           {data.question}
         </motion.p>
       ) : (

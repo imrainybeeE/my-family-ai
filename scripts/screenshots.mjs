@@ -120,9 +120,10 @@ for (const theme of ['light', 'dark']) {
   }
 
   await open('ask');
-  await page.getByText('Good questions to start with').waitFor();
+  await page.getByText('Try asking').waitFor();
   await idle(page, 30000);
   await shot(page, `${theme}-13-ask`);
+  await page.getByRole('button', { name: 'More questions' }).click();
   await page.getByRole('button', { name: 'What do we have in common?' }).click();
   await page.getByRole('button', { name: 'New chat' }).waitFor();
   await idle(page);

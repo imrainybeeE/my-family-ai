@@ -11,6 +11,7 @@ import { Felt, FELT_FOR_STYLE, FlowerBadge } from '../art/Flower';
 import { Strand, useWidth } from '../art/Garland';
 import { SectionTitle, Thinking } from '../ui/bits';
 import { seatRing } from '../../utils/ring';
+import { feel } from '../../feel/feel';
 
 /** One yarn colour per shared thing, used for its strand in the circle and its row below. */
 const YARNS = ['#e86f8f', '#648b79', '#5e93d1'];
@@ -231,7 +232,12 @@ function Row({ first, people, title, body, yarn, children }: { first: boolean; p
 function IdeaPager({ count, children }: { count: number; children: (i: number) => React.ReactNode }) {
   const [[i, dir], setPage] = useState<[number, number]>([0, 0]);
   const at = Math.min(i, count - 1);
-  const go = (d: number) => setPage(([cur]) => [Math.max(0, Math.min(count - 1, cur + d)), d]);
+  const go = (d: number) => {
+    const target = Math.max(0, Math.min(count - 1, i + d));
+    if (target === i) return;
+    feel('page');
+    setPage([target, d]);
+  };
   if (count < 1) return null;
   return (
     <section aria-roledescription="carousel" aria-label="Ideas to try">
@@ -293,7 +299,7 @@ function Ticket({ index, title, why, people, onPlan }: { index: number; title: s
             <FlowerBadge key={p.id} style={p.style} size={30} />
           ))}
         </span>
-        <button type="button" className="btn btn-sm" onClick={onPlan}>
+        <button type="button" className="btn btn-sm btn-soft" onClick={onPlan}>
           Plan it
         </button>
       </div>

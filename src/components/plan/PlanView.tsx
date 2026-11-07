@@ -8,6 +8,7 @@ import { useFamily } from '../../hooks/useFamily';
 import { ai, aiErrorMessage, PlanAsk, PlanIdea, PlanIdeas } from '../../services/ai';
 import { calculateCommonGround } from '../../utils/tasteMatching';
 import { hashBrief } from '../../services/brief';
+import { feel } from '../../feel/feel';
 import { generateFamilyProfileReport } from '../../utils/familyProfileAnalysis';
 import { PageHeader } from '../layout/TabBar';
 import { FlowerBadge } from '../art/Flower';
@@ -51,7 +52,19 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
     const c = new AbortController();
     requestRef.current = c;
     const key = inputRef.current;
-    return { signal: c.signal, stale: () => c.signal.aborted || inputRef.current !== key };
+    return {
+      signal: c.signal,
+      // A reply for out-of-date answers is dropped, and the plan starts again from who's coming.
+      stale: () => {
+        if (c.signal.aborted) return true;
+        if (inputRef.current === key) return false;
+        setStage('who');
+        setAsk(null);
+        setResult(null);
+        setError(null);
+        return true;
+      },
+    };
   };
 
   useEffect(() => {
@@ -111,9 +124,9 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
       setResult({ ...r, ideas: r.ideas.slice(0, 3) });
     } catch (err) {
       if (c.stale()) return;
-      // Offline ideas come from the saved tastes of the people joining; they can't follow the practical answers.
-      setError(`${aiErrorMessage(err)}${answers.length ? ' These simpler ideas come from saved tastes only, not your answers above.' : ''}`);
-      setResult(offlineIdeas(task, members.filter((m) => whoIds.includes(m.id)), responses));
+      setError(aiErrorMessage(err));
+      // Offline ideas come from saved tastes alone, so they're only offered when no practical answers were given.
+      setResult(answers.length ? null : offlineIdeas(task, members.filter((m) => whoIds.includes(m.id)), responses));
     }
     setStage('ideas');
   };
@@ -267,7 +280,7 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
               ))}
               <label className="grid gap-2">
                 <span className="t-label">Anything else?</span>
-                <input className="field" value={extra} onChange={(e) => setExtra(e.target.value)} placeholder={task === 'eat' ? 'Nai Nai’s birthday, something soft…' : 'It might rain, we have a toddler…'} />
+                <input className="field" value={extra} onChange={(e) => setExtra(e.target.value)} placeholder={task === 'eat' ? 'Budget or food needs' : 'Time or budget'} />
               </label>
               <div className="sticky z-10 -mx-5 px-5 pt-4" style={{ bottom: 'calc(var(--tabbar-top) + 4px + var(--safe-b))', background: 'linear-gradient(to bottom, color-mix(in srgb, var(--page) 0%, transparent), var(--page) 16px)' }}>
                 <button type="button" className="btn btn-primary btn-block" onClick={getIdeas}>
@@ -277,11 +290,35 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
             </div>
           )}
 
+          {stage === 'ideas' && !result && (
+            <section className="card p-5 grid gap-3" role="alert">
+              <p className="t-body">{error}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" className="btn btn-sm" onClick={() => setStage('questions')}>
+                  Change answers
+                </button>
+                <button type="button" className="btn btn-sm btn-primary" onClick={getIdeas}>
+                  Try again
+                </button>
+              </div>
+            </section>
+          )}
+
           {stage === 'ideas' && result && (
             <div className="grid gap-3">
               {error && <p className="t-small" style={{ color: 'var(--danger)' }}>{error}</p>}
               {result.ideas.map((idea, i) => (
-                <IdeaCard key={i} idea={idea} index={i} chosen={chosen} byName={byName} onChoose={() => setChosen((c) => (c === i ? null : i))} />
+                <IdeaCard
+                  key={i}
+                  idea={idea}
+                  index={i}
+                  chosen={chosen}
+                  byName={byName}
+                  onChoose={() => {
+                    feel(chosen === i ? 'tap' : 'land');
+                    setChosen((c) => (c === i ? null : i));
+                  }}
+                />
               ))}
               <p className="t-small ink-3">Ideas from your saved answers.</p>
               <div className="grid gap-1 mt-1">
@@ -399,8 +436,13 @@ function PickForUs({ count, onPick }: { count: number; onPick: (i: number) => vo
         const tick = () => {
           onPick(i % count);
           i += 1;
-          if (i <= steps) window.setTimeout(tick, 70 + i * 12);
-          else setSpinning(false);
+          if (i <= steps) {
+            feel('select');
+            window.setTimeout(tick, 70 + i * 12);
+          } else {
+            feel('land');
+            setSpinning(false);
+          }
         };
         tick();
       }}

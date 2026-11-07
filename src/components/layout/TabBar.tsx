@@ -5,6 +5,7 @@ import { AskIcon, GardenIcon, PlanIcon, TogetherIcon } from '../art/Icons';
 import { useHousehold } from '../../context/HouseholdContext';
 import { FlowerBadge } from '../art/Flower';
 import { onRovingKeyDown } from '../ui/roving';
+import { feel } from '../../feel/feel';
 
 const TABS: { id: TabType; label: string; Icon: typeof GardenIcon }[] = [
   { id: 'garden', label: 'Garden', Icon: GardenIcon },
@@ -21,9 +22,22 @@ export function TabBar({ tab, onChange }: { tab: TabType; onChange: (t: TabType)
         {TABS.map(({ id, label, Icon }) => {
           const on = tab === id;
           return (
-            <button key={id} type="button" role="tab" aria-selected={on} aria-controls="main" tabIndex={on ? 0 : -1} onClick={() => onChange(id)}>
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              aria-controls="main"
+              tabIndex={on ? 0 : -1}
+              onClick={() => {
+                if (!on) feel('tap');
+                onChange(id);
+              }}
+            >
               {on && <motion.span layoutId="tab-well" className="tab-well" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
-              <Icon active={on} />
+              <motion.span className="grid" initial={false} animate={on ? { scale: [1, 1.18, 1], y: [0, -2, 0] } : { scale: 1, y: 0 }} transition={{ duration: 0.38, ease: [0.3, 0.7, 0.4, 1] }}>
+                <Icon active={on} />
+              </motion.span>
               {label}
             </button>
           );

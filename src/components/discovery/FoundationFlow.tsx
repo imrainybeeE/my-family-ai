@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { ChevronLeft } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
 import { Thinking } from '../ui/bits';
@@ -14,6 +14,8 @@ import { petalsFor, scoreDiscoveryProfile } from '../../utils/discoveryScoring';
 import { PetalMark, StitchedFlower } from '../art/StitchedFlower';
 import { buildBrief } from '../../services/brief';
 import { ai } from '../../services/ai';
+import { feel } from '../../feel/feel';
+import { PetalBurst } from '../art/PetalBurst';
 import { memberName } from '../../utils/member';
 import { BloomNote, DiscoveryProfile, DiscoveryStyleId } from '../../types';
 
@@ -64,8 +66,15 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
     advanceTimer.current = null;
   };
   useEffect(() => cancelAdvance, [index, stage, open]);
+  // The chime lands as the flower opens.
+  useEffect(() => {
+    if (stage !== 'blooming') return;
+    const t = window.setTimeout(() => feel('bloom'), 1250);
+    return () => window.clearTimeout(t);
+  }, [stage]);
   // The finish run in flight: its reveal timer and bloom-note request. Closing, switching person or
   // starting again ends it, so nothing from it lands on a newer run or another person.
+  const reduceMotion = useReducedMotion();
   const runRef = useRef<{ timer: number | null; abort: AbortController } | null>(null);
   const endRun = () => {
     if (runRef.current?.timer != null) window.clearTimeout(runRef.current.timer);
@@ -137,7 +146,9 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
       return;
     }
     if (!live()) return;
-    run.timer = window.setTimeout(() => live() && setStage('reveal'), Math.max(0, 1700 - (Date.now() - started)));
+    // The bloom is the app's one big moment: the sewn flower spins away, the real one opens and
+    // throws its petals, and only then does the result card arrive.
+    run.timer = window.setTimeout(() => live() && setStage('reveal'), Math.max(0, (reduceMotion ? 900 : 3100) - (Date.now() - started)));
 
     // Ask the AI for a personal note about this bloom, then keep it with the answers.
     if (!activeMember) return;
@@ -165,8 +176,11 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
     const latest = answersRef.current;
     const v = latest[String(q.id)];
     if (!(Array.isArray(v) ? v.length : v)) return;
-    if (index < FOUNDATION_QUESTIONS.length - 1) setIndex((i) => i + 1);
-    else finish(latest);
+    if (index < FOUNDATION_QUESTIONS.length - 1) {
+      // A bead slides down the yarn when a section is finished.
+      if (FOUNDATION_QUESTIONS[index + 1].section !== q.section) feel('bead');
+      setIndex((i) => i + 1);
+    } else finish(latest);
   };
 
   /** Picks an option. A tap or click on a single-choice question moves on after a beat. */
@@ -174,10 +188,13 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
     const id = String(q.id);
     if (q.isMultiSelect) {
       const max = q.maxSelections || 2;
-      const next = selected.includes(option) ? selected.filter((o) => o !== option) : selected.length >= max ? [...selected.slice(1), option] : [...selected, option];
+      const removing = selected.includes(option);
+      const next = removing ? selected.filter((o) => o !== option) : selected.length >= max ? [...selected.slice(1), option] : [...selected, option];
+      feel(removing ? 'tap' : 'stitch');
       setAnswers((a) => ({ ...a, [id]: next }));
       return;
     }
+    if (answersRef.current[id] !== option) feel('stitch');
     const next = { ...answersRef.current, [id]: option };
     answersRef.current = next;
     setAnswers(next);
@@ -290,8 +307,11 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
                 <StitchedFlower petals={petals} size={220} />
               </motion.div>
               <Flower style={profile.primaryStyle} size={230} bloom delay={1.2} />
+              <PetalBurst styles={[profile.primaryStyle, profile.secondaryStyle]} delay={1.25} />
             </div>
-            <p className="t-head ink-2">Your flower is ready</p>
+            <motion.p className="t-head ink-2" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 2.3, duration: 0.4 }}>
+              Your flower is ready
+            </motion.p>
           </motion.div>
         )}
 

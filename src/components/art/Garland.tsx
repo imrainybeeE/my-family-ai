@@ -1,4 +1,5 @@
 import React, { useId, useLayoutEffect, useRef, useState } from 'react';
+import { feel } from '../../feel/feel';
 import { motion } from 'motion/react';
 import { DiscoveryStyleId } from '../../types';
 import { Felt, FELT_FOR_STYLE } from './Flower';
@@ -79,7 +80,15 @@ export function Garland({ plants, onSelect }: { plants: GardenPlant[]; onSelect?
                     animate={{ scale: 1, rotate: TILTS[n % 8], opacity: 1 }}
                     transition={{ type: 'spring', stiffness: 220, damping: 16, delay: 0.35 + n * 0.08 }}
                   >
-                    <Felt name={bud ? 'bud' : FELT_FOR_STYLE[p.style!]} size={s} />
+                    {/* Hung from the yarn: a tap swings it, and it springs back with a little wobble. */}
+                    <motion.span
+                      className="block"
+                      style={{ transformOrigin: '50% 8%' }}
+                      whileTap={{ rotate: n % 2 ? -10 : 10, scale: 0.96 }}
+                      transition={{ type: 'spring', stiffness: 380, damping: 7 }}
+                    >
+                      <Felt name={bud ? 'bud' : FELT_FOR_STYLE[p.style!]} size={s} />
+                    </motion.span>
                   </motion.span>
                   <span className="tag -mt-4 relative" style={{ transform: `rotate(${n % 2 ? 3 : -3}deg)`, background: p.isYou ? '#fbe2ea' : undefined }}>
                     {p.name}
@@ -89,7 +98,7 @@ export function Garland({ plants, onSelect }: { plants: GardenPlant[]; onSelect?
               return (
                 <div key={p.id} role="listitem" className="absolute flex flex-col items-center" style={{ left: x - s / 2, top: y - s / 2, width: s }}>
                   {onSelect ? (
-                    <button type="button" onClick={() => onSelect(p.id)} className="flex flex-col items-center bg-transparent border-0 p-0 transition-transform active:scale-95" aria-label={label}>
+                    <button type="button" onPointerDown={() => feel('tap')} onClick={() => onSelect(p.id)} className="flex flex-col items-center bg-transparent border-0 p-0" aria-label={label}>
                       {body}
                     </button>
                   ) : (

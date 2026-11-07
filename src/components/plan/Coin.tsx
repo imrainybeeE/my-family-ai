@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Felt } from '../art/Flower';
+import { feel } from '../../feel/feel';
 
 /** Flip a sewing button: yellow side up for the first choice, pink for the second. */
 export function Coin() {
@@ -18,9 +19,11 @@ export function Coin() {
     setTurns(base + (side === 'b' ? 180 : 0));
     setLanded(null);
     setFlipping(true);
+    feel('flip');
     window.setTimeout(() => {
       setLanded(side);
       setFlipping(false);
+      feel('land');
     }, 1450);
   };
 

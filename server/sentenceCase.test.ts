@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { caseTastes, sentenceCase, tidyChatLine } from './ai.ts';
+import { caseTastes, dropFiller, sentenceCase, tidyChatLine } from './ai.ts';
 
 const names = ['Maya', 'Mum', 'Dad', 'Nai Nai', 'Leo', 'The Tan family'];
 
@@ -33,4 +33,12 @@ test('writes taste labels as words inside sentences', () => {
   assert.equal(caseTastes('Maya and Nai Nai picked Asian Stir Fry and Noodles.', options), 'Maya and Nai Nai picked Asian stir fry and noodles.');
   assert.equal(caseTastes('Curry & Rice is Mum’s pick.', options), 'Curry and rice is Mum’s pick.');
   assert.equal(caseTastes('- Mystery & Whodunnit for Nai Nai', options), '- Mystery and whodunnit for Nai Nai');
+});
+
+test('drops decorative adjectives but keeps meaning', () => {
+  assert.equal(dropFiller('Prepare a warm curry meal indoors.'), 'Prepare a curry meal indoors.');
+  assert.equal(dropFiller('Cook a fragrant, warm curry with Mum.'), 'Cook a curry with Mum.');
+  assert.equal(dropFiller('An amazing evening walk.'), 'An evening walk.');
+  assert.equal(dropFiller('Have fun together outside.'), 'Have fun together outside.');
+  assert.equal(dropFiller('Fresh fruit and smoothies.'), 'Fresh fruit and smoothies.');
 });

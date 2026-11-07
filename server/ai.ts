@@ -171,11 +171,28 @@ export function caseTastes(text: string, options: string[]): string {
   return out;
 }
 
+/**
+ * Decorative adjectives the model leans on ("a warm, fragrant curry"). They are removed in code,
+ * since the prompt alone doesn't stop them. Only adjectives that read fine when dropped are listed.
+ */
+const FILLER = /\b(fragrant|nourishing|delicious|vibrant|wonderful|amazing|perfect|lovely|tasty|yummy|hearty|scrumptious|cosy|warm|fun|relaxing|exciting)(,)?\s+(?=[a-z])/gi;
+export function dropFiller(text: string): string {
+  return text
+    .replace(FILLER, (m, _w, _c, offset: number, all: string) => {
+      // Keep words used as nouns or after verbs that need them ("have fun", "stay warm").
+      const before = all.slice(Math.max(0, offset - 8), offset).toLowerCase();
+      return /\b(have|had|for|stay|keep|is|are|was|be)\s+$/.test(before) ? m : '';
+    })
+    .replace(/\b([Aa])n ([bcdfghjklmnpqrstvwxyz])/g, '$1 $2')
+    .replace(/\b([Aa]) ([aeiou])/g, '$1n $2')
+    .replace(/^([a-z])/, (c) => c.toUpperCase());
+}
+
 const tasteOptions = (brief: FamilyBrief) => [...new Set(brief.members.flatMap((m) => (m.tastes || []).flatMap((t) => t.a)))];
 
 /** Tidies a chat answer: British spelling, taste labels as words, and **bold ideas** in sentence case with "and" for "&". */
 export function tidyChatLine(line: string, names: string[], options: string[] = []): string {
-  return caseTastes(british(line), options).replace(/\*\*([^*]+)\*\*/g, (_, idea: string) => `**${sentenceCase(idea.replace(/\s*&\s*/g, ' and '), names)}**`);
+  return dropFiller(caseTastes(british(line), options)).replace(/\*\*([^*]+)\*\*/g, (_, idea: string) => `**${sentenceCase(idea.replace(/\s*&\s*/g, ' and '), names)}**`);
 }
 
 /**
@@ -187,14 +204,14 @@ function tidyReply<T>(value: T, brief: FamilyBrief): T {
   const canonical = new Map(brief.members.map((m) => [m.name.toLowerCase(), m.name]));
   const options = tasteOptions(brief);
   const walk = (v: unknown): unknown => {
-    if (Array.isArray(v)) return v.map((x) => (typeof x === 'string' ? caseTastes(british(x), options) : walk(x)));
+    if (Array.isArray(v)) return v.map((x) => (typeof x === 'string' ? dropFiller(caseTastes(british(x), options)) : walk(x)));
     if (!v || typeof v !== 'object') return v;
     const out: Record<string, unknown> = {};
     for (const [k, child] of Object.entries(v)) {
       if (k === 'members' && Array.isArray(child)) {
         out[k] = [...new Set(child.map((n) => canonical.get(String(n).trim().toLowerCase())).filter(Boolean))];
       } else if (typeof child === 'string') {
-        const text = caseTastes(british(child), options);
+        const text = dropFiller(caseTastes(british(child), options));
         out[k] = k === 'title' || k === 'headline' ? sentenceCase(text, proper) : text;
       } else {
         out[k] = walk(child);
@@ -333,7 +350,7 @@ const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 /** A line with a word limit as well as a character limit; the words are counted after tidying. */
 const words = (maxWords: number, maxChars: number) => line(maxChars).refine((s) => wordCount(s) <= maxWords, `at most ${maxWords} words`);
 
-const SparkSchema = z.object({ question: words(11, 110), why: line(80), members: people });
+const SparkSchema = z.object({ question: words(10, 110), why: line(80), members: people });
 
 const BloomSchema = z.object({ note: line(160), tryThis: line(100) });
 
@@ -373,7 +390,7 @@ const PlanIdeasSchema = z.object({
 const SuggestSchema = z.object({ suggestions: z.array(words(9, 80)).min(1).max(4) });
 
 // Only the opening sentence fails a reply for length; a long fact or idea line is dropped instead.
-const ChatSchema = z.object({ answer: words(16, 120), facts: z.array(line(120)).max(3), ideas: z.array(line(120)).max(3) });
+const ChatSchema = z.object({ answer: words(14, 120), facts: z.array(line(120)).max(3), ideas: z.array(line(120)).max(3) });
 
 /** Where the family said they'd eat or be: at home, out, or take-out. */
 type Setting = 'home' | 'out' | 'takeout';
@@ -451,11 +468,12 @@ At most 45 words in total. Call ${asker} "you", never by name, and everyone else
       else send({ error: 'ai_error' });
     } else {
       const { answer } = out.data;
-      const short = (l: string) => wordCount(l) <= 12;
+      const short = (l: string) => wordCount(l) <= 10;
       const facts = out.data.facts.filter(short).slice(0, 2);
       const ideas = out.data.ideas.filter(short).slice(0, 2);
       // 45 words at most: the last idea goes first, then the last fact.
-      const total = () => wordCount([answer, ...facts, ...ideas].join(' '));
+      // Counted as shown, with each "Idea:" label.
+      const total = () => wordCount([answer, ...facts, ...ideas.map((i) => `Idea: ${i}`)].join(' '));
       while (total() > 45 && ideas.length + facts.length > 0) (ideas.length > 1 || !facts.length ? ideas : facts).pop();
       const lines = [answer, ...(facts.length || ideas.length ? [''] : []), ...facts.map((f) => `- ${f}`), ...ideas.map((i) => `- **Idea:** ${i}`)];
       send({ t: tidyChatLine(lines.join('\n'), [...g.brief.members.map((m) => m.name), g.brief.householdName], tasteOptions(g.brief)) });
@@ -481,7 +499,7 @@ aiRouter.post('/suggest', async (req, res) => {
     res,
     g.ai,
     g.brief,
-    `Suggest 3 short questions ${g.brief.asker} could tap to ask the family helper. ${context} Write them as ${g.brief.asker} would type them: "I", "me" and "we" for ${g.brief.asker}, never their name; other people by name. Each at most 8 words, specific to this family, and answerable from the saved answers or useful for planning time together.`,
+    `Suggest 3 short questions ${g.brief.asker} could tap to ask the family helper. ${context} Write them as ${g.brief.asker} would type them, in correct grammar: "I" as a subject ("Where could Dad and I walk?"), "me" as an object, never ${g.brief.asker}'s name; other people by name. Each at most 8 words, specific to this family, and answerable from the saved answers or useful for planning time together.`,
     'Give the suggestions.',
     SuggestSchema,
   );
@@ -539,7 +557,7 @@ aiRouter.post('/roots', async (req, res) => {
     g.ai,
     g.brief,
     `${member} is answering the Advanced discovery questions, a deeper and optional layer after the Foundation discovery.
-- reflection: one sentence under 16 words, speaking to them as "you", that adds something rather than restating their answer: link it to a specific thing another family member saved, keeping exactly what that person meant (if Mum wants her own effort noticed, don't turn it into Mum noticing others), or, if nothing links closely, one small way the family could act on it. Don't judge or analyse them, and no praise words.
+- reflection: one sentence under 16 words, speaking to them as "you", that adds something rather than restating their answer: link it to a specific thing another family member saved, keeping exactly what that person meant, in a plain sentence about them (for example "Mum feels appreciated when someone notices what she does."; never turn it into Mum noticing others), or, if nothing links closely, one small way the family could act on it. Don't judge or analyse them, and no praise words.
 - followUp: at most one short follow-up question (under 16 words) about something not already in the question or their answer, only when the answer is very short or vague and one more detail would help the family plan together or understand them. Otherwise null. Never follow up on worries, stress, health, or anything they seemed hesitant about.${followUpAnswered ? ' They have already answered a follow-up for this question, so followUp must be null.' : ''}`,
     `Question: "${question}"\n${member}'s answer: "${answer}"`,
     RootsSchema,
@@ -556,9 +574,9 @@ aiRouter.post('/insights', async (req, res) => {
     `Write the family profile for the app's Together screen, using only the saved answers.
 - headline: one sentence under 8 words naming one concrete thing most of the family shares (for example "Dinner brings the Tans together").
 - together: 2–3 things two or more people enjoy or value. title under 5 words; detail is under 12 words saying who, without repeating the title's words (for example title "Mystery shows", detail "Mum and Nai Nai both picked whodunnits."), never "everyone" unless it is true. members: the names involved.
-- differences: 1–2 interesting differences, described neutrally. detail is under 14 words naming who prefers what; bridge is under 12 words with a practical, positive way to enjoy that difference.
+- differences: 1–2 interesting differences about different things (never two about energy or rest), described neutrally. detail is under 14 words naming who prefers what; bridge is under 12 words with a practical, positive way to enjoy that difference.
 - ideas: exactly 3 things to try together, each grounded in answers. title under 5 words; why is under 12 words; tip is one practical sentence under 12 words. members: who it suits.
-Use the family facts for any numbers. Write for a phone screen: short, concrete, plain. No praise words.
+Use the family facts for any numbers. Write for a phone screen: short, concrete, plain. No praise words. Never rank picks ("top", "number one", "most loved"): the answers are unranked lists. Only say "the family", "everyone" or the family's name for something every person who answered picked.
 - missing: if some people haven't answered the Foundation discovery yet, under 8 words naming them (for example "Leo hasn't answered yet"); otherwise null.
 If only one person has answered, stay honest: describe what that person brings and what the family could discover next, and say so in missing.`,
     'Write the family profile.',

@@ -11,6 +11,7 @@ import { ADVANCED_QUESTIONS } from '../../data/advancedQuestions';
 import { ai } from '../../services/ai';
 import { memberName } from '../../utils/member';
 import { AdvancedAnswer } from '../../types';
+import { feel } from '../../feel/feel';
 
 type Stage = 'intro' | 'ask' | 'reflect' | 'done';
 
@@ -99,11 +100,13 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
       if (!c.signal.aborted) setSaving(false);
     }
     if (c.signal.aborted) return;
+    feel('stitch');
     setStage('reflect');
     setReflecting(true);
     try {
       const r = await ai.roots(brief, name, q.question, answer, false, c.signal);
       if (c.signal.aborted) return;
+      feel('arrive');
       setReflection({ text: r.reflection, followUp: r.followUp });
       await write(q.id, { ...entry, reflection: r.reflection });
     } catch {

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowUp, RotateCcw } from 'lucide-react';
+import { ArrowUp, ChevronDown, RotateCcw } from 'lucide-react';
 import { useHousehold } from '../../context/HouseholdContext';
 import { useUI } from '../../App';
 import { useAiResource } from '../../hooks/useFamily';
@@ -8,6 +8,7 @@ import { ai, aiErrorMessage, ChatTurn, streamChat } from '../../services/ai';
 import { PageHeader } from '../layout/TabBar';
 import { AiText, Thinking } from '../ui/bits';
 import { Felt } from '../art/Flower';
+import { feel } from '../../feel/feel';
 
 /** The six guided questions from the project brief, always available. */
 const GUIDED = [
@@ -18,6 +19,9 @@ const GUIDED = [
   'Suggest something we could enjoy together',
   'What could I ask my family member to understand them better?',
 ];
+
+/** Shown when personal suggestions can't be fetched; they fit anyone in the family. */
+const NEUTRAL = ['What do we have in common?', 'What could we do this weekend?', 'What should we eat tonight?'];
 
 interface Msg extends ChatTurn {
   id: string;
@@ -38,6 +42,7 @@ export function AskView() {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [followUps, setFollowUps] = useState<string[]>([]);
+  const [moreOpen, setMoreOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   // Bumped by every send and New chat, so a reply or follow-up from an older chat is dropped.
   const genRef = useRef(0);
@@ -70,6 +75,7 @@ export function AskView() {
       const q = text.trim();
       if (!q || busy) return;
       const gen = ++genRef.current;
+      feel('send');
       setInput('');
       setFollowUps([]);
       const history: Msg[] = [...messages.filter((m) => !m.error), { id: `u${Date.now()}`, role: 'user', content: q }];
@@ -90,6 +96,7 @@ export function AskView() {
           },
           controller.signal
         );
+        if (gen === genRef.current) feel('arrive');
         if (refused || !answer.trim()) {
           answer = 'I can’t help with that one. Try asking about your family’s answers, plans or things to do together.';
           setMessages((list) => list.map((m) => (m.id === replyId ? { ...m, content: answer } : m)));
@@ -121,7 +128,7 @@ export function AskView() {
   }, [ui.askPrefill]);
 
   const empty = messages.length === 0;
-  const suggestions = starters.data?.suggestions?.slice(0, 3) || [];
+  const suggestions = starters.data?.suggestions?.slice(0, 3) || (starters.error ? NEUTRAL : []);
 
   return (
     <div className="page" style={{ paddingBottom: `calc(var(--tabbar-top) + ${composerH}px + 32px + var(--safe-b))` }}>
@@ -134,28 +141,34 @@ export function AskView() {
             <p className="t-body ink-2 flex-1">Answers come only from what your family saved.</p>
           </section>
 
-          <h2 className="t-head mt-4 mb-3">For {brief.asker}</h2>
-          <div className="grid gap-2">
-            {starters.loading && !suggestions.length && (
-              <div className="card p-4">
-                <Thinking label="Thinking of good questions" />
-              </div>
-            )}
-            {suggestions.map((s) => (
-              <SuggestionButton key={s} text={s} onClick={() => send(s)} />
-            ))}
+          <h2 className="t-head mt-4 mb-3">Try asking</h2>
+          <div className="grid gap-2" aria-busy={starters.loading}>
+            {starters.loading && !suggestions.length
+              ? [0, 1, 2].map((i) => <div key={i} className="skeleton h-[52px] w-full" />)
+              : suggestions.map((s) => <SuggestionButton key={s} text={s} onClick={() => send(s)} />)}
           </div>
 
-          <h2 className="t-head mt-8 mb-3">Good questions to start with</h2>
-          <ul className="card overflow-hidden">
-            {GUIDED.map((g, i) => (
-              <li key={g} style={{ borderTop: i ? '1px solid var(--line)' : undefined }}>
-                <button type="button" onClick={() => send(g)} className="w-full text-left bg-transparent border-0 t-body px-4 py-3 min-h-[48px] active:bg-[var(--accent-soft)]">
-                  {g}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <button
+            type="button"
+            className="t-label mt-6 bg-transparent border-0 p-0 min-h-[44px] flex items-center gap-1"
+            style={{ color: 'var(--accent-ink)' }}
+            aria-expanded={moreOpen}
+            onClick={() => setMoreOpen((o) => !o)}
+          >
+            More questions
+            <ChevronDown size={16} strokeWidth={2.6} style={{ transform: moreOpen ? 'rotate(180deg)' : undefined, transition: 'transform 180ms' }} />
+          </button>
+          {moreOpen && (
+            <ul className="card overflow-hidden mt-1">
+              {GUIDED.map((g, i) => (
+                <li key={g} style={{ borderTop: i ? '1px solid var(--line)' : undefined }}>
+                  <button type="button" onClick={() => send(g)} className="w-full text-left bg-transparent border-0 t-body px-4 py-3 min-h-[48px] active:bg-[var(--accent-soft)]">
+                    {g}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </>
       ) : (
         <div className="grid gap-4" aria-live="polite">
