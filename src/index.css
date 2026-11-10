@@ -550,6 +550,12 @@ button .font-semibold {
 .row-press {
   transition: opacity 160ms, transform var(--dur-spring-snappy) var(--spring-snappy);
 }
+.row-press[aria-pressed='true'] {
+  margin-inline: -1rem;
+  padding-inline: 1rem;
+  width: calc(100% + 2rem);
+  background: var(--accent-soft);
+}
 .row-press:active {
   opacity: 0.6;
   transform: scale(calc(1 - 0.015 * var(--motion)));
@@ -1018,6 +1024,10 @@ textarea.field {
 }
 .sheet-body:has(.quiz-stage) {
   padding-top: 0;
+}
+/* A toast over a full-height sheet drops below its header. */
+body:has(.sheet-full) .toast-slot {
+  top: calc(74px + var(--safe-t));
 }
 /* A petal on its way from an answer to the flower. */
 .petal-flight {

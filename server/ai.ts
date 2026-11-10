@@ -4,7 +4,7 @@ import { ApiError, FinishReason, GoogleGenAI, ThinkingLevel } from '@google/gena
 import type { Content } from '@google/genai';
 import { z } from 'zod';
 import { parseBrief, renderBrief } from './familyBrief.ts';
-import { alignMembers, checkClaims, sharedHeadline, sharedOnly, sharesTopic, stripClaims } from './claims.ts';
+import { alignMembers, checkClaims, headlineFor, sharedHeadline, sharedOnly, sharesTopic, stripClaims } from './claims.ts';
 import type { FamilyBrief } from './familyBrief.ts';
 
 // Every AI feature runs on Gemini Flash-Lite with minimal thinking: about 1.5s a reply and no
@@ -548,12 +548,6 @@ const TASKS: Record<string, string> = {
   travel: 'Where should we travel?',
 };
 
-/** "Maya and Nai Nai both like Asian stir fry": a headline written from a shared row. */
-export function headlineFor(title: string, members: string[]): string {
-  const who = members.length === 2 ? `${members[0]} and ${members[1]} both` : `${members.slice(0, -1).join(', ')} and ${members[members.length - 1]} all`;
-  return `${who} like ${/^(Asian|Italian|Mexican|Indian|Chinese|Japanese|Thai|Korean|French|Greek)\b/.test(title) ? title : title[0].toLowerCase() + title.slice(1)}`.slice(0, 60);
-}
-
 // --- Router ------------------------------------------------------------------------------------
 export const aiRouter = express.Router();
 
@@ -588,9 +582,9 @@ aiRouter.post('/chat', async (req, res) => {
   const asker = g.brief.asker;
   const task = `You're answering in the app's Ask tab for ${asker}.
 - answer: the answer itself, one sentence of at most 14 words, naming at least one specific food, place, activity, film or person from the saved answers. Never open by describing the answers or announcing a list ("You share some favourites", "Here are some ideas", "Based on"). If the saved answers don't cover the question, say so here.
-- facts: 0–2 lines of at most 10 words that add to the answer (never repeat it), each something the saved answers say, naming exactly who. Put people who share a pick in one line.
-- ideas: 0–2 suggestions of at most 10 words for things not already in the answers, each starting with a verb.
-At most 45 words in total. Call ${asker} "you", never by name, and everyone else by the names shown. Name concrete things rather than style labels. Plain text only: no markdown, headings or emojis, and no closing question.`;
+- facts: 0–1 line of at most 10 words that adds to the answer (never repeats it), something the saved answers say, naming exactly who.
+- ideas: 0–1 suggestion of at most 10 words for something not already in the answers, starting with a verb.
+At most 35 words in total. Call ${asker} "you", never by name, and everyone else by the names shown. Name concrete things rather than style labels. Plain text only: no markdown, headings or emojis, and no closing question.`;
 
   const abort = new AbortController();
   res.on('close', () => abort.abort());
@@ -603,12 +597,11 @@ At most 45 words in total. Call ${asker} "you", never by name, and everyone else
     } else {
       const { answer } = out.data;
       const short = (l: string) => wordCount(l) <= 10;
-      const facts = out.data.facts.filter(short).slice(0, 2);
-      const ideas = out.data.ideas.filter(short).slice(0, 2);
-      // 45 words at most: the last idea goes first, then the last fact.
-      // Counted as shown, with each "Idea:" label.
+      // A phone-sized answer: the answer, one fact and one idea at most, 35 words counted as shown.
+      const facts = out.data.facts.filter(short).slice(0, 1);
+      const ideas = out.data.ideas.filter(short).slice(0, 1);
       const total = () => wordCount([answer, ...facts, ...ideas.map((i) => `Idea: ${i}`)].join(' '));
-      while (total() > 45 && ideas.length + facts.length > 0) (ideas.length > 1 || !facts.length ? ideas : facts).pop();
+      while (total() > 35 && ideas.length + facts.length > 0) (facts.length ? facts : ideas).pop();
       const lines = [answer, ...(facts.length || ideas.length ? [''] : []), ...facts.map((f) => `- ${f}`), ...ideas.map((i) => `- **Idea:** ${i}`)];
       send({ t: youify(tidyChatLine(lines.join('\n'), [...g.brief.members.map((m) => m.name), g.brief.householdName], tasteOptions(g.brief)), asker) });
       send({ done: true, refused: false });

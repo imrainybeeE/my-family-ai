@@ -46,6 +46,7 @@ export function AskView() {
   const [busy, setBusy] = useState(false);
   const [followUps, setFollowUps] = useState<string[]>([]);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [moreFollowUps, setMoreFollowUps] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   // Bumped by every send and New chat, so a reply or follow-up from an older chat is dropped.
   const genRef = useRef(0);
@@ -120,6 +121,7 @@ export function AskView() {
             if (gen !== genRef.current) return;
             // Never suggest something already asked in this chat.
             const asked = new Set(history.filter((m) => m.role === 'user').map((m) => m.content.trim().toLowerCase()));
+            setMoreFollowUps(false);
             setFollowUps(r.suggestions.filter((x) => !asked.has(x.trim().toLowerCase())).slice(0, 3));
           })
           .catch(() => gen === genRef.current && setFollowUps([]));
@@ -245,9 +247,14 @@ export function AskView() {
           </AnimatePresence>
           {!busy && followUps.length > 0 && (
             <div className="grid gap-2 pl-11">
-              {followUps.map((f) => (
+              {(moreFollowUps ? followUps : followUps.slice(0, 1)).map((f) => (
                 <SuggestionButton key={f} text={tidyLine(f, names)} onClick={() => send(f)} small />
               ))}
+              {followUps.length > 1 && !moreFollowUps && (
+                <button type="button" className="btn btn-quiet btn-sm justify-self-start -ml-3" onClick={() => setMoreFollowUps(true)}>
+                  More questions
+                </button>
+              )}
             </div>
           )}
         </div>

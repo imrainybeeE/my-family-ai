@@ -20,6 +20,8 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
   const [stage, setStage] = useState<Stage>('intro');
   const [index, setIndex] = useState(0);
   const [text, setText] = useState('');
+  // The answer just saved shows as one line above the reflection; a tap opens it with its question.
+  const [showSaid, setShowSaid] = useState(false);
   const [reflection, setReflection] = useState<{ text: string; followUp: string | null } | null>(null);
   const [reflecting, setReflecting] = useState(false);
   const [followText, setFollowText] = useState('');
@@ -101,6 +103,7 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
     }
     if (c.signal.aborted) return;
     feel('stitch');
+    setShowSaid(false);
     setStage('reflect');
     setReflecting(true);
     try {
@@ -245,16 +248,16 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
 
         {stage === 'reflect' && (
           <motion.div key={`r${q.id}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="grid gap-4 pt-6">
-            <section className="stock stock-lilac">
-              <h3 className="t-head">{q.question}</h3>
-              <div className="flex items-center justify-between gap-3 mt-3">
-                <p className="t-hand opacity-75">You said</p>
-                <p className="t-small flex items-center gap-1 opacity-75">
-                  <Check size={14} strokeWidth={2.6} aria-hidden /> Answer saved
-                </p>
-              </div>
-              <p className="t-body mt-1">{text.trim()}</p>
-            </section>
+            <button type="button" className="stock stock-lilac text-left w-full border-0" aria-expanded={showSaid} onClick={() => setShowSaid((v) => !v)} style={{ padding: '14px 16px' }}>
+              <span className="flex items-center justify-between gap-3">
+                <span className="t-hand opacity-75">You said</span>
+                <span className="t-small flex items-center gap-1 opacity-75">
+                  <Check size={14} strokeWidth={2.6} aria-hidden /> Saved
+                </span>
+              </span>
+              {showSaid && <span className="block t-small font-semibold mt-2">{q.question}</span>}
+              <span className={`block t-body mt-1 ${showSaid ? '' : 'truncate'}`}>{text.trim()}</span>
+            </button>
             <div className="flex gap-2.5 items-start">
               <span className="shrink-0 w-9 h-9 grid place-items-center -mt-0.5 mr-1.5" aria-hidden>
                 <Felt name="yarnball" size={52} />

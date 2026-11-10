@@ -5,7 +5,7 @@ import { useHousehold } from '../../context/HouseholdContext';
 import { useUI } from '../../App';
 import { FamilyPerson, useAiResource, useFamily } from '../../hooks/useFamily';
 import { ai, Insights } from '../../services/ai';
-import { sharedHeadline, tastePicks } from '../../../server/claims';
+import { headlineFor, restates, sharedHeadline, tastePicks } from '../../../server/claims';
 import { PageHeader } from '../layout/TabBar';
 import { Felt, FELT_FOR_STYLE, FlowerBadge } from '../art/Flower';
 import { Strand, useWidth } from '../art/Garland';
@@ -43,16 +43,15 @@ export function TogetherView() {
     };
   }, [insights.error, brief]);
   const data = insights.data || fallback;
-  // Tapping a shared interest picks out its strand in the circle for a moment.
+  // Tapping a shared interest picks out its strand in the circle and says it as the headline;
+  // tapping it again, or another one, lets go.
   const [lit, setLit] = useState<number | null>(null);
-  const litTimer = useRef<number | null>(null);
-  useEffect(() => () => void (litTimer.current !== null && window.clearTimeout(litTimer.current)), []);
   const light = (i: number) => {
-    feel('select');
-    setLit(i);
-    if (litTimer.current !== null) window.clearTimeout(litTimer.current);
-    litTimer.current = window.setTimeout(() => setLit(null), 1800);
+    feel(lit === i ? 'tap' : 'select');
+    setLit((cur) => (cur === i ? null : i));
   };
+  const litRow = lit !== null ? data?.together[lit] : undefined;
+  const headline = litRow ? headlineFor(litRow.title, litRow.members) : data?.headline || '';
   const waiting = people.filter((p) => !p.style);
   const who = (names: string[]) => names.map(byName).filter(Boolean) as FamilyPerson[];
   const keep = (text: string) => tidyLine(text, brief.members.map((m) => m.name));
@@ -90,9 +89,13 @@ export function TogetherView() {
             </div>
           ) : (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <p className="t-head mt-2" style={{ fontSize: '1.375rem', lineHeight: '26px', textWrap: 'balance' }}>
-                {keep(data.headline)}
-              </p>
+              <div aria-live="polite">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.p key={headline} className="t-head mt-2" style={{ fontSize: '1.375rem', lineHeight: '26px', textWrap: 'balance' }} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.16 }}>
+                    {keep(headline)}
+                  </motion.p>
+                </AnimatePresence>
+              </div>
               {waiting.length > 0 && (
                 <p className="t-small ink-2 mt-2">
                   {joinNames(waiting.map((p) => p.name))} {waiting.length === 1 ? 'hasn’t' : 'haven’t'} answered yet
@@ -102,10 +105,10 @@ export function TogetherView() {
               {data.together.length > 0 && (
                 <>
                   <SectionTitle>Shared interests</SectionTitle>
-                  <ul className="card px-4" aria-label="Things you enjoy together">
+                  <ul className="card px-4 overflow-hidden" aria-label="Things you enjoy together">
                     {data.together.map((t, i) => (
                       // Who shares it is a fact the app knows, so every row states it directly rather than in AI words.
-                      <Row key={i} first={i === 0} yarn={YARNS[i % YARNS.length]} people={who(t.members)} title={t.title} body={keep(joinNames(who(t.members).map((p) => p.name)))} onPress={() => light(i)} />
+                      <Row key={i} first={i === 0} yarn={YARNS[i % YARNS.length]} people={who(t.members)} title={t.title} body={keep(joinNames(who(t.members).map((p) => p.name)))} pressed={lit === i} onPress={() => light(i)} />
                     ))}
                   </ul>
                 </>
@@ -133,7 +136,7 @@ export function TogetherView() {
                   const idea = data.ideas[i];
                   const names = who(idea.members).filter((p) => !p.isYou).map((p) => p.name);
                   const withWho = names.length ? ` with ${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0]}` : '';
-                  return <Ticket index={i} title={idea.title} why={keep(idea.why)} people={who(idea.members)} onPlan={() => ui.askAbout(`Help me plan ${idea.title.replace(/^([A-Z])(?=[a-z])/, (c) => c.toLowerCase())}${withWho}.`)} />;
+                  return <Ticket index={i} title={idea.title} why={restates(idea.why, idea.title, brief.members.map((m) => m.name)) ? '' : keep(idea.why)} people={who(idea.members)} onPlan={() => ui.askAbout(`Help me plan ${idea.title.replace(/^([A-Z])(?=[a-z])/, (c) => c.toLowerCase())}${withWho}.`)} />;
                 }}
               </IdeaPager>
 
@@ -261,11 +264,11 @@ function FamilyCircle({ people: given, links, lit, onOpen }: { people: FamilyPer
 }
 
 /** One observation: who, what, and an optional handwritten note. */
-function Row({ first, people, title, body, yarn, onPress, children }: { first: boolean; people: FamilyPerson[]; title: string; body: string; yarn?: string; /** Makes the row a button, e.g. to pick out its strand. */ onPress?: () => void; children?: React.ReactNode }) {
+function Row({ first, people, title, body, yarn, onPress, pressed, children }: { first: boolean; people: FamilyPerson[]; title: string; body: string; yarn?: string; /** Makes the row a toggle, e.g. to pick out its strand. */ onPress?: () => void; pressed?: boolean; children?: React.ReactNode }) {
   const Tag = onPress ? 'button' : 'div';
   return (
     <li style={{ borderTop: first ? 0 : '1px solid var(--line)' }}>
-      <Tag className={`block w-full text-left py-4 bg-transparent border-0 ${onPress ? 'row-press' : ''}`} {...(onPress ? { type: 'button' as const, onClick: onPress } : {})}>
+      <Tag className={`block w-full text-left py-4 bg-transparent border-0 ${onPress ? 'row-press' : ''}`} {...(onPress ? { type: 'button' as const, onClick: onPress, 'aria-pressed': Boolean(pressed) } : {})}>
       <div className="flex items-center justify-between gap-3">
         <h3 className="t-head flex items-start gap-2 min-w-0">
           {yarn && <span aria-hidden className="shrink-0 rounded-full mt-[0.55em]" style={{ width: 14, height: 4, background: yarn }} />}
@@ -348,7 +351,7 @@ function Ticket({ index, title, why, people, onPlan }: { index: number; title: s
     <article className={`stock ${TICKETS[index % 3]} relative flex flex-col`} style={{ padding: 16 }}>
       <span className={`tape ${TAPES[index % 3]}`} style={{ top: -10, left: 18, transform: 'rotate(-4deg)' }} aria-hidden />
       <h3 className="t-title mt-1" style={{ fontSize: '1.375rem', lineHeight: '26px' }}>{title}</h3>
-      <p className="t-small mt-2 opacity-85">{why}</p>
+      {why && <p className="t-small mt-2 opacity-85">{why}</p>}
       <div className="flex items-center justify-between gap-2 mt-4">
         <span className="flex -space-x-2" aria-label={people.length ? `Suits ${people.map((p) => p.name).join(', ')}` : undefined}>
           {people.slice(0, 4).map((p) => (

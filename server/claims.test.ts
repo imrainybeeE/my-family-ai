@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sharedOnly, alignMembers, checkClaims, sharedHeadline, sharedPickLines, sharesTopic, stem, stripClaims } from './claims.ts';
+import { sharedOnly, alignMembers, checkClaims, headlineFor, restates, sharedHeadline, sharedPickLines, sharesTopic, stem, stripClaims } from './claims.ts';
 import { buildBrief } from '../src/services/brief.ts';
 import { DEMO_HOUSEHOLD, DEMO_MEMBERS, DEMO_RESPONSES, DEMO_ACTIVE_MEMBER } from '../src/data/demoFamily.ts';
 
@@ -106,4 +106,16 @@ test('a shared row is pinned to one pick two people share', () => {
   assert.deepEqual(none.together, []);
   assert.equal(none.headline, 'No shared picks yet');
   assert.deepEqual(none.ideas, []);
+});
+
+test('headlineFor names two people, and counts them when names run long', () => {
+  assert.equal(headlineFor('Asian stir fry', ['Maya', 'Nai Nai']), 'Maya and Nai Nai both like Asian stir fry');
+  assert.equal(headlineFor('Park walks', ['Maya', 'Dad']), 'Maya and Dad both like park walks');
+  const long = headlineFor('Mystery films and shows', ['Grandma Rosalind', 'Uncle Bartholomew', 'Maximilian']);
+  assert.equal(long, 'Three people like mystery films and shows');
+});
+
+test('restates spots a line that only repeats its title', () => {
+  assert.equal(restates('Mum and Nai Nai both like baking cookies.', 'Baking cookies', ['Mum', 'Nai Nai']), true);
+  assert.equal(restates('Mum and Nai Nai want to learn dumpling-folding.', 'Make dumplings', ['Mum', 'Nai Nai']), false);
 });

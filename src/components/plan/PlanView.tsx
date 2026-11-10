@@ -346,7 +346,7 @@ const IDEA_STOCK = ['stock-butter', 'stock-pink', 'stock-sky'];
 
 /** Two to four short options sit in an even two-column grid; anything else wraps as chips. */
 function paired(options: string[]) {
-  return options.length >= 2 && options.length <= 4 && options.every((o) => o.length <= 18);
+  return options.length >= 2 && options.length <= 4 && options.every((o) => o.length <= 14);
 }
 
 /** One idea: the title and one line up front; the reasoning one tap away. */

@@ -19,7 +19,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={show}>
       {children}
       {createPortal(
-      <div className="fixed inset-x-0 top-[calc(10px+var(--safe-t))] z-[60] flex justify-center pointer-events-none" aria-live="polite">
+      <div className="toast-slot fixed inset-x-0 top-[calc(10px+var(--safe-t))] z-[60] flex justify-center pointer-events-none" aria-live="polite">
         <AnimatePresence>
           {message && (
             <motion.div

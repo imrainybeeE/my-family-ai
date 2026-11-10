@@ -80,7 +80,9 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
   const answersRef = useRef<Answers>({});
   answersRef.current = answers;
   const advanceTimer = useRef<number | null>(null);
-  const headingRef = useRef<HTMLHeadingElement>(null);
+  // Where the bloom's flower lands on the result card, measured as the reveal begins.
+  const bloomBox = useRef<HTMLDivElement>(null);
+  const [landing, setLanding] = useState<{ y: number; origin: string }>({ y: -150, origin: '50% 50%' });
   const cancelAdvance = () => {
     if (advanceTimer.current !== null) window.clearTimeout(advanceTimer.current);
     advanceTimer.current = null;
@@ -104,12 +106,6 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
     runRef.current = null;
   };
   useEffect(() => endRun, [open, draftKey]);
-  useEffect(() => {
-    if (stage !== 'ask') return;
-    // Each question starts at the top of the sheet, whatever was scrolled before.
-    headingRef.current?.closest('.sheet-body')?.scrollTo({ top: 0 });
-    headingRef.current?.focus({ preventScroll: true });
-  }, [index, stage]);
 
   useEffect(() => {
     if (!open) return;
@@ -171,7 +167,11 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
     // The bloom is the app's one big moment: the sewn flower comes to the middle and winds itself
     // tight, the real one springs open and throws its petals as its colour washes over the page,
     // and only then does the result card arrive.
-    run.timer = window.setTimeout(() => live() && setStage('reveal'), Math.max(0, (reduceMotion ? 900 : 2600) - (Date.now() - started)));
+    run.timer = window.setTimeout(() => {
+      if (!live()) return;
+      measureLanding();
+      setStage('reveal');
+    }, Math.max(0, (reduceMotion ? 900 : 2600) - (Date.now() - started)));
 
     // Ask the AI for a personal note about this bloom, then keep it with the answers.
     if (!activeMember) return;
@@ -192,6 +192,22 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
     } catch {
       if (live()) setNoteState('failed');
     }
+  };
+
+  /**
+   * The opened flower flies to where the card's flower will be, so the two read as one. The card's
+   * flower centre sits 136px below the top of the sheet body: 8px padding, 8px gap, 16px of tape and
+   * half the 208px flower panel.
+   */
+  const measureLanding = () => {
+    const box = bloomBox.current;
+    const body = box?.closest('.sheet-body');
+    const holder = box?.parentElement;
+    if (!box || !body || !holder) return;
+    const b = box.getBoundingClientRect();
+    const h = holder.getBoundingClientRect();
+    const target = body.getBoundingClientRect().top + 136;
+    setLanding({ y: target - (b.top + b.height / 2), origin: `50% ${b.top + b.height / 2 - h.top}px` });
   };
 
   const goNext = () => {
@@ -322,9 +338,7 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
             </div>
             <AnimatePresence mode="wait" initial={false}>
               <motion.div key={`q${q.id}`} initial={{ opacity: 0, x: 28 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -28 }} transition={{ duration: 0.2, ease: [0.3, 0.7, 0.4, 1] }} className="pt-5">
-                <h3 ref={headingRef} tabIndex={-1} className="t-title outline-none">
-                  {q.question}
-                </h3>
+                <QuestionHeading text={q.question} />
               <motion.p
                 key={limitNudge}
                 className="t-small ink-2 mt-1.5"
@@ -373,15 +387,20 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
           </motion.div>
         )}
 
+      </AnimatePresence>
+      {/* The bloom hands over to the result card: the two overlap, the leaving one lifted out of the flow. */}
+      <AnimatePresence mode="popLayout">
         {stage === 'blooming' && profile && (
           <motion.div
             key="blooming"
             initial={{ opacity: 1 }}
-            // The opened flower drifts up and shrinks toward its place on the card, so it reads as one flower.
-            exit={{ opacity: 0, scale: 0.73, y: -150, transition: { duration: 0.35, ease: [0.3, 0.7, 0.4, 1] } }}
+            // The opened flower flies to its place on the card and shrinks to the card's size (168 of 230),
+            // while the card fades in under it: one flower, never a blank frame.
+            style={{ transformOrigin: landing.origin, zIndex: 5, position: 'relative' }}
+            exit={reduceMotion ? { opacity: 0, transition: { duration: 0.15 } } : { y: landing.y, scale: 168 / 230, opacity: [1, 1, 0], transition: { duration: 0.42, ease: [0.3, 0.7, 0.4, 1], opacity: { duration: 0.46, times: [0, 0.88, 1] } } }}
             className="grid place-items-center place-content-center text-center gap-4 min-h-[calc(100dvh-160px-var(--safe-t)-var(--safe-b))]"
           >
-            <div className="relative grid place-items-center" style={{ width: 240, height: 240 }}>
+            <div ref={bloomBox} className="relative grid place-items-center" style={{ width: 240, height: 240 }}>
               {/* The flower you sewed comes down from the stage, then winds itself tight. */}
               <motion.div
                 className="absolute"
@@ -397,7 +416,7 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
                 <Flower style={profile.primaryStyle} size={230} bloom delay={reduceMotion ? 0.15 : 0.74} />
               </div>
             </div>
-            <motion.div className="relative" initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduceMotion ? 0.25 : 1.55, duration: reduceMotion ? 0.2 : 0.4 }}>
+            <motion.div className="relative" initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.1 } }} transition={{ delay: reduceMotion ? 0.25 : 1.55, duration: reduceMotion ? 0.2 : 0.4 }}>
               <p className="t-title">{FLOWERS[profile.primaryStyle].flower}</p>
               <p className="t-body ink-2 mt-1">{profile.primaryStyle}</p>
             </motion.div>
@@ -405,7 +424,7 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
         )}
 
         {stage === 'reveal' && profile && (
-          <motion.div key="reveal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid gap-5 pt-2">
+          <motion.div key="reveal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reduceMotion ? 0.2 : 0.32 }} className="grid gap-5 pt-2">
             <SpecimenCard name={name} top={profile.primaryStyle} second={profile.secondaryStyle} bloom pinOnly />
             <section className="card p-5" aria-live="polite" aria-label="A note for you">
               {noteState === 'loading' && (
@@ -453,5 +472,19 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
         document.body
       )}
     </Sheet>
+  );
+}
+
+/** The question heading. It takes focus as it arrives (after the last one has left), and each question starts at the top. */
+function QuestionHeading({ text }: { text: string }) {
+  const ref = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    ref.current?.closest('.sheet-body')?.scrollTo({ top: 0 });
+    ref.current?.focus({ preventScroll: true });
+  }, []);
+  return (
+    <h3 ref={ref} tabIndex={-1} className="t-title outline-none">
+      {text}
+    </h3>
   );
 }
