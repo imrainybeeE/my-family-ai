@@ -775,7 +775,7 @@ aiRouter.post('/plan/ideas', async (req, res) => {
     `The family wants help with "${taskTitle}". People joining: ${who.join(', ')}.
 Give exactly 3 options that fit these people, using their saved answers and practical answers. Every practical answer is binding for all three options: if they chose take-out, all three are take-out; if they chose at home, all three are at home; if they chose right now, none of them is for this evening or the weekend. Within those limits, make the three clearly different: for food, three different cuisines drawn from different people's picks (never two dishes of the same kind); otherwise different activities. Keep them the same kind of thing: for "What should we eat?", three dinners unless the practical answers ask for snacks or another meal. Each summary names the actual food or activity (not "a rice dish"). If a kind of meal was chosen, give three different dishes within it.
 - title: under 5 words.
-- summary: one sentence under 14 words describing the idea, without repeating words from the title.
+- summary: one sentence of 10–14 words giving one new practical detail the title doesn't: a key ingredient or step, how long it takes, or who does which part (for example "Leo grates the cheese while Dad rolls out the dough"). Never just restate the dish or activity and where it happens.
 - why: one sentence under 18 words on why it fits, naming people and what in their answers points to it.
 - members: the names it especially suits.
 - tradeoff: one short, honest sentence under 12 words on what you give up compared with the other options.

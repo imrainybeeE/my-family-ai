@@ -82,6 +82,21 @@ export function AiText({ text, className = '' }: { text: string; className?: str
   return <div className={`prose-ai ${className}`}>{blocks}</div>;
 }
 
+/* ---------- QuestionHeading: takes focus as it arrives (after the last one has left) ---------- */
+export function QuestionHeading({ text, className = 't-title' }: { text: string; className?: string }) {
+  const ref = React.useRef<HTMLHeadingElement>(null);
+  React.useEffect(() => {
+    // Each question starts at the top of its sheet, with focus on the question.
+    ref.current?.closest('.sheet-body')?.scrollTo({ top: 0 });
+    ref.current?.focus({ preventScroll: true });
+  }, []);
+  return (
+    <h3 ref={ref} tabIndex={-1} className={`${className} outline-none`}>
+      {text}
+    </h3>
+  );
+}
+
 /* ---------- CopyButton ---------- */
 export function CopyButton({ value, label = 'Copy', className = 'btn btn-sm' }: { value: string; label?: string; className?: string }) {
   const toast = useToast();

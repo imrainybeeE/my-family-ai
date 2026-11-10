@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { ChevronLeft } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
-import { Thinking } from '../ui/bits';
+import { QuestionHeading, Thinking } from '../ui/bits';
 import { onRovingKeyDown, rovingTabIndex } from '../ui/roving';
 import { SpecimenCard } from '../profile/SpecimenCard';
 import { Flower } from '../art/Flower';
@@ -411,7 +411,7 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
                 <StitchedFlower petals={petals} size={220} sewn />
               </motion.div>
               {/* The petals fly out from under the flower's rim once it is mostly open. */}
-              <PetalBurst styles={[profile.primaryStyle, profile.secondaryStyle]} delay={0.86} count={14} />
+              <PetalBurst styles={[profile.primaryStyle, profile.secondaryStyle]} delay={0.86} count={14} floor={112} />
               <div className="relative">
                 <Flower style={profile.primaryStyle} size={230} bloom delay={reduceMotion ? 0.15 : 0.74} />
               </div>
@@ -475,16 +475,3 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
   );
 }
 
-/** The question heading. It takes focus as it arrives (after the last one has left), and each question starts at the top. */
-function QuestionHeading({ text }: { text: string }) {
-  const ref = useRef<HTMLHeadingElement>(null);
-  useEffect(() => {
-    ref.current?.closest('.sheet-body')?.scrollTo({ top: 0 });
-    ref.current?.focus({ preventScroll: true });
-  }, []);
-  return (
-    <h3 ref={ref} tabIndex={-1} className="t-title outline-none">
-      {text}
-    </h3>
-  );
-}

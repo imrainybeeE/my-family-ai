@@ -38,7 +38,7 @@ export function SpecimenCard({ name, top, second, bloom = false, pinOnly = false
             <Flower style={second} size={64} />
           </motion.div>
         </div>
-        <div className="px-5 pt-4 pb-5">
+        <motion.div className="px-5 pt-4 pb-5" initial={pinOnly && !reduce ? { opacity: 0 } : false} animate={{ opacity: 1 }} transition={{ delay: 0.2, duration: 0.12 }}>
           <p className="t-hand ink-2">{name}</p>
           <h3 className="t-title mt-1">
             {top} <span aria-hidden className="ink-3">·</span>
@@ -47,7 +47,7 @@ export function SpecimenCard({ name, top, second, bloom = false, pinOnly = false
           <p className="t-small ink-2 mt-1">
             {f.flower} with a touch of {FLOWERS[second].flower.toLowerCase()}
           </p>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

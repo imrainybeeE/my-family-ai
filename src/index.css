@@ -1025,6 +1025,11 @@ textarea.field {
 .sheet-body:has(.quiz-stage) {
   padding-top: 0;
 }
+/* The Ask composer's hint reads as text you can replace, not as a disabled field. */
+#ask-input::placeholder {
+  color: var(--ink-3);
+  opacity: 1;
+}
 /* A toast over a full-height sheet drops below its header. */
 body:has(.sheet-full) .toast-slot {
   top: calc(74px + var(--safe-t));

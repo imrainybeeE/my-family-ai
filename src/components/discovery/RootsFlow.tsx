@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Check, ChevronLeft } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
-import { Thinking } from '../ui/bits';
+import { QuestionHeading, Thinking } from '../ui/bits';
 import { onRovingKeyDown, rovingTabIndex } from '../ui/roving';
 import { Felt } from '../art/Flower';
 import { YarnProgress } from '../art/YarnProgress';
@@ -28,7 +28,6 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const reflectRef = useRef<AbortController | null>(null);
-  const headingRef = useRef<HTMLHeadingElement>(null);
   const saved = myAnswers.advancedAnswers || {};
   const savedRef = useRef(saved);
   savedRef.current = saved;
@@ -58,12 +57,6 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, activeMember?.id, q.id]);
 
-  useEffect(() => {
-    if (stage !== 'ask') return;
-    // Each question starts at the top of the sheet, with focus on the question.
-    headingRef.current?.closest('.sheet-body')?.scrollTo({ top: 0 });
-    headingRef.current?.focus({ preventScroll: true });
-  }, [index, stage]);
 
   useEffect(() => () => reflectRef.current?.abort(), []);
   useEffect(() => {
@@ -205,9 +198,7 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
                 {q.theme}
                 <span className="sr-only">. Question {index + 1} of {ADVANCED_QUESTIONS.length}.</span>
               </p>
-              <h3 ref={headingRef} tabIndex={-1} className="t-title mt-1.5 outline-none">
-                {q.question}
-              </h3>
+              <QuestionHeading key={q.id} text={q.question} className="t-title mt-1.5" />
             </section>
             {quickPicks.length > 0 && (
               <div
