@@ -9,7 +9,7 @@ import { DiscoveryStyleId } from '../../types';
  * A burst of felt petals thrown out from a flower as it opens: the same rendered petals the quiz sews
  * on, arcing out, tumbling and settling with a little gravity. Played once; skipped with reduced motion.
  */
-export function PetalBurst({ styles, count = 10, delay = 0, radius = 170 }: { styles: DiscoveryStyleId[]; count?: number; delay?: number; radius?: number }) {
+export function PetalBurst({ styles, count = 10, delay = 0, radius = 170, floor = Infinity }: { styles: DiscoveryStyleId[]; count?: number; delay?: number; radius?: number; /** How far below the centre a falling petal may reach, in px, so it never crosses text under the flower. */ floor?: number }) {
   const reduce = useReducedMotion();
   const petals = useMemo(() => {
     const palette = styles.length ? styles : STYLE_ORDER;
@@ -17,17 +17,20 @@ export function PetalBurst({ styles, count = 10, delay = 0, radius = 170 }: { st
       // Spread evenly with a little jitter, so the burst reads as a ring and not a spray.
       const angle = (i / count) * Math.PI * 2 + Math.sin(i * 12.9898) * 0.25;
       const reach = radius * (0.7 + ((i * 7) % 5) * 0.08);
+      const size = 34 + ((i * 5) % 4) * 6;
+      const fall = 40 + ((i * 13) % 4) * 18;
       return {
         x: Math.cos(angle) * reach,
-        y: Math.sin(angle) * reach * 0.85,
-        fall: 40 + ((i * 13) % 4) * 18,
+        // Petals thrown downward land short of the floor, spreading sideways instead.
+        y: Math.min(Math.sin(angle) * reach * 0.85, floor - fall - size / 2),
+        fall,
         spin: (i % 2 ? 1 : -1) * (160 + ((i * 31) % 5) * 50),
-        size: 34 + ((i * 5) % 4) * 6,
+        size,
         style: palette[i % palette.length],
         tilt: (angle * 180) / Math.PI + 90,
       };
     });
-  }, [styles, count, radius]);
+  }, [styles, count, radius, floor]);
 
   if (reduce) return null;
   return (

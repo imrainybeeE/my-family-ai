@@ -164,7 +164,7 @@ export function PlanTiles({ onPick }: { onPick: (t: PlanTask) => void }) {
           key={task}
           type="button"
           onClick={() => onPick(task)}
-          className="flex flex-col items-center gap-1 bg-transparent border-0 py-1 rounded-2xl transition-transform active:scale-95"
+          className="press flex flex-col items-center gap-1 bg-transparent border-0 py-1 rounded-2xl"
           aria-label={`Plan: ${label}`}
         >
           <Art size={84} />

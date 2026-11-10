@@ -1,6 +1,6 @@
 // Captures the main screens of the demo family on an iPhone-sized viewport, in light and dark.
-// Usage: node scripts/screenshots.mjs [baseUrl] [outDir]
-// Needs the app running (npm run dev) and, for AI content, ANTHROPIC_API_KEY on the server.
+// Usage: node scripts/screenshots.mjs [baseUrl] [outDir] [themes]   (themes: light,dark)
+// Needs the app running (npm run dev) and, for AI content, GEMINI_API_KEY on the server.
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -39,7 +39,7 @@ const shot = async (page, name) => {
 const idle = (page, timeout = 60000) =>
   page.waitForFunction(() => !document.querySelector('[aria-busy="true"], [role="status"]'), null, { timeout }).catch(() => {});
 
-for (const theme of ['light', 'dark']) {
+for (const theme of (process.argv[4] || 'light,dark').split(',')) {
   const { ctx, page } = await phone(theme);
   // A fresh query string each time forces a full reload, which resets the demo family.
   const open = (hash) => page.goto(`${base}/?demo=1&theme=${theme}&v=${++visit}#${hash}`);
@@ -65,9 +65,12 @@ for (const theme of ['light', 'dark']) {
   await open('together');
   await page.getByText('Shared interests').waitFor({ timeout: 60000 });
   await shot(page, `${theme}-05-together`);
-  const ideasY = await page.getByRole('heading', { name: 'Ideas to try' }).evaluate((el) => el.getBoundingClientRect().top + window.scrollY - 90);
-  await scrollTo(ideasY);
-  await shot(page, `${theme}-06-together-ideas`);
+  // The helper sometimes has no idea worth showing; the page is complete without them.
+  const ideas = page.getByRole('heading', { name: 'Ideas to try' });
+  if (await ideas.waitFor({ timeout: 5000 }).then(() => true, () => false)) {
+    await scrollTo(await ideas.evaluate((el) => el.getBoundingClientRect().top + window.scrollY - 90));
+    await shot(page, `${theme}-06-together-ideas`);
+  }
 
   if (theme === 'light') {
     await open('plan');

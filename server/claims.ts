@@ -82,6 +82,46 @@ export function sharedHeadline(brief: FamilyBrief): string {
   return `${who} picked ${option}`;
 }
 
+const COUNT = ['', 'One person', 'Two people', 'Three people', 'Four people', 'Five people', 'Six people'];
+/**
+ * "Maya and Nai Nai both like Asian stir fry": a headline written from a shared row. When the names
+ * would make it too long for the 60-character headline, it counts the people instead, never cut short.
+ */
+export function headlineFor(title: string, members: string[]): string {
+  const topic = /^(Asian|Italian|Mexican|Indian|Chinese|Japanese|Thai|Korean|French|Greek)\b/.test(title) ? title : title[0].toLowerCase() + title.slice(1);
+  const who = members.length === 2 ? `${members[0]} and ${members[1]} both` : `${members.slice(0, -1).join(', ')} and ${members[members.length - 1]} all`;
+  const named = `${who} like ${topic}`;
+  if (named.length <= 60) return named;
+  const counted = `${COUNT[members.length] || `${members.length} people`} like ${topic}`;
+  return counted.length <= 60 ? counted : title;
+}
+
+/**
+ * True when a line only restates its title (and who it is for): once names and filler are dropped,
+ * every word it has left is already in the title. Such a line adds nothing under the title.
+ */
+export function restates(line: string, title: string, names: string[] = []): boolean {
+  const skip = new Set([...STOP, ...names.flatMap((n) => words(n)), 'both', 'all', 'everyone', 'together', 'like', 'likes', 'love', 'loves', 'enjoy', 'enjoys', 'want', 'wants', 'picked', 'chose', 'would', 'could', 'some', 'this', 'that', 'they', 'them', 'their', 'you', 'who']);
+  const keys = new Set(words(title).map(stem));
+  const rest = words(line).filter((w) => w.length >= 3 && !skip.has(w));
+  return rest.length > 0 ? rest.every((w) => keys.has(stem(w))) : true;
+}
+
+/** A plan line that sounds specific but names no real work ("measures the precise ingredients", "helps around the table"). */
+export function vagueDetail(text: string): boolean {
+  return /\b(the |some |all the )?(precise |fresh |main |right |needed |basic )?ingredients\b|\bhelps? (out )?(around|with (everything|the cooking|cooking|prep|the prep))\b|\bsets? up the (cooking )?station\b|\beveryone helps\b|\bgathers? (a)?round the (\w+ )?table\b/i.test(text);
+}
+
+/** Padding a short question doesn't need: "go explore together next" is just "explore". */
+export function paddedQuestion(text: string): boolean {
+  return /\btogether next\b|\bgo (explore|visit|try|discover)\b|\b(explore|visit|try|discover|go|watch|play|read) together\?$|\bnext\?$/i.test(text);
+}
+
+/** A suggestion built as "What baking should…", which nobody would type. */
+export function awkwardAsk(text: string): boolean {
+  return /^what \w+ing (should|could|can)\b/i.test(text.trim());
+}
+
 /** Lines for the prompt: who shares each pick, so the model never has to work it out. */
 export function sharedPickLines(brief: FamilyBrief): string[] {
   return tastePicks(brief)

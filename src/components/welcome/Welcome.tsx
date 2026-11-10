@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
+import { feel } from '../../feel/feel';
 import { useHousehold } from '../../context/HouseholdContext';
 import { CreateFamily } from '../onboarding/CreateFamily';
 import { JoinFamily } from '../onboarding/JoinFamily';
@@ -23,9 +24,11 @@ export function Welcome() {
   const [sheet, setSheet] = useState<'create' | 'join' | null>(null);
   const [ref, w] = useWidth<HTMLDivElement>();
   const k = w / 393;
+  const reduce = useReducedMotion();
 
   return (
     <div className="min-h-[100dvh] flex flex-col overflow-hidden" style={{ paddingBottom: 'calc(24px + var(--safe-b))' }}>
+      {/* The cover is a loose flat-lay: every piece can be picked up, moved about and dropped back. */}
       <div ref={ref} className="relative shrink-0" style={{ height: HERO * k }} aria-hidden>
         <svg className="absolute inset-0 overflow-visible" width={w} height={HERO * k}>
           <g transform={`scale(${k})`}>
@@ -35,13 +38,23 @@ export function Welcome() {
         {SPREAD.map((f, i) => (
           <motion.div
             key={f.name}
-            className="absolute"
+            className="loose absolute"
             style={{ left: f.x * k, top: f.y * k, width: f.size * k }}
             initial={{ opacity: 0, scale: 0.7, rotate: f.r - 20 }}
             animate={{ opacity: 1, scale: 1, rotate: f.r }}
             transition={{ type: 'spring', stiffness: 160, damping: 17, delay: 0.08 * i }}
+            drag={!reduce}
+            dragSnapToOrigin
+            dragElastic={0.6}
+            dragTransition={{ bounceStiffness: 190, bounceDamping: 11 }}
+            whileDrag={{ scale: 1.08, rotate: f.r + (i % 2 ? 9 : -9), zIndex: 5 }}
+            onDragStart={() => feel('tap')}
+            onDragEnd={() => feel('land')}
           >
-            <Felt name={f.name} size={Math.round(f.size * k)} />
+            {/* Each piece breathes a little on its own, so the cover is never quite still. */}
+            <motion.div animate={reduce ? undefined : { y: [0, i % 2 ? -5 : 5, 0], rotate: [0, i % 2 ? 2 : -2, 0] }} transition={{ duration: 5 + (i % 3) * 1.3, repeat: Infinity, ease: 'easeInOut', delay: 1.2 + i * 0.4 }}>
+              <Felt name={f.name} size={Math.round(f.size * k)} />
+            </motion.div>
           </motion.div>
         ))}
       </div>

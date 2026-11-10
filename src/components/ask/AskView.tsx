@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { createPortal } from 'react-dom';
+import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'motion/react';
 import { ArrowUp, ChevronDown, RotateCcw } from 'lucide-react';
 import { useHousehold } from '../../context/HouseholdContext';
 import { useUI } from '../../App';
@@ -45,11 +46,13 @@ export function AskView() {
   const [busy, setBusy] = useState(false);
   const [followUps, setFollowUps] = useState<string[]>([]);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [moreFollowUps, setMoreFollowUps] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   // Bumped by every send and New chat, so a reply or follow-up from an older chat is dropped.
   const genRef = useRef(0);
   const endRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLFormElement>(null);
+  const present = useIsPresent();
   const [composerH, setComposerH] = useState(54);
   useEffect(() => {
     const el = composerRef.current;
@@ -90,15 +93,24 @@ export function AskView() {
       abortRef.current = controller;
       let answer = '';
       try {
-        const { refused } = await streamChat(
-          brief,
-          history.map(({ role, content }) => ({ role, content })),
-          (chunk) => {
-            answer += chunk;
-            setMessages((list) => list.map((m) => (m.id === replyId ? { ...m, content: answer } : m)));
-          },
-          controller.signal
-        );
+        const ask = () =>
+          streamChat(
+            brief,
+            history.map(({ role, content }) => ({ role, content })),
+            (chunk) => {
+              answer += chunk;
+              setMessages((list) => list.map((m) => (m.id === replyId ? { ...m, content: answer } : m)));
+            },
+            controller.signal
+          );
+        // The helper's busy spells are short: a reply that fails before its first word is asked for
+        // once more, quietly, while the yarn ball is still thinking.
+        const { refused } = await ask().catch(async (err) => {
+          if ((err as Error)?.name === 'AbortError' || answer) throw err;
+          await new Promise((r) => setTimeout(r, 900));
+          if (controller.signal.aborted) throw err;
+          return ask();
+        });
         if (gen === genRef.current) feel('arrive');
         if (refused || !answer.trim()) {
           answer = 'I can’t help with that one. Try asking about your family’s answers, plans or things to do together.';
@@ -109,6 +121,7 @@ export function AskView() {
             if (gen !== genRef.current) return;
             // Never suggest something already asked in this chat.
             const asked = new Set(history.filter((m) => m.role === 'user').map((m) => m.content.trim().toLowerCase()));
+            setMoreFollowUps(false);
             setFollowUps(r.suggestions.filter((x) => !asked.has(x.trim().toLowerCase())).slice(0, 3));
           })
           .catch(() => gen === genRef.current && setFollowUps([]));
@@ -204,7 +217,7 @@ export function AskView() {
                   </p>
                 ) : (
                   <>
-                    <HelperAvatar />
+                    <HelperAvatar rolling={!m.content && !m.error} />
                     <div className="card px-4 py-3.5 flex-1 min-w-0" style={{ borderRadius: '6px 20px 20px 20px' }}>
                       {m.content ? (
                         <AiText text={keepNames(m.content, names)} className="t-body lead" />
@@ -234,15 +247,23 @@ export function AskView() {
           </AnimatePresence>
           {!busy && followUps.length > 0 && (
             <div className="grid gap-2 pl-11">
-              {followUps.map((f) => (
+              {(moreFollowUps ? followUps : followUps.slice(0, 1)).map((f) => (
                 <SuggestionButton key={f} text={tidyLine(f, names)} onClick={() => send(f)} small />
               ))}
+              {followUps.length > 1 && !moreFollowUps && (
+                <button type="button" className="btn btn-quiet btn-sm justify-self-start -ml-3" onClick={() => setMoreFollowUps(true)}>
+                  More questions
+                </button>
+              )}
             </div>
           )}
         </div>
       )}
       <div ref={endRef} />
 
+      {/* The composer floats with the tab bar, outside the page that slides between tabs. */}
+      {createPortal(
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: present ? 1 : 0 }} transition={{ duration: 0.16 }}>
       {/* Page behind the composer and tab bar, fading in above them, so nothing shows between them. */}
       <div aria-hidden className="scrim fixed z-[19] inset-x-0 bottom-0 mx-auto max-w-[460px]" style={{ height: `calc(var(--tabbar-top) + ${composerH}px + 32px + var(--safe-b))`, ['--scrim-mask' as string]: 'linear-gradient(to bottom, transparent, #000 24px)' }} />
       <form
@@ -280,10 +301,13 @@ export function AskView() {
             }
           }}
         />
-        <button type="submit" className="shrink-0 grid place-items-center border-0 rounded-[10px] transition-opacity" style={busy || !input.trim() ? { height: 44, width: 44, background: 'var(--accent-soft)', color: 'var(--accent-ink)', opacity: 0.7 } : { height: 44, width: 44, background: 'var(--accent)', color: 'var(--on-accent)' }} disabled={busy || !input.trim()} aria-label="Send">
+        <button type="submit" className="shrink-0 grid place-items-center border-0 rounded-full transition-[opacity,transform] active:scale-90" style={busy || !input.trim() ? { height: 44, width: 44, background: 'var(--accent-soft)', color: 'var(--accent-ink)', opacity: 0.7 } : { height: 44, width: 44, background: 'var(--accent)', color: 'var(--on-accent)' }} disabled={busy || !input.trim()} aria-label="Send">
           <ArrowUp size={22} strokeWidth={2.8} />
         </button>
       </form>
+        </motion.div>,
+        document.querySelector('.app-column') || document.body
+      )}
     </div>
   );
 }
@@ -302,10 +326,17 @@ function SuggestionButton({ text, onClick, small }: { text: string; onClick: () 
   );
 }
 
-function HelperAvatar() {
+/** The helper is a ball of yarn. It rocks on the spot while it thinks, and settles when the answer lands. */
+function HelperAvatar({ rolling = false }: { rolling?: boolean }) {
+  const reduce = useReducedMotion();
   return (
     <span className="shrink-0 w-9 h-9 grid place-items-center -mt-0.5" aria-hidden>
-      <Felt name="yarnball" size={44} />
+      <motion.span
+        animate={rolling && !reduce ? { rotate: [-16, 16, -16], y: [0, -3, 0, -3, 0] } : { rotate: 0, y: 0 }}
+        transition={rolling && !reduce ? { duration: 1.1, repeat: Infinity, ease: 'easeInOut' } : { type: 'spring', stiffness: 200, damping: 14 }}
+      >
+        <Felt name="yarnball" size={44} />
+      </motion.span>
     </span>
   );
 }

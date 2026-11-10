@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Check, ChevronLeft } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
-import { Thinking } from '../ui/bits';
+import { QuestionHeading, Thinking } from '../ui/bits';
 import { onRovingKeyDown, rovingTabIndex } from '../ui/roving';
 import { Felt } from '../art/Flower';
 import { YarnProgress } from '../art/YarnProgress';
@@ -20,13 +20,14 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
   const [stage, setStage] = useState<Stage>('intro');
   const [index, setIndex] = useState(0);
   const [text, setText] = useState('');
+  // The answer just saved shows as one line above the reflection; a tap opens it with its question.
+  const [showSaid, setShowSaid] = useState(false);
   const [reflection, setReflection] = useState<{ text: string; followUp: string | null } | null>(null);
   const [reflecting, setReflecting] = useState(false);
   const [followText, setFollowText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const reflectRef = useRef<AbortController | null>(null);
-  const headingRef = useRef<HTMLHeadingElement>(null);
   const saved = myAnswers.advancedAnswers || {};
   const savedRef = useRef(saved);
   savedRef.current = saved;
@@ -56,12 +57,6 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, activeMember?.id, q.id]);
 
-  useEffect(() => {
-    if (stage !== 'ask') return;
-    // Each question starts at the top of the sheet, with focus on the question.
-    headingRef.current?.closest('.sheet-body')?.scrollTo({ top: 0 });
-    headingRef.current?.focus({ preventScroll: true });
-  }, [index, stage]);
 
   useEffect(() => () => reflectRef.current?.abort(), []);
   useEffect(() => {
@@ -101,6 +96,7 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
     }
     if (c.signal.aborted) return;
     feel('stitch');
+    setShowSaid(false);
     setStage('reflect');
     setReflecting(true);
     try {
@@ -202,9 +198,7 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
                 {q.theme}
                 <span className="sr-only">. Question {index + 1} of {ADVANCED_QUESTIONS.length}.</span>
               </p>
-              <h3 ref={headingRef} tabIndex={-1} className="t-title mt-1.5 outline-none">
-                {q.question}
-              </h3>
+              <QuestionHeading key={q.id} text={q.question} className="t-title mt-1.5" />
             </section>
             {quickPicks.length > 0 && (
               <div
@@ -245,16 +239,16 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
 
         {stage === 'reflect' && (
           <motion.div key={`r${q.id}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="grid gap-4 pt-6">
-            <section className="stock stock-lilac">
-              <h3 className="t-head">{q.question}</h3>
-              <div className="flex items-center justify-between gap-3 mt-3">
-                <p className="t-hand opacity-75">You said</p>
-                <p className="t-small flex items-center gap-1 opacity-75">
-                  <Check size={14} strokeWidth={2.6} aria-hidden /> Answer saved
-                </p>
-              </div>
-              <p className="t-body mt-1">{text.trim()}</p>
-            </section>
+            <button type="button" className="stock stock-lilac text-left w-full border-0" aria-expanded={showSaid} onClick={() => setShowSaid((v) => !v)} style={{ padding: '14px 16px' }}>
+              <span className="flex items-center justify-between gap-3">
+                <span className="t-hand opacity-75">You said</span>
+                <span className="t-small flex items-center gap-1 opacity-75">
+                  <Check size={14} strokeWidth={2.6} aria-hidden /> Saved
+                </span>
+              </span>
+              {showSaid && <span className="block t-small font-semibold mt-2">{q.question}</span>}
+              <span className={`block t-body mt-1 ${showSaid ? '' : 'truncate'}`}>{text.trim()}</span>
+            </button>
             <div className="flex gap-2.5 items-start">
               <span className="shrink-0 w-9 h-9 grid place-items-center -mt-0.5 mr-1.5" aria-hidden>
                 <Felt name="yarnball" size={52} />

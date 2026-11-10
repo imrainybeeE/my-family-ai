@@ -1,11 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { useHousehold } from '../../context/HouseholdContext';
 import { useUI } from '../../App';
 import { FamilyPerson, useAiResource, useFamily } from '../../hooks/useFamily';
 import { ai, Insights } from '../../services/ai';
-import { sharedHeadline, tastePicks } from '../../../server/claims';
+import { headlineFor, restates, sharedHeadline, tastePicks } from '../../../server/claims';
 import { PageHeader } from '../layout/TabBar';
 import { Felt, FELT_FOR_STYLE, FlowerBadge } from '../art/Flower';
 import { Strand, useWidth } from '../art/Garland';
@@ -43,6 +43,15 @@ export function TogetherView() {
     };
   }, [insights.error, brief]);
   const data = insights.data || fallback;
+  // Tapping a shared interest picks out its strand in the circle and says it as the headline;
+  // tapping it again, or another one, lets go.
+  const [lit, setLit] = useState<number | null>(null);
+  const light = (i: number) => {
+    feel(lit === i ? 'tap' : 'select');
+    setLit((cur) => (cur === i ? null : i));
+  };
+  const litRow = lit !== null ? data?.together[lit] : undefined;
+  const headline = litRow ? headlineFor(litRow.title, litRow.members) : data?.headline || '';
   const waiting = people.filter((p) => !p.style);
   const who = (names: string[]) => names.map(byName).filter(Boolean) as FamilyPerson[];
   const keep = (text: string) => tidyLine(text, brief.members.map((m) => m.name));
@@ -70,7 +79,7 @@ export function TogetherView() {
         </section>
       ) : (
         <>
-          <FamilyCircle people={people} links={links} onOpen={ui.openMember} />
+          <FamilyCircle people={people} links={links} lit={lit} onOpen={ui.openMember} />
 
           {!data ? (
             <div className="mt-4 grid gap-3" aria-busy>
@@ -80,9 +89,13 @@ export function TogetherView() {
             </div>
           ) : (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <p className="t-head mt-2" style={{ fontSize: '1.375rem', lineHeight: '26px', textWrap: 'balance' }}>
-                {keep(data.headline)}
-              </p>
+              <div aria-live="polite">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.p key={headline} className="t-head mt-2" style={{ fontSize: '1.375rem', lineHeight: '26px', textWrap: 'balance' }} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.16 }}>
+                    {keep(headline)}
+                  </motion.p>
+                </AnimatePresence>
+              </div>
               {waiting.length > 0 && (
                 <p className="t-small ink-2 mt-2">
                   {joinNames(waiting.map((p) => p.name))} {waiting.length === 1 ? 'hasn’t' : 'haven’t'} answered yet
@@ -92,10 +105,10 @@ export function TogetherView() {
               {data.together.length > 0 && (
                 <>
                   <SectionTitle>Shared interests</SectionTitle>
-                  <ul className="card px-4" aria-label="Things you enjoy together">
+                  <ul className="card px-4 overflow-hidden" aria-label="Things you enjoy together">
                     {data.together.map((t, i) => (
                       // Who shares it is a fact the app knows, so every row states it directly rather than in AI words.
-                      <Row key={i} first={i === 0} yarn={YARNS[i % YARNS.length]} people={who(t.members)} title={t.title} body={keep(joinNames(who(t.members).map((p) => p.name)))} />
+                      <Row key={i} first={i === 0} yarn={YARNS[i % YARNS.length]} people={who(t.members)} title={t.title} body={keep(joinNames(who(t.members).map((p) => p.name)))} pressed={lit === i} onPress={() => light(i)} />
                     ))}
                   </ul>
                 </>
@@ -123,7 +136,7 @@ export function TogetherView() {
                   const idea = data.ideas[i];
                   const names = who(idea.members).filter((p) => !p.isYou).map((p) => p.name);
                   const withWho = names.length ? ` with ${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0]}` : '';
-                  return <Ticket index={i} title={idea.title} why={keep(idea.why)} people={who(idea.members)} onPlan={() => ui.askAbout(`Help me plan ${idea.title.replace(/^([A-Z])(?=[a-z])/, (c) => c.toLowerCase())}${withWho}.`)} />;
+                  return <Ticket index={i} title={idea.title} why={restates(idea.why, idea.title, brief.members.map((m) => m.name)) ? '' : keep(idea.why)} people={who(idea.members)} onPlan={() => ui.askAbout(`Help me plan ${idea.title.replace(/^([A-Z])(?=[a-z])/, (c) => c.toLowerCase())}${withWho}.`)} />;
                 }}
               </IdeaPager>
 
@@ -153,9 +166,14 @@ export function TogetherView() {
  * Everyone's flower in a ring, with a strand of yarn between people who share something.
  * Each shared thing has its own yarn colour, matched by its row below.
  */
-function FamilyCircle({ people: given, links, onOpen }: { people: FamilyPerson[]; links: string[][]; onOpen: (id: string) => void }) {
+function FamilyCircle({ people: given, links, lit, onOpen }: { people: FamilyPerson[]; links: string[][]; lit: number | null; onOpen: (id: string) => void }) {
   const people = useMemo(() => seatRing(given, links), [given, links]);
   const [ref, w] = useWidth<HTMLDivElement>();
+  // The flowers arrive one after another only the first time.
+  const shown = useRef(false);
+  useEffect(() => {
+    shown.current = true;
+  }, []);
   const n = Math.max(people.length, 1);
   const size = n > 6 ? 78 : n > 4 ? 90 : 104;
   const H = n > 2 ? 300 : 190;
@@ -167,7 +185,8 @@ function FamilyCircle({ people: given, links, onOpen }: { people: FamilyPerson[]
   const pos = new Map(people.map((p, i) => [p.id, { x: cx + rx * Math.cos(angleOf(i)), y: cy + ry * Math.sin(angleOf(i)) }] as const));
   const order = new Map(people.map((p, i) => [p.id, i]));
   // Every strand follows the ring the short way round, in its own lane, so strands never cut across the middle or each other.
-  const strands: { d: string; color: string; key: string }[] = [];
+  const strands: { d: string; color: string; key: string; link: number }[] = [];
+  const litIds = lit === null ? null : new Set(links[lit]);
   const lanes = links.length;
   links.forEach((ids, li) => {
     const chain = ids.filter((id) => order.has(id)).sort((a, b) => order.get(a)! - order.get(b)!);
@@ -196,7 +215,7 @@ function FamilyCircle({ people: given, links, onOpen }: { people: FamilyPerson[]
         const b = { x: cx + lrx * Math.cos(angleOf(ib)), y: cy + lry * Math.sin(angleOf(ib)) };
         const mx = cx + ((a.x + b.x) / 2 - cx) * 0.35;
         const my = cy + ((a.y + b.y) / 2 - cy) * 0.35;
-        strands.push({ d: `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`, color: YARNS[li % YARNS.length], key: `${li}-${k}` });
+        strands.push({ d: `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`, color: YARNS[li % YARNS.length], key: `${li}-${k}`, link: li });
         continue;
       }
       const steps = Math.max(12, Math.round((Math.abs(delta) / Math.PI) * 48));
@@ -204,7 +223,7 @@ function FamilyCircle({ people: given, links, onOpen }: { people: FamilyPerson[]
         const t = from + (delta * j) / steps;
         return `${(cx + lrx * Math.cos(t)).toFixed(1)} ${(cy + lry * Math.sin(t)).toFixed(1)}`;
       });
-      strands.push({ d: `M ${pts.join(' L ')}`, color: YARNS[li % YARNS.length], key: `${li}-${k}` });
+      strands.push({ d: `M ${pts.join(' L ')}`, color: YARNS[li % YARNS.length], key: `${li}-${k}`, link: li });
     }
   });
   return (
@@ -213,7 +232,9 @@ function FamilyCircle({ people: given, links, onOpen }: { people: FamilyPerson[]
         {/* A faint stitched ring that everyone sits on; the yarn strands lie over it. */}
         {w > 0 && n > 2 && <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill="none" stroke="var(--line-strong)" strokeWidth={1.5} strokeDasharray="2 6" strokeLinecap="round" />}
         {strands.map((s, i) => (
-          <Strand key={s.key} d={s.d} color={s.color} delay={0.2 + i * 0.12} width={3} />
+          <g key={s.key} style={{ opacity: lit === null || lit === s.link ? 1 : 0.18, transition: 'opacity 260ms ease' }}>
+            <Strand d={s.d} color={s.color} delay={0.2 + i * 0.12} width={3} />
+          </g>
         ))}
       </svg>
       <ul aria-label="Everyone">
@@ -223,7 +244,11 @@ function FamilyCircle({ people: given, links, onOpen }: { people: FamilyPerson[]
           return (
             <li key={p.id} className="absolute" style={{ left: at.x - s / 2, top: at.y - s / 2, width: s }}>
               <button type="button" className="flex flex-col items-center bg-transparent border-0 p-0 w-full transition-transform active:scale-95" onClick={() => onOpen(p.id)} aria-label={`${p.name}${p.isYou ? ' (you)' : ''}`}>
-                <motion.span initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1, rotate: [-6, 5, -3, 7, -5, 4][i % 6] }} transition={{ type: 'spring', stiffness: 220, damping: 17, delay: 0.05 * i }}>
+                <motion.span
+                  initial={{ scale: 0.6, opacity: 0 }}
+                  animate={{ scale: litIds?.has(p.id) ? 1.14 : 1, opacity: litIds && !litIds.has(p.id) ? 0.45 : 1, rotate: [-6, 5, -3, 7, -5, 4][i % 6] + (litIds?.has(p.id) ? 8 : 0) }}
+                  transition={litIds ? { type: 'spring', stiffness: 300, damping: 12 } : { type: 'spring', stiffness: 220, damping: 17, delay: lit === null && !shown.current ? 0.05 * i : 0 }}
+                >
                   <Felt name={p.style ? FELT_FOR_STYLE[p.style] : 'bud'} size={s} />
                 </motion.span>
                 <span className="tag -mt-4 relative" style={{ transform: `rotate(${i % 2 ? 3 : -3}deg)` }}>
@@ -239,9 +264,11 @@ function FamilyCircle({ people: given, links, onOpen }: { people: FamilyPerson[]
 }
 
 /** One observation: who, what, and an optional handwritten note. */
-function Row({ first, people, title, body, yarn, children }: { first: boolean; people: FamilyPerson[]; title: string; body: string; yarn?: string; children?: React.ReactNode }) {
+function Row({ first, people, title, body, yarn, onPress, pressed, children }: { first: boolean; people: FamilyPerson[]; title: string; body: string; yarn?: string; /** Makes the row a toggle, e.g. to pick out its strand. */ onPress?: () => void; pressed?: boolean; children?: React.ReactNode }) {
+  const Tag = onPress ? 'button' : 'div';
   return (
-    <li className="py-4" style={{ borderTop: first ? 0 : '1px solid var(--line)' }}>
+    <li style={{ borderTop: first ? 0 : '1px solid var(--line)' }}>
+      <Tag className={`block w-full text-left py-4 bg-transparent border-0 ${onPress ? 'row-press' : ''}`} {...(onPress ? { type: 'button' as const, onClick: onPress, 'aria-pressed': Boolean(pressed) } : {})}>
       <div className="flex items-center justify-between gap-3">
         <h3 className="t-head flex items-start gap-2 min-w-0">
           {yarn && <span aria-hidden className="shrink-0 rounded-full mt-[0.55em]" style={{ width: 14, height: 4, background: yarn }} />}
@@ -255,6 +282,7 @@ function Row({ first, people, title, body, yarn, children }: { first: boolean; p
       </div>
       {body && <p className="t-small ink-2 mt-1">{body}</p>}
       {children}
+      </Tag>
     </li>
   );
 }
@@ -323,7 +351,7 @@ function Ticket({ index, title, why, people, onPlan }: { index: number; title: s
     <article className={`stock ${TICKETS[index % 3]} relative flex flex-col`} style={{ padding: 16 }}>
       <span className={`tape ${TAPES[index % 3]}`} style={{ top: -10, left: 18, transform: 'rotate(-4deg)' }} aria-hidden />
       <h3 className="t-title mt-1" style={{ fontSize: '1.375rem', lineHeight: '26px' }}>{title}</h3>
-      <p className="t-small mt-2 opacity-85">{why}</p>
+      {why && <p className="t-small mt-2 opacity-85">{why}</p>}
       <div className="flex items-center justify-between gap-2 mt-4">
         <span className="flex -space-x-2" aria-label={people.length ? `Suits ${people.map((p) => p.name).join(', ')}` : undefined}>
           {people.slice(0, 4).map((p) => (
