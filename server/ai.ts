@@ -4,7 +4,7 @@ import { ApiError, FinishReason, GoogleGenAI, ThinkingLevel } from '@google/gena
 import type { Content } from '@google/genai';
 import { z } from 'zod';
 import { parseBrief, renderBrief } from './familyBrief.ts';
-import { alignMembers, checkClaims, headlineFor, sharedHeadline, sharedOnly, sharesTopic, stripClaims } from './claims.ts';
+import { alignMembers, awkwardAsk, checkClaims, headlineFor, paddedQuestion, restates, sharedHeadline, sharedOnly, sharesTopic, stripClaims, vagueDetail } from './claims.ts';
 import type { FamilyBrief } from './familyBrief.ts';
 
 // Every AI feature runs on Gemini Flash-Lite with minimal thinking: about 1.5s a reply and no
@@ -112,6 +112,8 @@ const BRITISH: [RegExp, string][] = [
   [/\bColor/g, 'Colour'],
   [/\bcozy/g, 'cosy'],
   [/\bCozy/g, 'Cosy'],
+  [/\bsavory/g, 'savoury'],
+  [/\bSavory/g, 'Savoury'],
   [/\bmom\b/g, 'mum'],
   [/\bMom\b/g, 'Mum'],
   [/\bneighbor/g, 'neighbour'],
@@ -129,7 +131,8 @@ const BRITISH: [RegExp, string][] = [
   [/\bapologiz/g, 'apologis'],
   [/\bcustomiz/g, 'customis'],
 ];
-const british = (s: string) => BRITISH.reduce((t, [from, to]) => t.replace(from, to), s);
+// Spelling and the one acronym the taste labels use ("BBQ & Grilling" must never become "Bbq").
+const british = (s: string) => BRITISH.reduce((t, [from, to]) => t.replace(from, to), s).replace(/\bbbq\b/gi, 'BBQ');
 
 /**
  * Sentence case for a short title the model wrote in Title Case: keeps the first word, family
@@ -320,7 +323,9 @@ async function generate<T extends z.ZodType>(
   prompt: string | Content[],
   schema: T,
   rules?: (data: z.infer<T>) => string[],
-  repair?: (data: z.infer<T>) => z.infer<T>
+  repair?: (data: z.infer<T>) => z.infer<T>,
+  /** Writing faults (filler, awkward phrasing): worth one retry, never worth failing the reply. */
+  polish?: (data: z.infer<T>) => string[]
 ): Promise<Generated<z.infer<T>>> {
   const jsonSchema = z.toJSONSchema(schema, { target: 'draft-2020-12' });
   let feedback = '';
@@ -377,6 +382,12 @@ async function generate<T extends z.ZodType>(
       if (attempt === 0) continue;
       return { ok: false, status: 502, error: 'ai_invalid' };
     }
+    const rough = attempt === 0 ? polish?.(data) || [] : [];
+    if (rough.length) {
+      feedback = rough.slice(0, 4).join('; ');
+      console.warn('Gemini reply needs a rewrite', { attempt, lines: rough.length });
+      continue;
+    }
     // Who-likes-what claims are checked against the saved picks: one retry, then wrong sentences go.
     const issues = checkClaims(data, brief);
     if (issues.length && attempt === 0) {
@@ -402,9 +413,9 @@ async function generate<T extends z.ZodType>(
 }
 
 /** Runs one structured request and replies with the checked object. */
-async function structured<T extends z.ZodType>(res: Response, ai: GoogleGenAI, brief: FamilyBrief, task: string, user: string, schema: T, rules?: (data: z.infer<T>) => string[], repair?: (data: z.infer<T>) => z.infer<T>) {
+async function structured<T extends z.ZodType>(res: Response, ai: GoogleGenAI, brief: FamilyBrief, task: string, user: string, schema: T, rules?: (data: z.infer<T>) => string[], repair?: (data: z.infer<T>) => z.infer<T>, polish?: (data: z.infer<T>) => string[]) {
   try {
-    const out = await generate(ai, brief, task, user, schema, rules, repair);
+    const out = await generate(ai, brief, task, user, schema, rules, repair, polish);
     return out.ok ? res.json(out.data) : res.status(out.status).json({ error: out.error });
   } catch (err) {
     return sendError(res, err);
@@ -626,9 +637,16 @@ aiRouter.post('/suggest', async (req, res) => {
     res,
     g.ai,
     g.brief,
-    `Suggest 3 short questions ${g.brief.asker} could tap to ask the family helper. ${context} Write them as ${g.brief.asker} would type them, in correct grammar: "I" as a subject ("Where could Dad and I walk?"), "me" as an object, never ${g.brief.asker}'s name; other people by name. Each at most 8 words, about the family's tastes, time together or each other (never about the app, the quiz, or who hasn't answered), specific to this family, and answerable from the saved answers or useful for planning time together.`,
+    `Suggest 3 short questions ${g.brief.asker} could tap to ask the family helper. ${context} Write them as ${g.brief.asker} would type them, in correct grammar: "I" as a subject ("Where could Dad and I walk?"), "me" as an object, never ${g.brief.asker}'s name; other people by name. Each at most 8 words, about the family's tastes, time together or each other (never about the app, the quiz, or who hasn't answered), specific to this family, and answerable from the saved answers or useful for planning time together. Lead with a plain verb, the way people talk: "What could Mum and Nai Nai bake?", never "What baking should Mum and Nai Nai make?".`,
     'Give the suggestions.',
     SuggestSchema,
+    undefined,
+    // A suggestion that still reads awkwardly after the retry is dropped, as long as one is left.
+    (data) => {
+      const kept = data.suggestions.filter((s) => !awkwardAsk(s));
+      return kept.length ? { suggestions: kept } : data;
+    },
+    (data) => data.suggestions.filter(awkwardAsk).map((s) => `"${s}" is awkward: lead with a plain verb, as in "What could Mum and Nai Nai bake?"`),
   );
 });
 
@@ -640,9 +658,13 @@ aiRouter.post('/spark', async (req, res) => {
     res,
     g.ai,
     g.brief,
-    `Write one dinner-table conversation question for tonight that fits this family. Ground it in something from their answers: a shared interest, a difference worth exploring, or a tradition someone mentioned. It must be easy for kids and adults to answer, open-ended and warm, and never about worries or sensitive topics. Keep the question to at most 10 words, in plain words a seven-year-old knows, with no padding words ("go explore together next" is just "explore"). "why" is under 10 words naming whose answers inspired it. "members" lists those people's names.${recent.length ? `\nDon't repeat or closely echo these recent questions:\n- ${recent.join('\n- ')}` : ''}`,
+    `Write one dinner-table conversation question for tonight that fits this family. Ground it in something from their answers: a shared interest, a difference worth exploring, or a tradition someone mentioned. It must be easy for kids and adults to answer, open-ended and warm, and never about worries or sensitive topics. Keep the question to at most 10 words, in plain words a seven-year-old knows, with no padding words ("go explore together next" is just "explore": "Which new place should we explore?"). "why" is under 10 words naming whose answers inspired it. "members" lists those people's names.${recent.length ? `\nDon't repeat or closely echo these recent questions:\n- ${recent.join('\n- ')}` : ''}`,
     'Write tonight\'s question.',
     SparkSchema,
+    undefined,
+    // Padding that survives the retry is cut: "Where should we go explore together next?" becomes "Where should we explore?"
+    (data) => (paddedQuestion(data.question) ? { ...data, question: data.question.replace(/\s+(together next|together|next)(?=\?)/i, '').replace(/\s+together next\b/i, '').replace(/\bgo (explore|visit|try|discover)\b/i, '$1') } : data),
+    (data) => (paddedQuestion(data.question) ? [`question: cut the padding ("go explore together next" is just "explore"), as in "Which new place should we explore?"`] : []),
   );
 });
 
@@ -704,7 +726,7 @@ aiRouter.post('/insights', async (req, res) => {
 - headline: one sentence under 9 words that restates the first "together" item: the thing and who shares it (for example "Mum and Nai Nai love a good mystery"). Only speak for the whole family when everyone who answered picked it.
 - together: 2–3 things two or more people enjoy or value. title under 5 words; detail is under 12 words saying who, without repeating the title's words (for example title "Mystery shows", detail "Mum and Nai Nai both picked whodunnits."), never "everyone" unless it is true. members: the names involved.
 - differences: 1–2 interesting differences about different things (never two about energy or rest), described neutrally. detail is under 14 words naming who prefers what; title in plain words (for example "Food to skip", never abstract nouns like "avoidances"); bridge is one concrete action under 10 words that doesn't repeat the observation (for example "Serve mushrooms and seafood on the side").
-- ideas: exactly 3 things to try together, each grounded in answers. Name the thing in every line: never "it", "them" or "this" without saying what. title under 5 words; why is under 12 words; tip is one practical sentence under 12 words. members: the two or more people it suits.
+- ideas: exactly 3 things to try together, each grounded in answers. Name the thing in every line: never "it", "them" or "this" without saying what. title under 5 words; why is under 12 words giving the reason from their answers, never the activity again (for example "Mum wants to learn, and Nai Nai remembers New Year dumplings"), in plain everyday English; tip is one practical sentence under 12 words. members: the two or more people it suits.
 Use the family facts for any numbers. Write for a phone screen: short, concrete, plain. No praise words. Never rank picks ("top", "number one", "most loved"): the answers are unranked lists. Only say "the family", "everyone" or the family's name for something every person who answered picked.
 If only one person has answered, stay honest: describe what that person brings and what the family could discover next.`,
     'Write the family profile.',
@@ -722,6 +744,7 @@ If only one person has answered, stay honest: describe what that person brings a
       const samePeople = forEveryone || (named.length === first.members.length && named.every((n) => first.members.includes(n)));
       return sameThing && samePeople ? data : { ...data, headline: headlineFor(first.title, first.members) };
     },
+    (data) => data.ideas.flatMap((idea, i) => (restates(idea.why, idea.title, g.brief.members.map((m) => m.name)) ? [`ideas.${i}.why repeats the title: give the reason from their answers instead`] : [])),
   );
 });
 
@@ -775,7 +798,7 @@ aiRouter.post('/plan/ideas', async (req, res) => {
     `The family wants help with "${taskTitle}". People joining: ${who.join(', ')}.
 Give exactly 3 options that fit these people, using their saved answers and practical answers. Every practical answer is binding for all three options: if they chose take-out, all three are take-out; if they chose at home, all three are at home; if they chose right now, none of them is for this evening or the weekend. Within those limits, make the three clearly different: for food, three different cuisines drawn from different people's picks (never two dishes of the same kind); otherwise different activities. Keep them the same kind of thing: for "What should we eat?", three dinners unless the practical answers ask for snacks or another meal. Each summary names the actual food or activity (not "a rice dish"). If a kind of meal was chosen, give three different dishes within it.
 - title: under 5 words.
-- summary: one sentence of 10–14 words giving one new practical detail the title doesn't: a key ingredient or step, how long it takes, or who does which part (for example "Leo grates the cheese while Dad rolls out the dough"). Never just restate the dish or activity and where it happens.
+- summary: one sentence of 10–14 words giving one new practical detail the title doesn't, naming a real ingredient, a concrete step or how long it takes (for example "Mum measures the rice while Nai Nai chops carrots for the curry" or "Ready in 25 minutes with one pan"). Never just restate the dish and where it happens, and never vague roles such as "measures the ingredients" or "helps around the table".
 - why: one sentence under 18 words on why it fits, naming people and what in their answers points to it.
 - members: the names it especially suits.
 - tradeoff: one short, honest sentence under 12 words on what you give up compared with the other options.
@@ -791,5 +814,7 @@ These are AI ideas: never claim something exists, is open, is available or costs
       ...leavesChosenMeal(data.ideas.map((idea) => `${idea.title}. ${idea.summary}`), meal),
       ...repeatedDishes(data.ideas.map((idea) => `${idea.title}. ${idea.summary}`), meal),
     ],
+    undefined,
+    (data) => data.ideas.flatMap((idea, i) => (vagueDetail(idea.summary) ? [`ideas.${i}.summary is vague: name a real ingredient, step or time, as in "Mum measures the rice while Nai Nai chops carrots for the curry"`] : [])),
   );
 });

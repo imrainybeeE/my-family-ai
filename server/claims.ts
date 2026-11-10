@@ -107,6 +107,21 @@ export function restates(line: string, title: string, names: string[] = []): boo
   return rest.length > 0 ? rest.every((w) => keys.has(stem(w))) : true;
 }
 
+/** A plan line that sounds specific but names no real work ("measures the precise ingredients", "helps around the table"). */
+export function vagueDetail(text: string): boolean {
+  return /\b(the |some |all the )?(precise |fresh |main |right |needed |basic )?ingredients\b|\bhelps? (out )?(around|with (everything|the cooking|cooking|prep|the prep))\b|\bsets? up the (cooking )?station\b|\beveryone helps\b|\bgathers? (a)?round the (\w+ )?table\b/i.test(text);
+}
+
+/** Padding a short question doesn't need: "go explore together next" is just "explore". */
+export function paddedQuestion(text: string): boolean {
+  return /\btogether next\b|\bgo (explore|visit|try|discover)\b|\b(explore|visit|try|discover|go|watch|play|read) together\?$|\bnext\?$/i.test(text);
+}
+
+/** A suggestion built as "What baking should…", which nobody would type. */
+export function awkwardAsk(text: string): boolean {
+  return /^what \w+ing (should|could|can)\b/i.test(text.trim());
+}
+
 /** Lines for the prompt: who shares each pick, so the model never has to work it out. */
 export function sharedPickLines(brief: FamilyBrief): string[] {
   return tastePicks(brief)

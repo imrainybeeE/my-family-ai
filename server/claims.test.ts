@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sharedOnly, alignMembers, checkClaims, headlineFor, restates, sharedHeadline, sharedPickLines, sharesTopic, stem, stripClaims } from './claims.ts';
+import { sharedOnly, alignMembers, awkwardAsk, checkClaims, headlineFor, paddedQuestion, restates, vagueDetail, sharedHeadline, sharedPickLines, sharesTopic, stem, stripClaims } from './claims.ts';
 import { buildBrief } from '../src/services/brief.ts';
 import { DEMO_HOUSEHOLD, DEMO_MEMBERS, DEMO_RESPONSES, DEMO_ACTIVE_MEMBER } from '../src/data/demoFamily.ts';
 
@@ -118,4 +118,24 @@ test('headlineFor names two people, and counts them when names run long', () => 
 test('restates spots a line that only repeats its title', () => {
   assert.equal(restates('Mum and Nai Nai both like baking cookies.', 'Baking cookies', ['Mum', 'Nai Nai']), true);
   assert.equal(restates('Mum and Nai Nai want to learn dumpling-folding.', 'Make dumplings', ['Mum', 'Nai Nai']), false);
+});
+
+test('writing checks catch filler, padding and awkward asks', () => {
+  assert.equal(vagueDetail('Mum measures the precise ingredients while everyone helps around the table.'), true);
+  assert.equal(vagueDetail('Mum measures the rice while Nai Nai chops carrots for the curry.'), false);
+  assert.equal(paddedQuestion('Where should we go explore together next?'), true);
+  assert.equal(paddedQuestion('Which new place should we explore?'), false);
+  assert.equal(awkwardAsk('What baking should Mum and Nai Nai make?'), true);
+  assert.equal(awkwardAsk('What could Mum and Nai Nai bake?'), false);
+});
+
+test('a question ending in "together" or "next" is padded', () => {
+  assert.equal(paddedQuestion('Which new park or market should we explore next?'), true);
+  assert.equal(paddedQuestion('Which new park or market should we explore together?'), true);
+  assert.equal(paddedQuestion('What should we cook together on Sunday?'), false);
+  assert.equal(vagueDetail('Dad preps the grill while the family gathers around the table together.'), true);
+});
+
+test('"next" at the end of a question is padding', () => {
+  assert.equal(paddedQuestion('Which mystery show or film should we watch next?'), true);
 });

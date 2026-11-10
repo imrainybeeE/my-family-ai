@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { onRovingKeyDown, rovingTabIndex } from '../ui/roving';
 import { useHousehold } from '../../context/HouseholdContext';
-import { restates } from '../../../server/claims';
+import { restates, vagueDetail } from '../../../server/claims';
 import { useUI } from '../../App';
 import { useFamily } from '../../hooks/useFamily';
 import { ai, aiErrorMessage, PlanAsk, PlanIdea, PlanIdeas } from '../../services/ai';
@@ -368,7 +368,7 @@ function IdeaCard({ idea, index, chosen, byName, onChoose }: { idea: PlanIdea; i
         <h3 className="t-head">{idea.title}</h3>
       </div>
       <div className="px-5 pt-4 pb-3">
-        {!restates(idea.summary, idea.title, brief.members.map((m) => m.name)) && <p className="t-body">{idea.summary}</p>}
+        {!restates(idea.summary, idea.title, brief.members.map((m) => m.name)) && !vagueDetail(idea.summary) && <p className="t-body">{idea.summary}</p>}
         <button
             type="button"
             className="t-label bg-transparent border-0 p-0 min-h-[44px] flex items-center gap-1"
