@@ -319,7 +319,8 @@ async function generate<T extends z.ZodType>(
   task: string,
   prompt: string | Content[],
   schema: T,
-  rules?: (data: z.infer<T>) => string[]
+  rules?: (data: z.infer<T>) => string[],
+  repair?: (data: z.infer<T>) => z.infer<T>
 ): Promise<Generated<z.infer<T>>> {
   const jsonSchema = z.toJSONSchema(schema, { target: 'draft-2020-12' });
   let feedback = '';
@@ -351,9 +352,9 @@ async function generate<T extends z.ZodType>(
       continue;
     }
     let parsed = schema.safeParse(tidyReply(raw, brief));
-    // On the last try, list items that break a limit (one over-long difference) are dropped rather
-    // than failing the whole reply; required fields still have to be right.
-    if (!parsed.success && attempt === 1) {
+    // List items that break a limit (one over-long difference) are dropped rather than paying for
+    // another round trip; required fields still have to be right.
+    if (!parsed.success) {
       const trimmed = dropBrokenItems(tidyReply(raw, brief), parsed.error.issues.map((i) => i.path));
       const again = schema.safeParse(trimmed);
       if (again.success) parsed = again;
@@ -366,7 +367,8 @@ async function generate<T extends z.ZodType>(
       console.warn('Gemini reply failed validation', { attempt, feedback: feedback.slice(0, 200) });
       continue;
     }
-    const data = parsed.data;
+    // What code can put right (a headline that drifted from its row) is put right, not retried.
+    const data = repair ? repair(parsed.data) : parsed.data;
     // Rules the endpoint states in code (such as "all three ideas are take-out"): one retry, then nothing is sent.
     const broken = rules?.(data) || [];
     if (broken.length) {
@@ -400,9 +402,9 @@ async function generate<T extends z.ZodType>(
 }
 
 /** Runs one structured request and replies with the checked object. */
-async function structured<T extends z.ZodType>(res: Response, ai: GoogleGenAI, brief: FamilyBrief, task: string, user: string, schema: T, rules?: (data: z.infer<T>) => string[]) {
+async function structured<T extends z.ZodType>(res: Response, ai: GoogleGenAI, brief: FamilyBrief, task: string, user: string, schema: T, rules?: (data: z.infer<T>) => string[], repair?: (data: z.infer<T>) => z.infer<T>) {
   try {
-    const out = await generate(ai, brief, task, user, schema, rules);
+    const out = await generate(ai, brief, task, user, schema, rules, repair);
     return out.ok ? res.json(out.data) : res.status(out.status).json({ error: out.error });
   } catch (err) {
     return sendError(res, err);
@@ -545,6 +547,12 @@ const TASKS: Record<string, string> = {
   watch: 'What should we watch together?',
   travel: 'Where should we travel?',
 };
+
+/** "Maya and Nai Nai both like Asian stir fry": a headline written from a shared row. */
+export function headlineFor(title: string, members: string[]): string {
+  const who = members.length === 2 ? `${members[0]} and ${members[1]} both` : `${members.slice(0, -1).join(', ')} and ${members[members.length - 1]} all`;
+  return `${who} like ${/^(Asian|Italian|Mexican|Indian|Chinese|Japanese|Thai|Korean|French|Greek)\b/.test(title) ? title : title[0].toLowerCase() + title.slice(1)}`.slice(0, 60);
+}
 
 // --- Router ------------------------------------------------------------------------------------
 export const aiRouter = express.Router();
@@ -708,17 +716,18 @@ Use the family facts for any numbers. Write for a phone screen: short, concrete,
 If only one person has answered, stay honest: describe what that person brings and what the family could discover next.`,
     'Write the family profile.',
     InsightsSchema,
-    // The headline sums up the first shared interest, so the two never disagree.
+    undefined,
+    // The headline sums up the first shared interest. When the model's drifts (another thing, or
+    // other people), it is rewritten from that row, so the two never disagree.
     (data) => {
       const first = data.together[0];
-      if (!first) return [];
+      if (!first) return data;
       const names = g.brief.members.map((m) => m.name);
-      // Same thing, without counting names as the topic, and the same people.
       const sameThing = sharesTopic(data.headline, `${first.title} ${first.detail}`, names);
       const named = names.filter((n) => new RegExp(`\\b${escapeRe(n)}\\b`).test(data.headline));
       const forEveryone = /\b(everyone|the family|all of us)\b/i.test(data.headline) && first.members.length >= 3;
       const samePeople = forEveryone || (named.length === first.members.length && named.every((n) => first.members.includes(n)));
-      return sameThing && samePeople ? [] : ['headline: restate the first "together" item: the same thing and the same people'];
+      return sameThing && samePeople ? data : { ...data, headline: headlineFor(first.title, first.members) };
     },
   );
 });

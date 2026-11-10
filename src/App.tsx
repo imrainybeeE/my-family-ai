@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { HouseholdProvider, useHousehold } from './context/HouseholdContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -48,6 +48,12 @@ const tabFromHash = (): TabType => {
 function Shell() {
   const { household, isLoading, activeMember } = useHousehold();
   const [tab, setTab] = useState<TabType>(tabFromHash);
+  // The tabs sit side by side: moving to one on the right slides the page in from the right.
+  const lastTab = useRef(tab);
+  const dir = Math.sign(TABS.indexOf(tab) - TABS.indexOf(lastTab.current));
+  useEffect(() => {
+    lastTab.current = tab;
+  }, [tab]);
   const [planTask, setPlanTask] = useState<PlanTask | null>(null);
   const [askPrefill, setAskPrefill] = useState<string | null>(null);
   const [memberId, setMemberId] = useState<string | null>(null);
@@ -106,16 +112,17 @@ function Shell() {
 
   return (
     <UIContext.Provider value={ui}>
-      <AnimatePresence mode="wait" initial={false}>
+      <AnimatePresence mode="wait" initial={false} custom={dir}>
         <motion.main
           id="main"
           role="tabpanel"
           aria-label={tab}
           key={tab}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.18, ease: 'easeOut' }}
+          custom={dir}
+          variants={PAGE_TURN}
+          initial="enter"
+          animate="rest"
+          exit="leave"
         >
           {tab === 'garden' && <GardenView />}
           {tab === 'together' && <TogetherView />}
@@ -134,6 +141,12 @@ function Shell() {
     </UIContext.Provider>
   );
 }
+
+const PAGE_TURN = {
+  enter: (dir: number) => ({ opacity: 0, x: dir * 28, y: dir ? 0 : 8 }),
+  rest: { opacity: 1, x: 0, y: 0, transition: { type: 'spring' as const, stiffness: 420, damping: 36 } },
+  leave: (dir: number) => ({ opacity: 0, x: dir * -18, transition: { duration: 0.12, ease: 'easeIn' as const } }),
+};
 
 function Loading() {
   return (

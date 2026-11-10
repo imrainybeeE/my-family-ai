@@ -2,7 +2,7 @@
 // files to load: soft, felt-and-wood sounds, quiet enough to sit under a conversation. Haptics use
 // the Vibration API where it exists (Android) and the system switch haptic on iOS Safari.
 
-export type Feel = 'tap' | 'select' | 'stitch' | 'bead' | 'bloom' | 'flip' | 'land' | 'send' | 'arrive' | 'page' | 'error';
+export type Feel = 'tap' | 'select' | 'stitch' | 'bead' | 'gather' | 'bloom' | 'flip' | 'land' | 'send' | 'arrive' | 'page' | 'error';
 
 const SOUND_KEY = 'mfa:sound';
 let ctx: AudioContext | null = null;
@@ -107,6 +107,11 @@ const SOUNDS: Record<Feel, (c: AudioContext) => void> = {
     tone(c, { freq: 1046, dur: 0.16, gain: 0.07, type: 'triangle' });
     tone(c, { freq: 1568, at: 0.06, dur: 0.2, gain: 0.05 });
   },
+  // The sewn petals gather before the flower opens: thread drawn tight, rising.
+  gather: (c) => {
+    hiss(c, { dur: 0.7, freq: 500, to: 5200, q: 1.4, gain: 0.06 });
+    tone(c, { freq: 196, to: 392, dur: 0.7, gain: 0.04 });
+  },
   // The flower opens: a soft rising arpeggio with a shimmer.
   bloom: (c) => {
     [523, 659, 784, 1046].forEach((f, i) => tone(c, { freq: f, at: i * 0.09, dur: 0.6, gain: 0.07 }));
@@ -138,6 +143,7 @@ const VIBRATION: Partial<Record<Feel, number | number[]>> = {
   select: 10,
   stitch: [6, 40, 6],
   bead: 14,
+  gather: [4, 60, 4, 50, 5, 40, 6, 30, 8],
   bloom: [10, 60, 14, 60, 24],
   land: 22,
   error: [18, 50, 18],

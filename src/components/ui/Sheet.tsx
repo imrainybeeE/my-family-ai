@@ -14,6 +14,12 @@ interface SheetProps {
   footer?: React.ReactNode;
   /** Optional element shown at the left of the header, e.g. a back button. */
   leading?: React.ReactNode;
+  /** A class for the header row (a card stock colour), when the top of the sheet is a coloured stage. */
+  tone?: string;
+  /** A colour that washes over the whole sheet from its middle, for a flow's big moment. */
+  wash?: string | null;
+  /** Seconds the wash waits before it spreads. */
+  washDelay?: number;
 }
 
 let openSheets = 0;
@@ -42,7 +48,7 @@ function trapFocus(e: KeyboardEvent, panel: HTMLElement | null) {
 }
 
 /** A paper sheet that slides up from the bottom. Drag down or press Escape to close. */
-export function Sheet({ open, onClose, title, hideTitle, full, children, footer, leading }: SheetProps) {
+export function Sheet({ open, onClose, title, hideTitle, full, children, footer, leading, tone, wash, washDelay = 0 }: SheetProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
@@ -113,13 +119,27 @@ export function Sheet({ open, onClose, title, hideTitle, full, children, footer,
               if (info.offset.y > 120 || info.velocity.y > 600) onClose();
             }}
           >
+            <AnimatePresence>
+              {wash && (
+                <motion.span
+                  key="wash"
+                  className="sheet-wash"
+                  style={{ background: wash }}
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 1, delay: washDelay, ease: [0.3, 0.6, 0.2, 1] }}
+                  aria-hidden
+                />
+              )}
+            </AnimatePresence>
             {!full && (
               <div className="pt-1 pb-1 touch-none cursor-grab" onPointerDown={(e) => drag.start(e)}>
                 <div className="sheet-grab" />
               </div>
             )}
             <div
-              className={`flex items-center gap-2 px-5 ${full ? 'pt-[calc(12px+var(--safe-t))]' : 'pt-0'} ${hideTitle && !leading ? 'pb-0 -mb-3 justify-end relative z-10' : 'pb-2'}`}
+              className={`sheet-head ${tone || ''} flex items-center gap-2 px-5 ${full ? 'pt-[calc(12px+var(--safe-t))]' : 'pt-0'} ${hideTitle && !leading ? 'pb-0 -mb-3 justify-end relative z-10' : 'pb-2'}`}
               onPointerDown={full ? undefined : (e) => drag.start(e)}
             >
               {leading}

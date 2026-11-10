@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { useHousehold } from '../../context/HouseholdContext';
@@ -43,6 +43,16 @@ export function TogetherView() {
     };
   }, [insights.error, brief]);
   const data = insights.data || fallback;
+  // Tapping a shared interest picks out its strand in the circle for a moment.
+  const [lit, setLit] = useState<number | null>(null);
+  const litTimer = useRef<number | null>(null);
+  useEffect(() => () => void (litTimer.current !== null && window.clearTimeout(litTimer.current)), []);
+  const light = (i: number) => {
+    feel('select');
+    setLit(i);
+    if (litTimer.current !== null) window.clearTimeout(litTimer.current);
+    litTimer.current = window.setTimeout(() => setLit(null), 1800);
+  };
   const waiting = people.filter((p) => !p.style);
   const who = (names: string[]) => names.map(byName).filter(Boolean) as FamilyPerson[];
   const keep = (text: string) => tidyLine(text, brief.members.map((m) => m.name));
@@ -70,7 +80,7 @@ export function TogetherView() {
         </section>
       ) : (
         <>
-          <FamilyCircle people={people} links={links} onOpen={ui.openMember} />
+          <FamilyCircle people={people} links={links} lit={lit} onOpen={ui.openMember} />
 
           {!data ? (
             <div className="mt-4 grid gap-3" aria-busy>
@@ -95,7 +105,7 @@ export function TogetherView() {
                   <ul className="card px-4" aria-label="Things you enjoy together">
                     {data.together.map((t, i) => (
                       // Who shares it is a fact the app knows, so every row states it directly rather than in AI words.
-                      <Row key={i} first={i === 0} yarn={YARNS[i % YARNS.length]} people={who(t.members)} title={t.title} body={keep(joinNames(who(t.members).map((p) => p.name)))} />
+                      <Row key={i} first={i === 0} yarn={YARNS[i % YARNS.length]} people={who(t.members)} title={t.title} body={keep(joinNames(who(t.members).map((p) => p.name)))} onPress={() => light(i)} />
                     ))}
                   </ul>
                 </>
@@ -153,9 +163,14 @@ export function TogetherView() {
  * Everyone's flower in a ring, with a strand of yarn between people who share something.
  * Each shared thing has its own yarn colour, matched by its row below.
  */
-function FamilyCircle({ people: given, links, onOpen }: { people: FamilyPerson[]; links: string[][]; onOpen: (id: string) => void }) {
+function FamilyCircle({ people: given, links, lit, onOpen }: { people: FamilyPerson[]; links: string[][]; lit: number | null; onOpen: (id: string) => void }) {
   const people = useMemo(() => seatRing(given, links), [given, links]);
   const [ref, w] = useWidth<HTMLDivElement>();
+  // The flowers arrive one after another only the first time.
+  const shown = useRef(false);
+  useEffect(() => {
+    shown.current = true;
+  }, []);
   const n = Math.max(people.length, 1);
   const size = n > 6 ? 78 : n > 4 ? 90 : 104;
   const H = n > 2 ? 300 : 190;
@@ -167,7 +182,8 @@ function FamilyCircle({ people: given, links, onOpen }: { people: FamilyPerson[]
   const pos = new Map(people.map((p, i) => [p.id, { x: cx + rx * Math.cos(angleOf(i)), y: cy + ry * Math.sin(angleOf(i)) }] as const));
   const order = new Map(people.map((p, i) => [p.id, i]));
   // Every strand follows the ring the short way round, in its own lane, so strands never cut across the middle or each other.
-  const strands: { d: string; color: string; key: string }[] = [];
+  const strands: { d: string; color: string; key: string; link: number }[] = [];
+  const litIds = lit === null ? null : new Set(links[lit]);
   const lanes = links.length;
   links.forEach((ids, li) => {
     const chain = ids.filter((id) => order.has(id)).sort((a, b) => order.get(a)! - order.get(b)!);
@@ -196,7 +212,7 @@ function FamilyCircle({ people: given, links, onOpen }: { people: FamilyPerson[]
         const b = { x: cx + lrx * Math.cos(angleOf(ib)), y: cy + lry * Math.sin(angleOf(ib)) };
         const mx = cx + ((a.x + b.x) / 2 - cx) * 0.35;
         const my = cy + ((a.y + b.y) / 2 - cy) * 0.35;
-        strands.push({ d: `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`, color: YARNS[li % YARNS.length], key: `${li}-${k}` });
+        strands.push({ d: `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`, color: YARNS[li % YARNS.length], key: `${li}-${k}`, link: li });
         continue;
       }
       const steps = Math.max(12, Math.round((Math.abs(delta) / Math.PI) * 48));
@@ -204,7 +220,7 @@ function FamilyCircle({ people: given, links, onOpen }: { people: FamilyPerson[]
         const t = from + (delta * j) / steps;
         return `${(cx + lrx * Math.cos(t)).toFixed(1)} ${(cy + lry * Math.sin(t)).toFixed(1)}`;
       });
-      strands.push({ d: `M ${pts.join(' L ')}`, color: YARNS[li % YARNS.length], key: `${li}-${k}` });
+      strands.push({ d: `M ${pts.join(' L ')}`, color: YARNS[li % YARNS.length], key: `${li}-${k}`, link: li });
     }
   });
   return (
@@ -213,7 +229,9 @@ function FamilyCircle({ people: given, links, onOpen }: { people: FamilyPerson[]
         {/* A faint stitched ring that everyone sits on; the yarn strands lie over it. */}
         {w > 0 && n > 2 && <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill="none" stroke="var(--line-strong)" strokeWidth={1.5} strokeDasharray="2 6" strokeLinecap="round" />}
         {strands.map((s, i) => (
-          <Strand key={s.key} d={s.d} color={s.color} delay={0.2 + i * 0.12} width={3} />
+          <g key={s.key} style={{ opacity: lit === null || lit === s.link ? 1 : 0.18, transition: 'opacity 260ms ease' }}>
+            <Strand d={s.d} color={s.color} delay={0.2 + i * 0.12} width={3} />
+          </g>
         ))}
       </svg>
       <ul aria-label="Everyone">
@@ -223,7 +241,11 @@ function FamilyCircle({ people: given, links, onOpen }: { people: FamilyPerson[]
           return (
             <li key={p.id} className="absolute" style={{ left: at.x - s / 2, top: at.y - s / 2, width: s }}>
               <button type="button" className="flex flex-col items-center bg-transparent border-0 p-0 w-full transition-transform active:scale-95" onClick={() => onOpen(p.id)} aria-label={`${p.name}${p.isYou ? ' (you)' : ''}`}>
-                <motion.span initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1, rotate: [-6, 5, -3, 7, -5, 4][i % 6] }} transition={{ type: 'spring', stiffness: 220, damping: 17, delay: 0.05 * i }}>
+                <motion.span
+                  initial={{ scale: 0.6, opacity: 0 }}
+                  animate={{ scale: litIds?.has(p.id) ? 1.14 : 1, opacity: litIds && !litIds.has(p.id) ? 0.45 : 1, rotate: [-6, 5, -3, 7, -5, 4][i % 6] + (litIds?.has(p.id) ? 8 : 0) }}
+                  transition={litIds ? { type: 'spring', stiffness: 300, damping: 12 } : { type: 'spring', stiffness: 220, damping: 17, delay: lit === null && !shown.current ? 0.05 * i : 0 }}
+                >
                   <Felt name={p.style ? FELT_FOR_STYLE[p.style] : 'bud'} size={s} />
                 </motion.span>
                 <span className="tag -mt-4 relative" style={{ transform: `rotate(${i % 2 ? 3 : -3}deg)` }}>
@@ -239,9 +261,11 @@ function FamilyCircle({ people: given, links, onOpen }: { people: FamilyPerson[]
 }
 
 /** One observation: who, what, and an optional handwritten note. */
-function Row({ first, people, title, body, yarn, children }: { first: boolean; people: FamilyPerson[]; title: string; body: string; yarn?: string; children?: React.ReactNode }) {
+function Row({ first, people, title, body, yarn, onPress, children }: { first: boolean; people: FamilyPerson[]; title: string; body: string; yarn?: string; /** Makes the row a button, e.g. to pick out its strand. */ onPress?: () => void; children?: React.ReactNode }) {
+  const Tag = onPress ? 'button' : 'div';
   return (
-    <li className="py-4" style={{ borderTop: first ? 0 : '1px solid var(--line)' }}>
+    <li style={{ borderTop: first ? 0 : '1px solid var(--line)' }}>
+      <Tag className={`block w-full text-left py-4 bg-transparent border-0 ${onPress ? 'row-press' : ''}`} {...(onPress ? { type: 'button' as const, onClick: onPress } : {})}>
       <div className="flex items-center justify-between gap-3">
         <h3 className="t-head flex items-start gap-2 min-w-0">
           {yarn && <span aria-hidden className="shrink-0 rounded-full mt-[0.55em]" style={{ width: 14, height: 4, background: yarn }} />}
@@ -255,6 +279,7 @@ function Row({ first, people, title, body, yarn, children }: { first: boolean; p
       </div>
       {body && <p className="t-small ink-2 mt-1">{body}</p>}
       {children}
+      </Tag>
     </li>
   );
 }

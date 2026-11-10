@@ -21,15 +21,18 @@ const BASE = '50% 91%';
  * The flower you sew during the Foundation questions: every pick adds a felt petal in the
  * colour of the style it leans towards, around a knotted felt centre.
  */
-export function StitchedFlower({ petals, size = 120 }: { petals: DiscoveryStyleId[]; size?: number }) {
+export function StitchedFlower({ petals, size = 120, landDelay = 0, spin = 0, sewn = false }: { petals: DiscoveryStyleId[]; size?: number; /** Seconds a new petal waits, while it flies in. */ landDelay?: number; /** Each change turns the flower once. */ spin?: number; /** Already sewn: the petals are there from the first frame. */ sewn?: boolean }) {
   const petalSize = size * 0.52;
   const centre = size * 0.34;
   const [scope, animate] = useAnimate();
   const reduce = useReducedMotion();
   // A little bounce each time a petal is sewn on (none with reduced motion).
   useEffect(() => {
-    if (petals.length && !reduce) animate(scope.current, { scale: [0.95, 1] }, { type: 'spring', stiffness: 500, damping: 12 });
-  }, [petals.length, animate, scope, reduce]);
+    if (petals.length && !reduce && !sewn) animate(scope.current, { scale: [0.93, 1] }, { type: 'spring', stiffness: 500, damping: 12, delay: landDelay });
+  }, [petals.length, animate, scope, reduce, landDelay]);
+  useEffect(() => {
+    if (spin && !reduce) animate(scope.current, { rotate: [0, 360] }, { type: 'spring', stiffness: 60, damping: 13 });
+  }, [spin, animate, scope, reduce]);
   return (
     <div ref={scope} className="relative" style={{ width: size, height: size }} aria-hidden>
       {petals.map((style, i) => {
@@ -39,9 +42,9 @@ export function StitchedFlower({ petals, size = 120 }: { petals: DiscoveryStyleI
             key={i}
             className="absolute"
             style={{ left: size / 2 - petalSize / 2, top: size / 2 - petalSize * 0.91, width: petalSize, height: petalSize, transformOrigin: BASE }}
-            initial={{ scale: 0, rotate: angle - 40 }}
+            initial={sewn ? false : { scale: 0, rotate: angle - 40 }}
             animate={{ scale: 0.92 + ((i * 7) % 5) * 0.03, rotate: angle }}
-            transition={{ type: 'spring', stiffness: 260, damping: 15 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 15, delay: reduce ? 0 : landDelay }}
           >
             <Felt name={PETAL[style]} size={petalSize} />
           </motion.span>

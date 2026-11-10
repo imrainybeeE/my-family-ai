@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { ChevronLeft } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
@@ -11,7 +12,8 @@ import { useHousehold } from '../../context/HouseholdContext';
 import { useUI } from '../../App';
 import { FOUNDATION_QUESTIONS, FOUNDATION_SECTIONS, STYLE_MAPPING_CONFIG } from '../../data/foundationQuestions';
 import { petalsFor, scoreDiscoveryProfile } from '../../utils/discoveryScoring';
-import { PetalMark, StitchedFlower } from '../art/StitchedFlower';
+import { PETAL, PetalMark, StitchedFlower } from '../art/StitchedFlower';
+import { Felt } from '../art/Flower';
 import { buildBrief } from '../../services/brief';
 import { ai } from '../../services/ai';
 import { feel } from '../../feel/feel';
@@ -43,6 +45,17 @@ const SECTION_LABEL: Record<string, string> = {
 };
 
 type Stage = 'intro' | 'ask' | 'blooming' | 'reveal';
+interface Flight {
+  id: number;
+  style: DiscoveryStyleId;
+  x: number;
+  y: number;
+  dx: number;
+  dy: number;
+}
+let flightId = 0;
+/** How long a petal is in the air, in seconds. */
+const FLIGHT = 0.44;
 type Answers = Record<string, string | string[]>;
 
 export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -58,6 +71,10 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
   const [saveError, setSaveError] = useState<string | null>(null);
   const [limitNudge, setLimitNudge] = useState(0);
   useEffect(() => setLimitNudge(0), [index]);
+  // Petals in the air: each pick flies from its answer to the flower, then is sewn on.
+  const [flights, setFlights] = useState<Flight[]>([]);
+  const flowerRef = useRef<HTMLDivElement>(null);
+  const [spin, setSpin] = useState(0);
   // Latest answers and the pending auto-advance, so a quick change of mind always wins and
   // Back or Close cancels the move.
   const answersRef = useRef<Answers>({});
@@ -74,7 +91,8 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
   // Sound isn't motion, so reduced-motion users still hear it, just sooner. Closing cancels it.
   useEffect(() => {
     if (stage !== 'blooming' || !open) return;
-    const t = window.setTimeout(() => feel('bloom'), reduceMotion ? 150 : 650);
+    if (!reduceMotion) feel('gather');
+    const t = window.setTimeout(() => feel('bloom'), reduceMotion ? 150 : 780);
     return () => window.clearTimeout(t);
   }, [stage, open, reduceMotion]);
   // The finish run in flight: its reveal timer and bloom-note request. Closing, switching person or
@@ -150,9 +168,10 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
       return;
     }
     if (!live()) return;
-    // The bloom is the app's one big moment: the sewn flower spins away, the real one opens and
-    // throws its petals, and only then does the result card arrive.
-    run.timer = window.setTimeout(() => live() && setStage('reveal'), Math.max(0, (reduceMotion ? 900 : 2300) - (Date.now() - started)));
+    // The bloom is the app's one big moment: the sewn flower comes to the middle and winds itself
+    // tight, the real one springs open and throws its petals as its colour washes over the page,
+    // and only then does the result card arrive.
+    run.timer = window.setTimeout(() => live() && setStage('reveal'), Math.max(0, (reduceMotion ? 900 : 2600) - (Date.now() - started)));
 
     // Ask the AI for a personal note about this bloom, then keep it with the answers.
     if (!activeMember) return;
@@ -182,7 +201,10 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
     if (!(Array.isArray(v) ? v.length : v)) return;
     if (index < FOUNDATION_QUESTIONS.length - 1) {
       // A bead slides down the yarn when a section is finished.
-      if (FOUNDATION_QUESTIONS[index + 1].section !== q.section) feel('bead');
+      if (FOUNDATION_QUESTIONS[index + 1].section !== q.section) {
+        feel('bead');
+        setSpin((n) => n + 1);
+      }
       setIndex((i) => i + 1);
     } else {
       // A tap you can feel as the flower starts (iOS only plays haptics from a tap).
@@ -192,7 +214,17 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
   };
 
   /** Picks an option. A tap or click on a single-choice question moves on after a beat. */
-  const choose = (option: string, byPointer: boolean) => {
+  const fly = (option: string, from: Element | null) => {
+    const style = STYLE_MAPPING_CONFIG[q.id]?.[option]?.[0];
+    const seed = from?.querySelector('.seed')?.getBoundingClientRect();
+    const target = flowerRef.current?.getBoundingClientRect();
+    if (!style || !seed || !target || reduceMotion) return;
+    const x = seed.left + seed.width / 2;
+    const y = seed.top + seed.height / 2;
+    setFlights((f) => [...f, { id: ++flightId, style, x, y, dx: target.left + target.width / 2 - x, dy: target.top + target.height / 2 - y }]);
+  };
+
+  const choose = (option: string, byPointer: boolean, from: Element | null = null) => {
     const id = String(q.id);
     if (q.isMultiSelect) {
       const max = q.maxSelections || 2;
@@ -205,18 +237,25 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
       }
       const next = removing ? selected.filter((o) => o !== option) : [...selected, option];
       feel(removing ? 'tap' : 'stitch');
+      if (!removing) fly(option, from);
       setAnswers((a) => ({ ...a, [id]: next }));
       return;
     }
-    if (answersRef.current[id] !== option) feel('stitch');
+    if (answersRef.current[id] !== option) {
+      feel('stitch');
+      fly(option, from);
+    }
     const next = { ...answersRef.current, [id]: option };
     answersRef.current = next;
     setAnswers(next);
     cancelAdvance();
-    if (byPointer) advanceTimer.current = window.setTimeout(goNext, 380);
+    // Long enough to watch the petal land before the next question slides in.
+    if (byPointer) advanceTimer.current = window.setTimeout(goNext, reduceMotion ? 380 : 620);
   };
 
   const title = stage === 'reveal' || stage === 'blooming' ? 'Your flower' : 'Find your flower';
+  // The stage takes about a fifth of the screen, so six answers still fit under it on a small phone.
+  const stageSize = Math.round(Math.min(150, Math.max(96, window.innerHeight * 0.2 - 30)));
 
   return (
     <Sheet
@@ -225,6 +264,9 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
       full
       title={title}
       hideTitle={stage === 'ask'}
+      tone={stage === 'ask' ? `stage-tone ${SECTION_STOCK[q.section]}` : undefined}
+      wash={(stage === 'blooming' || stage === 'reveal') && profile ? `color-mix(in srgb, ${FLOWERS[profile.primaryStyle].color} 22%, var(--wash-base))` : null}
+      washDelay={reduceMotion ? 0 : 0.74}
       leading={
         stage === 'ask' ? (
           <div className="flex-1 flex items-center gap-2">
@@ -266,20 +308,26 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
         )}
 
         {stage === 'ask' && (
-          <motion.div key={`q${q.id}`} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.22 }} className="pt-1">
-            <section className={`stock ${SECTION_STOCK[q.section]}`} style={{ padding: 20 }}>
-              <div className="flex items-center justify-between gap-3 -mt-2 -mb-1">
-                <p className="t-hand">{SECTION_LABEL[q.section]}</p>
-                <span className="-my-1 -mr-2">
-                  <StitchedFlower petals={petals} size={72} />
-                </span>
+          <motion.div key="ask" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+            {/* The stage: the flower being sewn, on the section's card stock. It stays put while the questions change. */}
+            <div className={`quiz-stage ${SECTION_STOCK[q.section]}`}>
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.p key={q.section} className="t-hand quiz-stage-label" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
+                  {SECTION_LABEL[q.section]}
+                </motion.p>
+              </AnimatePresence>
+              <div ref={flowerRef} className="quiz-stage-flower">
+                <StitchedFlower petals={petals} size={stageSize} landDelay={flights.length ? FLIGHT - 0.06 : 0} spin={spin} />
               </div>
-              <h3 ref={headingRef} tabIndex={-1} className="t-title outline-none" style={{ fontSize: '1.375rem', lineHeight: '27px' }}>
-                {q.question}
-              </h3>
+            </div>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div key={`q${q.id}`} initial={{ opacity: 0, x: 28 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -28 }} transition={{ duration: 0.2, ease: [0.3, 0.7, 0.4, 1] }} className="pt-5">
+                <h3 ref={headingRef} tabIndex={-1} className="t-title outline-none">
+                  {q.question}
+                </h3>
               <motion.p
                 key={limitNudge}
-                className="t-small mt-2 opacity-80"
+                className="t-small ink-2 mt-1.5"
                 aria-live="polite"
                 animate={limitNudge ? { x: [0, -6, 6, -4, 4, 0] } : undefined}
                 transition={{ duration: 0.36 }}
@@ -291,7 +339,6 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
                   : q.subtitle}
                 <span className="sr-only">. Question {index + 1} of {FOUNDATION_QUESTIONS.length}.</span>
               </motion.p>
-            </section>
             {saveError && (
               <p role="alert" className="t-small mt-3" style={{ color: 'var(--danger)' }}>
                 {saveError}
@@ -313,7 +360,7 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
                     aria-checked={on}
                     tabIndex={q.isMultiSelect ? undefined : rovingTabIndex(i, q.options.indexOf(selected[0]))}
                     className="option"
-                    onClick={(e) => choose(o, e.detail > 0)}
+                    onClick={(e) => choose(o, e.detail > 0, e.currentTarget)}
                   >
                     <PetalMark on={on} style={STYLE_MAPPING_CONFIG[q.id]?.[o]?.[0]} />
                     <span className="flex-1">{o}</span>
@@ -321,6 +368,8 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
                 );
               })}
             </div>
+              </motion.div>
+            </AnimatePresence>
           </motion.div>
         )}
 
@@ -333,21 +382,22 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
             className="grid place-items-center place-content-center text-center gap-4 min-h-[calc(100dvh-160px-var(--safe-t)-var(--safe-b))]"
           >
             <div className="relative grid place-items-center" style={{ width: 240, height: 240 }}>
+              {/* The flower you sewed comes down from the stage, then winds itself tight. */}
               <motion.div
                 className="absolute"
-                initial={{ opacity: 1, rotate: 0, scale: 1 }}
-                animate={reduceMotion ? { opacity: 0 } : { opacity: 0, rotate: 160, scale: 0.85 }}
-                transition={reduceMotion ? { duration: 0.15 } : { duration: 0.6, delay: 0.1, ease: [0.5, 0, 0.3, 1] }}
+                initial={reduceMotion ? { opacity: 1 } : { opacity: 1, y: -190, scale: 0.6, rotate: 0 }}
+                animate={reduceMotion ? { opacity: 0 } : { y: [-190, 0, 0], scale: [0.6, 1, 0.4], rotate: [0, 30, 560], opacity: [1, 1, 0] }}
+                transition={reduceMotion ? { duration: 0.15 } : { duration: 0.9, times: [0, 0.38, 1], ease: [[0.2, 0.8, 0.3, 1], [0.7, 0, 0.9, 0.5]] }}
               >
-                <StitchedFlower petals={petals} size={220} />
+                <StitchedFlower petals={petals} size={220} sewn />
               </motion.div>
               {/* The petals fly out from under the flower's rim once it is mostly open. */}
-              <PetalBurst styles={[profile.primaryStyle, profile.secondaryStyle]} delay={0.55} />
+              <PetalBurst styles={[profile.primaryStyle, profile.secondaryStyle]} delay={0.86} count={14} />
               <div className="relative">
-                <Flower style={profile.primaryStyle} size={230} bloom delay={reduceMotion ? 0.15 : 0.35} />
+                <Flower style={profile.primaryStyle} size={230} bloom delay={reduceMotion ? 0.15 : 0.74} />
               </div>
             </div>
-            <motion.div initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduceMotion ? 0.25 : 1.4, duration: reduceMotion ? 0.2 : 0.4 }}>
+            <motion.div className="relative" initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduceMotion ? 0.25 : 1.55, duration: reduceMotion ? 0.2 : 0.4 }}>
               <p className="t-title">{FLOWERS[profile.primaryStyle].flower}</p>
               <p className="t-body ink-2 mt-1">{profile.primaryStyle}</p>
             </motion.div>
@@ -385,6 +435,23 @@ export function FoundationFlow({ open, onClose }: { open: boolean; onClose: () =
           </motion.div>
         )}
       </AnimatePresence>
+      {createPortal(
+        flights.map((f) => (
+          <motion.span
+            key={f.id}
+            className="petal-flight"
+            style={{ left: f.x - 17, top: f.y - 17 }}
+            initial={{ x: 0, y: 0, rotate: 25, scale: 1 }}
+            animate={{ x: f.dx, y: f.dy, rotate: 25 + (f.dx > 0 ? 200 : -200), scale: 1.5 }}
+            transition={{ duration: FLIGHT, x: { duration: FLIGHT, ease: [0.5, 0, 0.9, 0.6] }, y: { duration: FLIGHT, ease: [0.2, 0.9, 0.4, 1] } }}
+            onAnimationComplete={() => setFlights((all) => all.filter((x) => x.id !== f.id))}
+            aria-hidden
+          >
+            <Felt name={PETAL[f.style]} size={34} />
+          </motion.span>
+        )),
+        document.body
+      )}
     </Sheet>
   );
 }
