@@ -1235,17 +1235,15 @@ body:has(.sheet-full) .toast-slot {
   overflow: visible;
 }
 .real-poster {
+  display: block;
   flex: none;
-  width: 64px;
+  width: 84px;
   aspect-ratio: 2 / 3;
   object-fit: cover;
   border-radius: 8px;
   background: var(--card-2);
   box-shadow: 0 1px 2px rgb(var(--shade) / 0.18), 0 8px 16px -8px rgb(var(--shade) / 0.45);
   transform: rotate(-2deg);
-}
-.real-poster-blank {
-  display: block;
 }
 /* A felt map pin with the pick's number sewn on. */
 .real-pin {
@@ -1286,4 +1284,68 @@ body:has(.sheet-full) .toast-slot {
   color: var(--ink-2);
   font-size: 0.8125rem;
   font-weight: 600;
+}
+
+/* Photos from outside sources fade in over their card's colour once they've loaded. */
+.photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 360ms ease;
+}
+.photo[data-ready] {
+  opacity: 1;
+}
+.idea-photo {
+  margin: 0;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+.real-hero-photo {
+  position: relative;
+  margin: -1.1rem -1.15rem 0;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--r-paper) var(--r-paper) 0 0;
+  background: var(--card-2);
+}
+/* An example photo says so, on a small paper label in the corner. */
+.real-example {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  padding: 3px 9px;
+  border-radius: 7px;
+  background: rgb(255 255 255 / 0.92);
+  color: var(--tag-ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgb(var(--shade) / 0.25);
+}
+/* The numbered pin sits half on the photo, half on the card. */
+.real-under-photo {
+  margin-top: -22px;
+  position: relative;
+}
+.real-under-photo .t-head {
+  margin-top: 26px;
+}
+.real-poster {
+  overflow: hidden;
+}
+.real-poster-title {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 6px;
+  background: var(--stock-lilac);
+  color: var(--stock-lilac-ink);
+  font-family: var(--font-hand);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  overflow-wrap: anywhere;
 }

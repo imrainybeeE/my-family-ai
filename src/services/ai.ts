@@ -86,6 +86,8 @@ export interface PlanIdea {
   members: string[];
   tradeoff: string;
   check: string | null;
+  /** A photo of the dish, activity or place, when one was found. */
+  image?: string | null;
 }
 
 /** A real place or film for a chosen idea: facts from the source, the fit line from the AI. */
@@ -99,11 +101,13 @@ export interface RealPick {
   trend: string | null;
   url: string;
   image: string | null;
+  /** Set when the picture shows what the place is known for (a dish), not the place itself. */
+  imageExample: string | null;
   fit: string | null;
   members: string[];
 }
 
-export type RealSource = 'google-maps' | 'google-search' | 'openstreetmap' | 'apple-chart';
+export type RealSource = 'google-maps' | 'google-search' | 'openstreetmap' | 'netflix' | 'apple-chart';
 
 export interface RealPicks {
   source: RealSource | null;

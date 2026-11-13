@@ -16,6 +16,7 @@ test('flags people credited with picks they did not make', () => {
   assert.equal(issues.length, 1);
   assert.match(issues[0].message, /Dad didn't pick/);
   assert.equal(checkClaims({ why: 'Dad avoids seafood, so skip the fish.' }, brief).length, 1);
+  assert.equal(checkClaims({ picks: [{ n: 1, fit: 'Dad picked tacos, so this suits him.', members: ['Dad'] }] }, brief).length, 1, 'real-pick fit lines are checked');
 });
 
 test('checks each person against their own claim', () => {
@@ -138,4 +139,11 @@ test('a question ending in "together" or "next" is padded', () => {
 
 test('"next" at the end of a question is padding', () => {
   assert.equal(paddedQuestion('Which mystery show or film should we watch next?'), true);
+});
+
+test('a real pick with a false fit line keeps its place and loses the line', () => {
+  const reply = { picks: [{ n: 1, fit: 'Dad picked tacos.', members: ['Dad'] }] };
+  const kept = stripClaims(reply, checkClaims(reply, brief), { fit: ' ' });
+  assert.equal(kept.picks.length, 1);
+  assert.equal(kept.picks[0].fit.trim(), '');
 });

@@ -16,6 +16,7 @@ import { FlowerBadge } from '../art/Flower';
 import { DoArt, EatArt, TravelArt, WatchArt } from '../art/Icons';
 import { SectionTitle, Thinking } from '../ui/bits';
 import { Coin } from './Coin';
+import { Photo } from '../ui/Photo';
 import { RealPicks } from './RealPicks';
 import { PlanTask } from '../../types';
 
@@ -285,7 +286,7 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
                 <span className="t-label">Anything else?</span>
                 <input className="field" value={extra} onChange={(e) => setExtra(e.target.value)} placeholder={task === 'eat' ? 'Budget or food needs' : 'Time or budget'} />
               </label>
-              <div className="sticky z-10 -mx-5 px-5 pt-4" style={{ bottom: 'calc(var(--tabbar-top) + 4px + var(--safe-b))' }}>
+              <div className="sticky z-[31] -mx-5 px-5 pt-4" style={{ bottom: 'calc(var(--tabbar-top) + 4px + var(--safe-b))' }}>
                 <div aria-hidden className="scrim absolute inset-0 -z-10" style={{ ['--scrim-mask' as string]: 'linear-gradient(to bottom, transparent, #000 16px)' }} />
                 <button type="button" className="btn btn-primary btn-block" onClick={getIdeas}>
                   Get three ideas
@@ -328,7 +329,7 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
               <AnimatePresence>
                 {chosen !== null && result.ideas[chosen] && (
                   <motion.div
-                    className="sticky z-10 -mx-5 px-5 pt-4"
+                    className="sticky z-[31] -mx-5 px-5 pt-4"
                     style={{ bottom: 'calc(var(--tabbar-top) + 4px + var(--safe-b))' }}
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -386,6 +387,7 @@ function IdeaCard({ idea, index, chosen, byName, onChoose }: { idea: PlanIdea; i
   const { brief } = useHousehold();
   const isChosen = chosen === index;
   const people = idea.members.map(byName).filter(Boolean);
+  const [photo, setPhoto] = useState(Boolean(idea.image));
   return (
     <motion.article
       layout
@@ -394,6 +396,11 @@ function IdeaCard({ idea, index, chosen, byName, onChoose }: { idea: PlanIdea; i
       style={{ outline: isChosen ? '2px solid var(--accent)' : 'none', outlineOffset: 2 }}
       aria-current={isChosen || undefined}
     >
+      {photo && idea.image && (
+        <figure className={`idea-photo ${IDEA_STOCK[index % 3]}`}>
+          <Photo src={idea.image} onFail={() => setPhoto(false)} />
+        </figure>
+      )}
       <div className={`px-5 pt-4 pb-4 ${IDEA_STOCK[index % 3]}`}>
         <h3 className="t-head">{idea.title}</h3>
       </div>

@@ -7,6 +7,7 @@ import { ai, aiErrorMessage, PlanIdea, RealPick, RealPicks as RealPicksResult, R
 import { feel } from '../../feel/feel';
 import { FlowerBadge } from '../art/Flower';
 import { Thinking } from '../ui/bits';
+import { Photo } from '../ui/Photo';
 import { PlanTask } from '../../types';
 
 /** The typed area is remembered on this phone only, never in the family's saved answers. */
@@ -29,7 +30,8 @@ const saveArea = (area: string) => {
 const SOURCE_NOTE: Record<RealSource, string> = {
   'google-maps': 'Places and ratings from Google Maps. Check opening hours before you go.',
   'google-search': 'Titles from Google Search this week. Check the age rating first.',
-  openstreetmap: 'Places from OpenStreetMap. Check opening hours before you go.',
+  openstreetmap: 'Places from OpenStreetMap; photos from Wikipedia. Check opening hours before you go.',
+  netflix: 'Ranked by this week’s Netflix Top 10. Check the age rating first.',
   'apple-chart': 'Ranked by this week’s Apple TV film chart. Check the age rating first.',
 };
 
@@ -42,7 +44,7 @@ type Phase = { kind: 'where' } | { kind: 'loading'; near: string } | { kind: 'do
 export function RealPicks({ task, idea, who, onBack }: { task: PlanTask; idea: PlanIdea; who: string[]; onBack: () => void }) {
   const { brief } = useHousehold();
   const films = task === 'watch';
-  const remembered = readArea();
+  const remembered = films ? '' : readArea();
   const [phase, setPhase] = useState<Phase>(() => (films || remembered ? { kind: 'loading', near: remembered } : { kind: 'where' }));
   const [area, setArea] = useState(remembered);
   const [locating, setLocating] = useState(false);
@@ -57,6 +59,7 @@ export function RealPicks({ task, idea, who, onBack }: { task: PlanTask; idea: P
     try {
       const result = await ai.planReal(brief, task, who, { title: idea.title, summary: idea.summary }, where, c.signal);
       if (c.signal.aborted) return;
+      if (where && 'area' in where) saveArea(where.area);
       feel('land');
       setPhase({ kind: 'done', result });
     } catch (err) {
@@ -66,7 +69,7 @@ export function RealPicks({ task, idea, who, onBack }: { task: PlanTask; idea: P
   };
 
   useEffect(() => {
-    if (films) search(remembered ? { area: remembered } : null, remembered);
+    if (films) search(null, '');
     else if (remembered) search({ area: remembered }, remembered);
     return () => request.current?.abort();
     // Runs once for the idea this step opened with.
@@ -96,7 +99,6 @@ export function RealPicks({ task, idea, who, onBack }: { task: PlanTask; idea: P
     e.preventDefault();
     const a = area.trim();
     if (!a) return;
-    saveArea(a);
     search({ area: a }, a);
   };
 
@@ -119,7 +121,7 @@ export function RealPicks({ task, idea, who, onBack }: { task: PlanTask; idea: P
             <LocateFixed size={18} strokeWidth={2.4} /> {locating ? 'Finding you…' : 'Use my location'}
           </button>
           <form className="grid grid-cols-[1fr_auto] gap-2" onSubmit={submitArea}>
-            <input className="field" value={area} onChange={(e) => setArea(e.target.value)} placeholder="Or type a town or postcode" aria-label="Town, suburb or postcode" autoComplete="address-level2" />
+            <input className="field" value={area} onChange={(e) => setArea(e.target.value)} placeholder="Town or postcode" aria-label="Town, suburb or postcode" autoComplete="address-level2" />
             <button type="submit" className="btn" disabled={!area.trim()} aria-label="Search this area">
               <Search size={18} strokeWidth={2.4} />
             </button>
@@ -208,6 +210,8 @@ function PickCard({ pick, index, films }: { pick: RealPick; index: number; films
   const people = pick.members.map(byName).filter(Boolean);
   const meta = [pick.kind, pick.distanceKm != null ? `${pick.distanceKm < 1 ? `${Math.round(pick.distanceKm * 1000)} m` : `${pick.distanceKm} km`} away` : pick.area].filter(Boolean).join(' · ');
   const facts = pick.facts.filter((f) => !f.startsWith('About:'));
+  const [photo, setPhoto] = useState(Boolean(pick.image));
+  const hero = !films && photo && pick.image;
   return (
     <motion.article
       className="card real-card"
@@ -215,14 +219,18 @@ function PickCard({ pick, index, films }: { pick: RealPick; index: number; films
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: 'spring', stiffness: 380, damping: 30, delay: 0.06 + index * 0.08 }}
     >
-      {index === 0 && <span className="tape tape-butter" style={{ top: -9, left: 22, transform: 'rotate(-3deg)' }} aria-hidden />}
-      <div className="flex gap-3.5 items-start">
+      {index === 0 && <span className="tape tape-butter" style={{ top: -9, left: 22, transform: 'rotate(-3deg)', zIndex: 3 }} aria-hidden />}
+      {hero && (
+        <figure className="real-hero-photo">
+          <Photo src={pick.image!} alt={pick.imageExample ? `Example photo: ${pick.imageExample}` : pick.name} onFail={() => setPhoto(false)} />
+          {pick.imageExample && <figcaption className="real-example">Example: {pick.imageExample}</figcaption>}
+        </figure>
+      )}
+      <div className={`flex gap-3.5 items-start ${hero ? 'real-under-photo' : ''}`}>
         {films ? (
-          pick.image ? (
-            <img className="real-poster" src={pick.image} alt="" loading="lazy" referrerPolicy="no-referrer" />
-          ) : (
-            <span className="real-poster real-poster-blank" aria-hidden />
-          )
+          <span className="real-poster" aria-hidden>
+            {photo && pick.image ? <Photo src={pick.image} onFail={() => setPhoto(false)} /> : <span className="real-poster-title">{pick.name}</span>}
+          </span>
         ) : (
           <span className="real-pin" aria-hidden>
             <span>{index + 1}</span>

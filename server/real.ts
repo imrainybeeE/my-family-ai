@@ -5,7 +5,7 @@
 const UA = 'MyFamilyAI/1.0 (student project; https://imrainybeee.github.io/my-family-ai/)';
 const FETCH_MS = 12_000;
 
-export type RealSource = 'google-maps' | 'google-search' | 'openstreetmap' | 'apple-chart';
+export type RealSource = 'google-maps' | 'google-search' | 'openstreetmap' | 'netflix' | 'apple-chart';
 
 /** One real thing the family could go to or watch, with facts from the source only. */
 export interface Candidate {
@@ -21,7 +21,12 @@ export interface Candidate {
   trend: string | null;
   url: string;
   image: string | null;
+  /** Where a picture of this exact place might be: OpenStreetMap's image or Wikipedia tags. */
+  source?: { image?: string; wikipedia?: string; landmark?: boolean };
 }
+
+/** Kinds of place famous enough to have their own Wikipedia photo. */
+const LANDMARKS = /museum|gallery|zoo|aquarium|theme_park|attraction|park|nature_reserve|viewpoint|castle|monument|temple|place_of_worship|beach|waterfall|peak|mall|stadium/;
 
 export interface Place {
   lat: number;
@@ -131,6 +136,11 @@ export function osmCandidates(hits: any[], at: { lat: number; lon: number }): Ca
       trend: null,
       url: mapsSearchUrl(`${name}, ${area || ''}`.replace(/,\s*$/, '')),
       image: null,
+      source: {
+        image: typeof tags.image === 'string' && /^https:\/\/\S+\.(jpe?g|png|webp)$/i.test(tags.image) ? tags.image : undefined,
+        wikipedia: typeof tags.wikipedia === 'string' ? tags.wikipedia : undefined,
+        landmark: LANDMARKS.test(String(h.type || '')),
+      },
     });
   }
   return out.sort((x, y) => (x.distanceKm ?? 0) - (y.distanceKm ?? 0)).slice(0, 16);
@@ -177,6 +187,14 @@ export async function chartFilms(country: string): Promise<Candidate[]> {
   const films = await fetchChart(cc).catch(() => wait(800).then(() => fetchChart(cc)));
   if (films.length) charts.set(cc, { at: Date.now(), films });
   return films;
+}
+
+/** A poster for a title from this week's chart, when the title is on it. */
+export async function chartPoster(title: string, country: string): Promise<string | null> {
+  const t = title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  if (!t) return null;
+  const films = await chartFilms(country).catch(() => []);
+  return films.find((f) => f.name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().startsWith(t))?.image ?? null;
 }
 
 async function fetchChart(cc: string): Promise<Candidate[]> {

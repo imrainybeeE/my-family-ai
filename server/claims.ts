@@ -140,7 +140,7 @@ export function sentences(text: string): string[] {
 }
 
 /** Fields that state facts. Suggestions (ideas, tips, titles, questions) are not checked. */
-const FACT_KEYS = new Set(['answer', 'facts', 'detail', 'why', 'known', 'headline', 'note', 'reflection']);
+const FACT_KEYS = new Set(['answer', 'facts', 'detail', 'why', 'fit', 'known', 'headline', 'note', 'reflection']);
 const NEGATIVE = /\b(avoid|avoids|avoiding|skip|skips|dislike|dislikes|hate|hates|no|not|never|without|won't|doesn't|don't|isn't|aren't|can't)\b/i;
 const POSITIVE = /\b(like|likes|liked|love|loves|loved|enjoy|enjoys|enjoyed|pick|picks|picked|prefer|prefers|chose|choose|share|shares|want|wants)\b/i;
 const EVERYONE = /\b(everyone|everybody|whole family|all of you|the family)\b/i;

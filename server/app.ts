@@ -1,6 +1,7 @@
 import express from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import { aiRouter } from './ai.ts';
+import { warmNetflix } from './media.ts';
 
 /** Sites allowed to call the AI from a browser. The GitHub Pages site and local dev by default. */
 const ORIGINS = (process.env.ALLOWED_ORIGINS || 'https://imrainybeee.github.io')
@@ -27,6 +28,8 @@ function cors(req: Request, res: Response, next: NextFunction) {
 
 /** The AI API on its own: used by the local server and by the hosted function. */
 export function createApp() {
+  // This week's Netflix chart is a large download, so it starts before anyone asks for it.
+  warmNetflix();
   const app = express();
   app.set('trust proxy', true);
   app.use('/api/ai', cors, express.json({ limit: '300kb' }), aiRouter);
