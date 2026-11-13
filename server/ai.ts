@@ -6,6 +6,8 @@ import { z } from 'zod';
 import { parseBrief, renderBrief } from './familyBrief.ts';
 import { alignMembers, awkwardAsk, checkClaims, headlineFor, paddedQuestion, restates, sharedHeadline, sharedOnly, sharesTopic, stripClaims, vagueDetail } from './claims.ts';
 import type { FamilyBrief } from './familyBrief.ts';
+import { chartFilms, firstJson, geocode, linkFor, mapsSearchUrl, osmPlaces, reverseGeocode, roundCoord, validCoords } from './real.ts';
+import type { Candidate, Place, RealSource } from './real.ts';
 
 // Every AI feature runs on Gemini Flash-Lite with minimal thinking: about 1.5s a reply and no
 // thinking tokens. When Google reports it busy or out of quota, the request moves to the
@@ -817,4 +819,187 @@ These are AI ideas: never claim something exists, is open, is available or costs
     undefined,
     (data) => data.ideas.flatMap((idea, i) => (vagueDetail(idea.summary) ? [`ideas.${i}.summary is vague: name a real ingredient, step or time, as in "Mum measures the rice while Nai Nai chops carrots for the curry"`] : [])),
   );
+});
+
+// --- Real places and films for a chosen idea --------------------------------------------------
+// Facts (names, ratings, chart positions, distances) come from a data source; the AI only picks
+// which suit the family and writes why. Google grounding is tried first; when the key can't use
+// it, places come from OpenStreetMap and films from Apple's chart. Locations are never stored.
+
+/** How far each kind of plan looks, in km. */
+const RADIUS: Record<string, number> = { eat: 6, do: 20, travel: 120 };
+/** When grounding is refused (no quota on this key), it's skipped for a while instead of costing a call each time. */
+let groundingOffUntil = 0;
+const TREND_RULE = 'Lean towards what is popular right now: places or titles people are talking about, highly rated with many recent reviews, newly opened or newly released, social-media favourites. Avoid obscure or tired choices.';
+
+const GroundedSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        name: line(80),
+        kind: line(60),
+        area: z.string().max(80).nullable().optional(),
+        facts: z.array(z.string().max(90)).max(3).optional(),
+        trend: z.string().max(110).nullable().optional(),
+      })
+    )
+    .max(10),
+});
+
+async function groundedCandidates(ai: GoogleGenAI, task: string, idea: string, place: Place | null): Promise<{ source: RealSource; items: Candidate[] } | null> {
+  if (Date.now() < groundingOffUntil) return null;
+  const watch = task === 'watch';
+  const where = place ? `near ${place.label} (around ${place.lat}, ${place.lon})` : 'in Malaysia';
+  const prompt = watch
+    ? `Find 8 real films or shows a family could watch now that match this idea: "${idea}". Use Google Search for what is in cinemas ${where} and trending on streaming this week. ${TREND_RULE}
+Reply with only JSON: {"items":[{"name":"exact title","kind":"genre and where to watch, e.g. Animation · in cinemas","area":null,"facts":["year","age rating if found"],"trend":"why it is popular this week, from the search results, or null"}]}`
+    : `Find 8 real, currently operating places ${where} that match this plan idea: "${idea}". Use Google Maps. Stay within ${RADIUS[task] ?? 20} km. ${TREND_RULE}
+Reply with only JSON: {"items":[{"name":"exact place name","kind":"what it is, e.g. Dumpling restaurant","area":"neighbourhood","facts":["4.6★ (2,100 reviews)","price level if known"],"trend":"why it is popular right now, from reviews or news, or null"}]}
+Facts and trend lines must come from the map data, never guesses.`;
+  try {
+    const reply = await ai.models.generateContent({
+      model: MODEL,
+      contents: prompt,
+      config: {
+        tools: watch ? [{ googleSearch: {} }] : [{ googleMaps: {} }],
+        ...(place && !watch ? { toolConfig: { retrievalConfig: { latLng: { latitude: place.lat, longitude: place.lon } } } } : {}),
+        thinkingConfig: { thinkingLevel: THINKING },
+      },
+    });
+    logUsage(reply.modelVersion, reply.usageMetadata);
+    const parsed = GroundedSchema.safeParse(firstJson(reply.text || ''));
+    if (!parsed.success || !parsed.data.items.length) return null;
+    const chunks = (reply.candidates?.[0]?.groundingMetadata?.groundingChunks || []).map((c) => c.maps || c.web || {});
+    return {
+      source: watch ? 'google-search' : 'google-maps',
+      items: parsed.data.items.map((it, i) => ({
+        id: `g${i + 1}`,
+        name: it.name,
+        kind: it.kind,
+        area: it.area || null,
+        distanceKm: null,
+        facts: (it.facts || []).filter(Boolean),
+        trend: it.trend || null,
+        url: linkFor(it.name, chunks) || (watch ? `https://www.google.com/search?q=${encodeURIComponent(`${it.name} where to watch`)}` : mapsSearchUrl(`${it.name} ${it.area || place?.label || ''}`)),
+        image: null,
+      })),
+    };
+  } catch (err) {
+    const status = err instanceof ApiError ? err.status : 0;
+    if ([400, 403, 429].includes(status)) {
+      groundingOffUntil = Date.now() + 15 * 60_000;
+      console.warn(`Grounding unavailable (${status}); using open data for 15 minutes`);
+    } else console.warn('Grounded search failed', String(err).slice(0, 160));
+    return null;
+  }
+}
+
+const OsmPlanSchema = z.object({ searches: z.array(line(40)).min(1).max(3) });
+
+async function openCandidates(ai: GoogleGenAI, brief: FamilyBrief, task: string, idea: string, place: Place): Promise<Candidate[]> {
+  const plan = await generate(
+    ai,
+    brief,
+    `Turn a family plan idea into 1–3 short map searches for real places nearby, the kind you'd type into a map app: a place type, optionally with a cuisine or activity in front. Examples: "chinese restaurant", "noodle", "dim sum", "ramen", "korean restaurant", "dessert cafe", "bubble tea", "park", "playground", "bowling", "trampoline park", "escape room", "museum", "zoo", "aquarium", "theme park", "cinema", "beach", "waterfall", "mall".
+Order them from most specific to most general, and make the last one broad enough to always find something (for food, "restaurant" plus the cuisine, or just "restaurant"). If the idea is cooking or eating at home, search for restaurants serving the same food so the family can still try it out.`,
+    `Plan idea: ${idea}`,
+    OsmPlanSchema
+  );
+  if (!plan.ok) return [];
+  const radius = RADIUS[task] ?? 20;
+  const found = await osmPlaces(plan.data.searches, place, radius);
+  return found.length >= 3 ? found : osmPlaces(plan.data.searches.slice(-1), place, radius * 3);
+}
+
+const PickSchema = z.object({
+  picks: z.array(z.object({ n: z.number().int(), fit: words(16, 120), members: people })).min(1).max(4),
+});
+
+aiRouter.post('/plan/real', async (req, res) => {
+  const g = guard(req, res);
+  if (!g) return;
+  const task = text(req.body?.task, 10);
+  const who = names(req.body?.who);
+  const idea = [text(req.body?.idea?.title, 60), text(req.body?.idea?.summary, 160)].filter(Boolean).join(': ');
+  if (!TASKS[task] || !who.length || !idea) {
+    res.status(400).json({ error: 'missing_task' });
+    return;
+  }
+  const where = req.body?.where;
+  try {
+    let place: Place | null = null;
+    if (validCoords(where?.lat, where?.lon)) place = await reverseGeocode(roundCoord(where.lat), roundCoord(where.lon));
+    else if (text(where?.area, 80)) {
+      place = await geocode(text(where.area, 80));
+      if (!place) {
+        res.status(404).json({ error: 'unknown_area' });
+        return;
+      }
+    }
+    if (!place && task !== 'watch') {
+      res.status(400).json({ error: 'need_location' });
+      return;
+    }
+
+    const searchUrl = task === 'watch' ? `https://www.google.com/search?q=${encodeURIComponent(`${idea.split(':')[0]} films trending now`)}` : mapsSearchUrl(`${idea.split(':')[0]} near ${place!.label}`);
+    let source: RealSource | null = null;
+    let candidates: Candidate[] = [];
+    const grounded = await groundedCandidates(g.ai, task, idea, place);
+    if (grounded) ({ source, items: candidates } = grounded);
+    else if (task === 'watch') {
+      source = 'apple-chart';
+      candidates = await chartFilms(place?.country || 'my').catch((err) => {
+        console.warn('Film chart failed', String(err).slice(0, 160));
+        return [];
+      });
+    } else {
+      source = 'openstreetmap';
+      candidates = await openCandidates(g.ai, g.brief, task, idea, place!).catch((err) => {
+        console.warn('OpenStreetMap lookup failed', String(err).slice(0, 160));
+        return [];
+      });
+    }
+    if (!candidates.length) {
+      res.json({ source: null, near: place?.label ?? null, picks: [], searchUrl });
+      return;
+    }
+
+    const list = candidates
+      .map((c, i) => `${i + 1}. ${c.name} (${c.kind}${c.distanceKm != null ? `, ${c.distanceKm} km away` : ''})${c.trend ? ` [${c.trend}]` : ''}${c.facts.length ? ` ${c.facts.join('; ')}` : ''}`)
+      .join('\n');
+    const picked = await generate(
+      g.ai,
+      g.brief,
+      `The family chose this plan: "${idea}". People joining: ${who.join(', ')}.
+Below is a list of real ${task === 'watch' ? 'films' : 'places'} from a data source. Pick the 3 or 4 that best suit these people and the plan, by number (n), best first. ${task === 'watch' ? 'Only pick titles suitable for everyone joining: if a child or grandparent is joining, skip horror, gory or adult titles. Strongly prefer higher chart positions (lower numbers): they are what is trending right now, so only pick a low-ranked title when nothing near the top suits them.' : 'Prefer the ones that look popular and well established, and nearer ones when it is otherwise close.'} Never pick two of the same thing.
+- fit: one sentence under 16 words on why it suits them, naming people and what in their answers points to it. Don't repeat the name or restate facts from the list, and never claim it is open, available or costs a certain amount.
+- members: the names it especially suits.`,
+      `Real ${task === 'watch' ? 'films' : 'places'}:\n${list}`,
+      PickSchema,
+      (data) => {
+        const bad = data.picks.filter((p) => !candidates[p.n - 1]).map((p) => `pick ${p.n} is not in the list`);
+        const dup = new Set(data.picks.map((p) => p.n)).size !== data.picks.length ? ['each number may be picked once'] : [];
+        return [...bad, ...dup];
+      },
+      undefined,
+      // The name already heads the card, so a fit line that repeats it gets one rewrite.
+      (data) =>
+        data.picks.flatMap((p, i) => {
+          const c = candidates[p.n - 1];
+          return c && p.fit.toLowerCase().includes(c.name.toLowerCase().slice(0, 24)) ? [`picks.${i}.fit repeats the name "${c.name}": start with the people or the reason instead`] : [];
+        })
+    );
+    // When the AI can't choose, the nearest places are shown without fit lines. Films aren't: an
+    // unfiltered chart can hold titles that aren't for children.
+    if (!picked.ok && task === 'watch') {
+      res.status(picked.status).json({ error: picked.error });
+      return;
+    }
+    const picks = picked.ok
+      ? picked.data.picks.map((p) => ({ ...candidates[p.n - 1], fit: p.fit, members: p.members }))
+      : candidates.slice(0, 3).map((c) => ({ ...c, fit: null, members: [] }));
+    res.json({ source, near: place?.label ?? null, picks, searchUrl });
+  } catch (err) {
+    return sendError(res, err);
+  }
 });

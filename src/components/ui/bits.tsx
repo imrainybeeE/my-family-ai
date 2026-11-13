@@ -150,7 +150,7 @@ export function Segmented<T extends string>({
 }: {
   value: T;
   options: { value: T; label: string }[];
-  onChange: (v: T) => void;
+  onChange: (v: T, e: React.MouseEvent<HTMLButtonElement>) => void;
   label: string;
 }) {
   return (
@@ -162,7 +162,7 @@ export function Segmented<T extends string>({
           role="radio"
           aria-checked={value === o.value}
           tabIndex={rovingTabIndex(i, options.findIndex((x) => x.value === value))}
-          onClick={() => onChange(o.value)}
+          onClick={(e) => onChange(o.value, e)}
         >
           {o.label}
         </button>

@@ -20,12 +20,15 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Shantell+Sans:wght@500;600&display=swap" rel="stylesheet" />
     <script>
-      // Paint the right theme before React loads, so dark mode never flashes white.
+      // Paint the right paper before React loads, so the page never flashes the wrong theme.
       try {
         var m = localStorage.getItem('myfamilyai_theme');
         var p = new URLSearchParams(location.search).get('theme');
         var dark = p ? p === 'dark' : m === 'dark' || ((!m || m === 'system') && matchMedia('(prefers-color-scheme: dark)').matches);
         if (dark) document.documentElement.classList.add('dark');
+        var q = new URLSearchParams(location.search).get('palette');
+        var palette = q === 'ocean' || q === 'forest' ? q : localStorage.getItem('myfamilyai_palette');
+        document.documentElement.dataset.palette = palette === 'forest' ? 'forest' : 'ocean';
       } catch (e) {}
     </script>
   </head>

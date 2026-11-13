@@ -4,7 +4,7 @@ import { Sheet } from '../ui/Sheet';
 import { CopyButton, Segmented, SeedMark, useToast } from '../ui/bits';
 import { onRovingKeyDown, rovingTabIndex } from '../ui/roving';
 import { useHousehold } from '../../context/HouseholdContext';
-import { useTheme, ThemeMode } from '../../context/ThemeContext';
+import { useTheme, ThemeMode, Palette, PALETTES } from '../../context/ThemeContext';
 import { FlowerBadge } from '../art/Flower';
 import { ALLOWED_ROLES, validateMemberInput } from '../../utils/familyCode';
 import { uniqueNames } from '../../utils/member';
@@ -13,7 +13,7 @@ import { feel, setSoundOn, soundOn } from '../../feel/feel';
 
 export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { household, members, responses, activeMember, selectActiveMember, addMember, leaveHousehold, isDemo } = useHousehold();
-  const { mode, setMode } = useTheme();
+  const { mode, setMode, palette, setPalette, isDark } = useTheme();
   const toast = useToast();
   const [adding, setAdding] = useState(false);
   const [role, setRole] = useState<MemberRole>('Sister');
@@ -41,11 +41,28 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
     <Sheet open={open} onClose={onClose} title="Settings">
       <div className="grid gap-7 pb-4">
         <section>
-          <h3 className="t-label ink-2 mb-2">Appearance</h3>
+          <h3 className="t-label ink-2 mb-2">Theme</h3>
+          <div className="grid grid-cols-2 gap-3 mb-3" role="radiogroup" aria-label="Theme" onKeyDown={(e) => onRovingKeyDown(e)}>
+            {PALETTES.map((p, i) => (
+              <PaletteTile
+                key={p.value}
+                palette={p.value}
+                label={p.label}
+                dark={isDark}
+                on={palette === p.value}
+                tabIndex={rovingTabIndex(i, PALETTES.findIndex((x) => x.value === palette))}
+                onPick={(e) => {
+                  if (palette === p.value) return;
+                  feel('select');
+                  setPalette(p.value, origin(e));
+                }}
+              />
+            ))}
+          </div>
           <Segmented<ThemeMode>
             label="Appearance"
             value={mode}
-            onChange={setMode}
+            onChange={(v, e) => setMode(v, origin(e))}
             options={[
               { value: 'light', label: 'Light' },
               { value: 'dark', label: 'Dark' },
@@ -188,5 +205,60 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
         </section>
       </div>
     </Sheet>
+  );
+}
+
+/** Where a repaint grows from: the tap, or the middle of the control when it came from the keyboard. */
+function origin(e: React.MouseEvent<HTMLElement>) {
+  if (e.detail > 0) return { x: e.clientX, y: e.clientY };
+  const r = e.currentTarget.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
+
+/** Each tile is drawn in its own palette, whichever one is showing, so you can see what you'd get. */
+const SWATCH: Record<Palette, { light: string[]; dark: string[] }> = {
+  // page, card, accent, accent-soft, ink-faint
+  ocean: { light: ['#e4ecf5', '#ffffff', '#24345e', '#dfe6f5', '#d6deea'], dark: ['#131b2c', '#1c263b', '#e6ecf8', '#2a3653', '#2b3650'] },
+  forest: { light: ['#e6ede2', '#ffffff', '#2e6b4a', '#dcebe0', '#d3dccd'], dark: ['#111a15', '#19251f', '#8fdcae', '#1d3a2b', '#29382f'] },
+};
+
+function PaletteTile({
+  palette,
+  label,
+  dark,
+  on,
+  tabIndex,
+  onPick,
+}: {
+  palette: Palette;
+  label: string;
+  dark: boolean;
+  on: boolean;
+  tabIndex: number;
+  onPick: (e: React.MouseEvent<HTMLButtonElement>) => void;
+}) {
+  const [page, card, accent, soft, line] = SWATCH[palette][dark ? 'dark' : 'light'];
+  return (
+    <button type="button" role="radio" aria-checked={on} tabIndex={tabIndex} className="palette-tile" onClick={onPick}>
+      <svg viewBox="0 0 120 84" className="palette-tile-art" aria-hidden>
+        <rect width="120" height="84" fill={page} />
+        {palette === 'ocean' ? (
+          <path d="M0 70 q10 -6 20 0 t20 0 t20 0 t20 0 t20 0 t20 0 V84 H0Z" fill={soft} />
+        ) : (
+          <path d="M0 72 q18 -14 40 -4 q22 -14 46 -2 q18 -8 34 0 V84 H0Z" fill={soft} />
+        )}
+        <rect x="14" y="14" width="58" height="40" rx="7" fill={card} />
+        <rect x="22" y="23" width="30" height="5" rx="2.5" fill={accent} />
+        <rect x="22" y="33" width="40" height="4" rx="2" fill={line} />
+        <rect x="22" y="41" width="26" height="4" rx="2" fill={line} />
+        <path d="M78 10 C 88 30, 104 22, 108 44" stroke="#e86f8f" strokeWidth="3" fill="none" strokeLinecap="round" />
+        <circle cx="96" cy="58" r="9" fill="#f4c542" />
+        <circle cx="96" cy="58" r="4" fill={accent} />
+      </svg>
+      <span className="palette-tile-label">
+        <span className="font-semibold">{label}</span>
+        <SeedMark on={on} />
+      </span>
+    </button>
   );
 }

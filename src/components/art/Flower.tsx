@@ -83,7 +83,7 @@ export function FlowerBadge({ style, size = 44, ring = true, label }: { style?: 
   return (
     <span
       className="inline-grid place-items-center rounded-full shrink-0 overflow-hidden"
-      style={{ width: size, height: size, background: bg, boxShadow: ring ? '0 0 0 2px var(--card), 0 2px 6px -2px rgba(20,30,50,.35)' : undefined }}
+      style={{ width: size, height: size, background: bg, boxShadow: ring ? '0 0 0 2px var(--card), 0 2px 6px -2px rgb(var(--shade) / .35)' : undefined }}
       role={label ? 'img' : undefined}
       aria-label={label}
     >

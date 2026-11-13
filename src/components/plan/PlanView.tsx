@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { onRovingKeyDown, rovingTabIndex } from '../ui/roving';
 import { useHousehold } from '../../context/HouseholdContext';
 import { restates, vagueDetail } from '../../../server/claims';
@@ -16,6 +16,7 @@ import { FlowerBadge } from '../art/Flower';
 import { DoArt, EatArt, TravelArt, WatchArt } from '../art/Icons';
 import { SectionTitle, Thinking } from '../ui/bits';
 import { Coin } from './Coin';
+import { RealPicks } from './RealPicks';
 import { PlanTask } from '../../types';
 
 const TASK: Record<PlanTask, { label: string; hint: string; title: string; Art: typeof EatArt }> = {
@@ -25,7 +26,7 @@ const TASK: Record<PlanTask, { label: string; hint: string; title: string; Art: 
   travel: { label: 'Travel', hint: 'A trip away', title: 'Where should we go?', Art: TravelArt },
 };
 
-type Stage = 'who' | 'asking' | 'questions' | 'thinking' | 'ideas';
+type Stage = 'who' | 'asking' | 'questions' | 'thinking' | 'ideas' | 'real';
 
 export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask | null; onConsumeTask: () => void }) {
   const { brief, members, responses, myAnswers } = useHousehold();
@@ -324,6 +325,32 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
                 />
               ))}
               <p className="t-small ink-3">Written by AI</p>
+              <AnimatePresence>
+                {chosen !== null && result.ideas[chosen] && (
+                  <motion.div
+                    className="sticky z-10 -mx-5 px-5 pt-4"
+                    style={{ bottom: 'calc(var(--tabbar-top) + 4px + var(--safe-b))' }}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 16 }}
+                    transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                  >
+                    <div aria-hidden className="scrim absolute inset-0 -z-10" style={{ ['--scrim-mask' as string]: 'linear-gradient(to bottom, transparent, #000 16px)' }} />
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-block"
+                      onClick={() => {
+                        feel('select');
+                        setStage('real');
+                        window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+                      }}
+                    >
+                      <span className="truncate">{task === 'watch' ? 'Find real films' : 'Find real places'}</span>
+                      <ArrowRight size={18} strokeWidth={2.6} />
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
               <div className="grid gap-1 mt-1">
                 <PickForUs titles={result.ideas.map((x) => x.title)} onPick={setChosen} />
                 <div className="grid grid-cols-2">
@@ -336,6 +363,9 @@ export function PlanView({ initialTask, onConsumeTask }: { initialTask: PlanTask
                 </div>
               </div>
             </div>
+          )}
+          {stage === 'real' && result && chosen !== null && result.ideas[chosen] && (
+            <RealPicks task={task} idea={result.ideas[chosen]} who={who} onBack={() => setStage('ideas')} />
           )}
         </motion.div>
       </AnimatePresence>
