@@ -42,7 +42,14 @@ export const FELT_FOR_STYLE: Record<DiscoveryStyleId, FeltName> = {
 };
 
 export function Felt({ name, size, className, style }: { name: FeltName; size: number; className?: string; style?: React.CSSProperties }) {
-  return <img src={`${import.meta.env.BASE_URL}felt/${name}.webp`} width={size} height={size} alt="" aria-hidden className={`felt ${className || ''}`} style={style} draggable={false} decoding="async" />;
+  const base = `${import.meta.env.BASE_URL}felt/`;
+  const sizes = `${Math.ceil(size)}px`;
+  return (
+    <picture style={{ display: 'block', width: size, height: size }}>
+      <source type="image/avif" srcSet={`${base}avif/256/${name}.avif 256w, ${base}avif/384/${name}.avif 384w, ${base}avif/512/${name}.avif 512w`} sizes={sizes} />
+      <img src={`${base}${name}.webp`} srcSet={`${base}256/${name}.webp 256w, ${base}384/${name}.webp 384w, ${base}${name}.webp 512w`} sizes={sizes} width={size} height={size} alt="" aria-hidden className={`felt ${className || ''}`} style={style} draggable={false} decoding="async" />
+    </picture>
+  );
 }
 
 interface FlowerProps {

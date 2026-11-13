@@ -18,7 +18,9 @@ try {
     await page.waitForTimeout(1800);
     // Pause JS motion at a settled frame, not in the middle of the cover's gentle drift.
     await page.clock.pauseAt(await page.evaluate(() => Date.now() + 10000));
-    await page.screenshot({ path: path.join(out, `${palette}-${colorScheme}-${screen}.png`), animations: 'disabled' });
+    const prefix = path.join(out, `${palette}-${colorScheme}-${screen}`);
+    fs.writeFileSync(`${prefix}-art.json`, JSON.stringify(await page.locator('img.felt').evaluateAll(images => images.map(image => { const r = image.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })), null, 2));
+    await page.screenshot({ path: `${prefix}.png`, animations: 'disabled' });
     await page.clock.resume();
   };
   await page.goto(`${base}/?theme=${colorScheme}&palette=${palette}`);

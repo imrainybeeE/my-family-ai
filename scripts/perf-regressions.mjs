@@ -72,6 +72,17 @@ async function check(name, seed, demo = false, expectedFamily = false) {
    await page.getByRole('dialog').waitFor({ state: 'hidden' });
    await page.getByRole('button', { name: 'Start your family', exact: true }).click();
    assert.equal(await page.getByRole('dialog').locator('input').first().inputValue(), 'Kept draft');
+   await page.keyboard.press('Escape');
+   await page.getByRole('dialog').waitFor({ state: 'hidden' });
+   const piece = page.locator('.loose').nth(2);
+   const before = await piece.boundingBox();
+   await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+   await page.mouse.down();
+   await page.mouse.move(before.x + before.width / 2 + 40, before.y + before.height / 2 + 15, { steps: 12 });
+   assert.ok((await piece.boundingBox()).x > before.x + 20, 'Felt art must still drag');
+   await page.mouse.up();
+   await page.waitForTimeout(1800);
+   assert.ok(Math.abs((await piece.boundingBox()).x - before.x) < 8, 'Felt art must snap back');
   }
   assert.deepEqual(errors, []);
   passed++;
