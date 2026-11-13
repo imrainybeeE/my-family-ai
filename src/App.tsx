@@ -7,9 +7,9 @@ import { TabBar } from './components/layout/TabBar';
 import { Flower } from './components/art/Flower';
 import { PlanTask, TabType } from './types';
 
-// A screen or sheet joins the bundle only when it is used.
-const Welcome = lazy(() => import('./components/welcome/Welcome').then((m) => ({ default: m.Welcome })));
-const GardenView = lazy(() => import('./components/home/GardenView').then((m) => ({ default: m.GardenView })));
+// The two entry screens are eager; other tabs and sheets load on demand.
+import { Welcome } from './components/welcome/Welcome';
+import { GardenView } from './components/home/GardenView';
 const TogetherView = lazy(() => import('./components/together/TogetherView').then((m) => ({ default: m.TogetherView })));
 const PlanView = lazy(() => import('./components/plan/PlanView').then((m) => ({ default: m.PlanView })));
 const AskView = lazy(() => import('./components/ask/AskView').then((m) => ({ default: m.AskView })));

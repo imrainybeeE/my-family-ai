@@ -4,6 +4,7 @@ import { buildBrief, FamilyBrief } from '../services/brief';
 import { DEMO_ACTIVE_MEMBER, DEMO_HOUSEHOLD, DEMO_MEMBERS, DEMO_RESPONSES } from '../data/demoFamily';
 import { AVATAR_PALETTE } from '../utils/familyCode';
 import { mergeAnswers, rollbackAnswers } from '../utils/member';
+import { mayHaveSavedSession } from '../utils/savedSession';
 import { Household, HouseholdMember, MemberRole, MemberTasteAnswers } from '../types';
 
 // The demo never talks to Firebase. Keep the SDK off that route's import graph.
@@ -103,6 +104,9 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       try {
+        // A first-time visitor has no family to restore. Authentication still
+        // happens in ensureUser before creating or joining a real household.
+        if (!await mayHaveSavedSession()) return;
         const [{ ensureAnonymousUser }, { getUserSession, getHousehold, getHouseholdMembers }] = await Promise.all([
           firebase(), import('../services/householdReads'),
         ]);
