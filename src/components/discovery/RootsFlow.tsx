@@ -238,7 +238,7 @@ export function RootsFlow({ open, onClose }: { open: boolean; onClose: () => voi
         )}
 
         {stage === 'reflect' && (
-          <motion.div key={`r${q.id}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="grid gap-4 pt-6">
+          <motion.div key={`r${q.id}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="grid grid-cols-1 gap-4 pt-6">
             <button type="button" className="stock stock-lilac text-left w-full border-0" aria-expanded={showSaid} onClick={() => setShowSaid((v) => !v)} style={{ padding: '14px 16px' }}>
               <span className="flex items-center justify-between gap-3">
                 <span className="t-hand opacity-75">You said</span>
