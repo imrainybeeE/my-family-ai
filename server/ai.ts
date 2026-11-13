@@ -6,6 +6,9 @@ import { z } from 'zod';
 import { parseBrief, renderBrief } from './familyBrief.ts';
 import { alignMembers, awkwardAsk, checkClaims, headlineFor, paddedQuestion, restates, sharedHeadline, sharedOnly, sharesTopic, stripClaims, vagueDetail } from './claims.ts';
 import type { FamilyBrief } from './familyBrief.ts';
+import { chartFilms, chartPoster, firstJson, geocode, linkFor, mapsSearchUrl, osmPlaces, reverseGeocode, roundCoord, validCoords } from './real.ts';
+import type { Candidate, Place, RealSource } from './real.ts';
+import { filmPoster, netflixTop10, seriesPoster, wikiImage, wikiImages, wikiPageImage } from './media.ts';
 
 // Every AI feature runs on Gemini Flash-Lite with minimal thinking: about 1.5s a reply and no
 // thinking tokens. When Google reports it busy or out of quota, the request moves to the
@@ -378,7 +381,7 @@ async function generate<T extends z.ZodType>(
     const broken = rules?.(data) || [];
     if (broken.length) {
       feedback = broken.slice(0, 4).join('; ');
-      console.warn('Gemini reply broke a rule', { attempt, rules: broken.length });
+      console.warn('Gemini reply broke a rule', { attempt, rules: broken.slice(0, 3) });
       if (attempt === 0) continue;
       return { ok: false, status: 502, error: 'ai_invalid' };
     }
@@ -400,7 +403,7 @@ async function generate<T extends z.ZodType>(
     }
     // After the retry, wrong sentences are removed. If that leaves the reply invalid, or anything
     // false survives, nothing is sent: no flagged claim ever reaches the family.
-    const fixed = sharedOnly(alignMembers(issues.length ? stripClaims(data, issues, { headline: sharedHeadline(brief) }) : data, brief), brief);
+    const fixed = sharedOnly(alignMembers(issues.length ? stripClaims(data, issues, { headline: sharedHeadline(brief), fit: NO_FIT }) : data, brief), brief);
     const checked = schema.safeParse(fixed);
     if (!checked.success || checkClaims(checked.data, brief).length || (rules?.(checked.data) || []).length) {
       console.warn('Reply still had wrong attributions after a retry; not sent', checked.success ? checkClaims(checked.data, brief).map((i) => i.message) : checked.error.issues.slice(0, 2).map((i) => `${i.path.join('.')}: ${i.message}`));
@@ -413,10 +416,11 @@ async function generate<T extends z.ZodType>(
 }
 
 /** Runs one structured request and replies with the checked object. */
-async function structured<T extends z.ZodType>(res: Response, ai: GoogleGenAI, brief: FamilyBrief, task: string, user: string, schema: T, rules?: (data: z.infer<T>) => string[], repair?: (data: z.infer<T>) => z.infer<T>, polish?: (data: z.infer<T>) => string[]) {
+async function structured<T extends z.ZodType>(res: Response, ai: GoogleGenAI, brief: FamilyBrief, task: string, user: string, schema: T, rules?: (data: z.infer<T>) => string[], repair?: (data: z.infer<T>) => z.infer<T>, polish?: (data: z.infer<T>) => string[], enrich?: (data: z.infer<T>) => Promise<unknown>) {
   try {
     const out = await generate(ai, brief, task, user, schema, rules, repair, polish);
-    return out.ok ? res.json(out.data) : res.status(out.status).json({ error: out.error });
+    if (!out.ok) return res.status(out.status).json({ error: out.error });
+    return res.json(enrich ? await enrich(out.data) : out.data);
   } catch (err) {
     return sendError(res, err);
   }
@@ -460,6 +464,7 @@ const PlanIdeasSchema = z.object({
         members: people,
         tradeoff: line(100),
         check: line(150).nullable(),
+        photo: line(40),
       })
     )
     .min(3)
@@ -802,6 +807,7 @@ Give exactly 3 options that fit these people, using their saved answers and prac
 - why: one sentence under 18 words on why it fits, naming people and what in their answers points to it.
 - members: the names it especially suits.
 - tradeoff: one short, honest sentence under 12 words on what you give up compared with the other options.
+- photo: ${taskKey === 'watch' ? 'the exact title of one real, family-suitable film or show that fits this idea.' : 'the name of a Wikipedia article whose photo shows this idea best: the dish, activity or place itself, in 1–3 words (for example "Char kway teow", "Kite", "Batu Caves", "Bowling").'}
 - check: for plans that depend on the outside world (a restaurant, venue, trip, booking or film rating), one short sentence on what to check first. For things done at home with what you have, null.
 These are AI ideas: never claim something exists, is open, is available or costs a certain amount. ${watchNote}`,
     `Practical answers:\n${practical || '- none given'}`,
@@ -816,5 +822,278 @@ These are AI ideas: never claim something exists, is open, is available or costs
     ],
     undefined,
     (data) => data.ideas.flatMap((idea, i) => (vagueDetail(idea.summary) ? [`ideas.${i}.summary is vague: name a real ingredient, step or time, as in "Mum measures the rice while Nai Nai chops carrots for the curry"`] : [])),
+    async (data) => ({ ideas: await Promise.all(data.ideas.map(async ({ photo, ...idea }) => ({ ...idea, image: await quick(ideaPicture(photo, idea.title, taskKey === 'watch')) }))) }),
   );
 });
+
+// --- Real places and films for a chosen idea --------------------------------------------------
+// Facts (names, ratings, chart positions, distances) come from a data source; the AI only picks
+// which suit the family and writes why. Google grounding is tried first; when the key can't use
+// it, places come from OpenStreetMap and films from Apple's chart. Locations are never stored.
+
+/** How far each kind of plan looks, in km. */
+const RADIUS: Record<string, number> = { eat: 6, do: 20, travel: 120 };
+/** When grounding is refused (no quota on this key), it's skipped for a while instead of costing a call each time. */
+let groundingOffUntil = 0;
+const TREND_RULE = 'Lean towards what is popular right now: places or titles people are talking about, highly rated with many recent reviews, newly opened or newly released, social-media favourites. Avoid obscure or tired choices.';
+
+const GroundedSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        name: line(80),
+        kind: line(60),
+        area: z.string().max(80).nullable().optional(),
+        facts: z.array(z.string().max(90)).max(3).optional(),
+        trend: z.string().max(110).nullable().optional(),
+      })
+    )
+    .max(10),
+});
+
+async function groundedCandidates(ai: GoogleGenAI, task: string, idea: string, place: Place | null): Promise<{ source: RealSource; items: Candidate[] } | null> {
+  if (Date.now() < groundingOffUntil) return null;
+  const watch = task === 'watch';
+  const where = place ? `near ${place.label} (around ${place.lat}, ${place.lon})` : 'in Malaysia';
+  const prompt = watch
+    ? `Find 8 real films or shows a family could watch now that match this idea: "${idea}". Use Google Search for what is in cinemas ${where} and trending on streaming this week. ${TREND_RULE}
+Reply with only JSON: {"items":[{"name":"exact title","kind":"genre and where to watch, e.g. Animation · in cinemas","area":null,"facts":["year","age rating if found"],"trend":"why it is popular this week, from the search results, or null"}]}`
+    : `Find 8 real, currently operating places ${where} that match this plan idea: "${idea}". Use Google Maps. Stay within ${RADIUS[task] ?? 20} km. ${TREND_RULE}
+Reply with only JSON: {"items":[{"name":"exact place name","kind":"what it is, e.g. Dumpling restaurant","area":"neighbourhood","facts":["4.6★ (2,100 reviews)","price level if known"],"trend":"why it is popular right now, from reviews or news, or null"}]}
+Facts and trend lines must come from the map data, never guesses.`;
+  try {
+    const reply = await ai.models.generateContent({
+      model: MODEL,
+      contents: prompt,
+      config: {
+        tools: watch ? [{ googleSearch: {} }] : [{ googleMaps: {} }],
+        ...(place && !watch ? { toolConfig: { retrievalConfig: { latLng: { latitude: place.lat, longitude: place.lon } } } } : {}),
+        thinkingConfig: { thinkingLevel: THINKING },
+      },
+    });
+    logUsage(reply.modelVersion, reply.usageMetadata);
+    const parsed = GroundedSchema.safeParse(firstJson(reply.text || ''));
+    if (!parsed.success || !parsed.data.items.length) return null;
+    const chunks = (reply.candidates?.[0]?.groundingMetadata?.groundingChunks || []).map((c) => c.maps || c.web || {});
+    // Only items the source actually returned are kept; anything else could be the model's guess.
+    const sourced = parsed.data.items.filter((it) => linkFor(it.name, chunks));
+    if (sourced.length < 2) return null;
+    return {
+      source: watch ? 'google-search' : 'google-maps',
+      items: sourced.map((it, i) => ({
+        id: `g${i + 1}`,
+        name: it.name,
+        kind: it.kind,
+        area: it.area || null,
+        distanceKm: null,
+        facts: (it.facts || []).filter(Boolean),
+        trend: it.trend || null,
+        url: linkFor(it.name, chunks)!,
+        image: null,
+      })),
+    };
+  } catch (err) {
+    const status = err instanceof ApiError ? err.status : 0;
+    if ([400, 403, 429].includes(status)) {
+      groundingOffUntil = Date.now() + 15 * 60_000;
+      console.warn(`Grounding unavailable (${status}); using open data for 15 minutes`);
+    } else console.warn('Grounded search failed', String(err).slice(0, 160));
+    return null;
+  }
+}
+
+const OsmPlanSchema = z.object({ searches: z.array(line(40)).min(1).max(3) });
+
+async function openCandidates(ai: GoogleGenAI, brief: FamilyBrief, task: string, idea: string, place: Place): Promise<Candidate[]> {
+  const plan = await generate(
+    ai,
+    brief,
+    `Turn a family plan idea into 1–3 short map searches for real places nearby, the kind you'd type into a map app: a place type, optionally with a cuisine or activity in front. Examples: "chinese restaurant", "noodle", "dim sum", "ramen", "korean restaurant", "dessert cafe", "bubble tea", "park", "playground", "bowling", "trampoline park", "escape room", "museum", "zoo", "aquarium", "theme park", "cinema", "beach", "waterfall", "mall".
+Order them from most specific to most general, and make the last one broad enough to always find something (for food, "restaurant" plus the cuisine, or just "restaurant"). If the idea is cooking or eating at home, search for restaurants serving the same food so the family can still try it out.`,
+    `Plan idea: ${idea}`,
+    OsmPlanSchema
+  ).catch(() => null);
+  // Without the AI, a broad search for the kind of plan still finds real places.
+  const searches = plan?.ok ? plan.data.searches : ({ eat: ['restaurant'], do: ['park', 'museum'], travel: ['attraction'] } as Record<string, string[]>)[task] || ['attraction'];
+  const radius = RADIUS[task] ?? 20;
+  const found = await osmPlaces(searches, place, radius);
+  if (found.length >= 3) return found;
+  // Too few nearby: look further with the broadest search, keeping the nearby ones first.
+  const wider = await osmPlaces(searches.slice(-1), place, radius * 3);
+  const seen = new Set(found.map((c) => c.name.toLowerCase()));
+  return [...found, ...wider.filter((c) => !seen.has(c.name.toLowerCase()))].slice(0, 16).map((c, i) => ({ ...c, id: `osm${i + 1}` }));
+}
+
+/**
+ * What a real pick's fit line becomes when its only sentence made a false claim. The place or film
+ * is still real, so the pick stays and shows without a fit line.
+ */
+const NO_FIT = ' ';
+
+const PickSchema = z.object({
+  picks: z.array(z.object({ n: z.number().int(), fit: words(16, 120), members: people, photo: line(40) })).min(1).max(4),
+});
+
+aiRouter.post('/plan/real', async (req, res) => {
+  const g = guard(req, res);
+  if (!g) return;
+  const task = text(req.body?.task, 10);
+  const who = names(req.body?.who);
+  const idea = [text(req.body?.idea?.title, 60), text(req.body?.idea?.summary, 160)].filter(Boolean).join(': ');
+  if (!TASKS[task] || !who.length || !idea) {
+    res.status(400).json({ error: 'missing_task' });
+    return;
+  }
+  const where = req.body?.where;
+  try {
+    let place: Place | null = null;
+    if (validCoords(where?.lat, where?.lon)) place = await reverseGeocode(roundCoord(where.lat), roundCoord(where.lon));
+    else if (text(where?.area, 80)) {
+      place = await geocode(text(where.area, 80));
+      if (!place) {
+        res.status(404).json({ error: 'unknown_area' });
+        return;
+      }
+    }
+    if (!place && task !== 'watch') {
+      res.status(400).json({ error: 'need_location' });
+      return;
+    }
+
+    const searchUrl = task === 'watch' ? `https://www.google.com/search?q=${encodeURIComponent(`${idea.split(':')[0]} films trending now`)}` : mapsSearchUrl(`${idea.split(':')[0]} near ${place!.label}`);
+    let source: RealSource | null = null;
+    let candidates: Candidate[] = [];
+    const grounded = await groundedCandidates(g.ai, task, idea, place);
+    if (grounded) ({ source, items: candidates } = grounded);
+    else if (task === 'watch') {
+      const cc = place?.country || process.env.DEFAULT_COUNTRY || 'my';
+      candidates = netflixCandidates(await netflixTop10(cc).catch(() => []), cc);
+      source = 'netflix';
+      if (!candidates.length) {
+        source = 'apple-chart';
+        candidates = await chartFilms(cc).catch((err) => {
+          console.warn('Film chart failed', String(err).slice(0, 160));
+          return [];
+        });
+      }
+    } else {
+      source = 'openstreetmap';
+      candidates = await openCandidates(g.ai, g.brief, task, idea, place!).catch((err) => {
+        console.warn('OpenStreetMap lookup failed', String(err).slice(0, 160));
+        return [];
+      });
+    }
+    if (!candidates.length) {
+      res.json({ source: null, near: place?.label ?? null, picks: [], searchUrl });
+      return;
+    }
+
+    const list = candidates
+      .map((c, i) => `${i + 1}. ${c.name} (${c.kind}${c.distanceKm != null ? `, ${c.distanceKm} km away` : ''})${c.trend ? ` [${c.trend}]` : ''}${c.facts.length ? ` ${c.facts.join('; ')}` : ''}`)
+      .join('\n');
+    // A busy AI doesn't sink the step: places still come back, nearest first, without fit lines.
+    const picked = await generate(
+      g.ai,
+      g.brief,
+      `The family chose this plan: "${idea}". People joining: ${who.join(', ')}.
+Below is a list of real ${task === 'watch' ? 'films' : 'places'} from a data source. Pick the 4 that best suit these people and the plan, by number (n), best first. ${task === 'watch' ? 'Only pick titles suitable for everyone joining: if a child or grandparent is joining, skip horror, gory or adult titles. Strongly prefer higher chart positions (the # in square brackets): they are what is trending right now, so only pick a low-ranked title when nothing near the top suits them.' : 'Prefer the ones that look popular and well established, and nearer ones when it is otherwise close.'} Never pick two of the same thing.
+- fit: one sentence under 16 words on why it suits them, naming people and what in their answers points to it. Don't repeat the name or restate facts from the list, and never claim it is open, available or costs a certain amount.
+- members: the names it especially suits.
+- photo: ${task === 'watch' ? 'the exact title.' : 'the dish, food or activity this place is most likely known for, judging by its name and kind, as a Wikipedia article name of 1–3 words (for example "Char kway teow", "Dim sum", "Bowling", "Museum").'}`,
+      `Real ${task === 'watch' ? 'films' : 'places'}:\n${list}`,
+      PickSchema,
+      (data) => {
+        const bad = data.picks.filter((p) => !candidates[p.n - 1]).map((p) => `pick ${p.n} is not in the list`);
+        const dup = new Set(data.picks.map((p) => p.n)).size !== data.picks.length ? ['each number may be picked once'] : [];
+        return [...bad, ...dup];
+      },
+      undefined,
+      // The name already heads the card, so a fit line that repeats it gets one rewrite.
+      (data) =>
+        data.picks.flatMap((p, i) => {
+          const c = candidates[p.n - 1];
+          return c && p.fit.toLowerCase().includes(c.name.toLowerCase().slice(0, 24)) ? [`picks.${i}.fit repeats the name "${c.name}": start with the people or the reason instead`] : [];
+        })
+    ).catch((err) => {
+      console.warn('Choosing real picks failed', String(err).slice(0, 120));
+      return { ok: false as const, status: 503, error: 'ai_error' };
+    });
+    // When the AI can't choose, the nearest places are shown without fit lines. Films only fall back
+    // to titles the chart itself files as family viewing: an unfiltered chart isn't for children.
+    const fallback = task === 'watch' ? candidates.filter((c) => /kids|family|animation/i.test(c.kind)) : candidates;
+    if (!picked.ok && !fallback.length) {
+      res.status(picked.status).json({ error: picked.error });
+      return;
+    }
+    const chosen = picked.ok
+      ? picked.data.picks.map((p) => ({ ...candidates[p.n - 1], fit: p.fit.trim() || null, members: p.members, photo: p.photo }))
+      : fallback.slice(0, 3).map((c) => ({ ...c, fit: null, members: [], photo: '' }));
+    const pictures = await Promise.all(chosen.map(({ source: hints, photo, ...c }) => pictureFor(c, hints, photo, task)));
+    // Two places known for the same dish get different photos of it.
+    const used = new Set<string>();
+    const picks = chosen.map(({ source: _hints, photo: _photo, ...c }, i) => {
+      const pick = pictures[i].find((o) => !used.has(o.url)) ?? null;
+      if (pick) used.add(pick.url);
+      return { ...c, image: pick?.url ?? null, imageExample: pick?.example ?? null };
+    });
+    res.json({ source, near: place?.label ?? null, picks, searchUrl });
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+/** A picture lookup that never holds a reply up for more than 3.5 seconds. */
+function quick<T>(lookup: Promise<T | null>): Promise<T | null> {
+  return Promise.race([lookup.catch(() => null), new Promise<null>((r) => setTimeout(() => r(null), 3500))]);
+}
+
+/**
+ * The best picture for a real pick: the place's own photo when OpenStreetMap or Wikipedia has
+ * one, a poster for a film or series, and otherwise a photo of what it's known for, labelled as
+ * an example so nobody takes it for the place itself.
+ */
+async function pictureFor(c: Candidate, hints: Candidate['source'], photo: string, task: string): Promise<{ url: string; example: string | null }[]> {
+  if (c.image) return [{ url: c.image, example: null }];
+  if (task === 'watch') {
+    const poster = await quick(c.kind.startsWith('Series') ? seriesPoster(c.name) : chartPoster(c.name, process.env.DEFAULT_COUNTRY || 'my').then((p) => p || filmPoster(c.name)));
+    return poster ? [{ url: poster, example: null }] : [];
+  }
+  const own = hints?.image || (hints?.wikipedia ? await quick(wikiPageImage(hints.wikipedia)) : null) || (hints?.landmark ? await quick(wikiImage(c.name, { mustMatch: c.name })) : null);
+  if (own) return [{ url: own, example: null }];
+  // Labelled with the article each photo comes from, so the label names what's actually shown.
+  return photo ? ((await quick(wikiImages(photo))) || []).map((p) => ({ url: p.url, example: p.title })) : [];
+}
+
+/** Netflix's Top 10 for a country as candidates, ranked as Netflix ranks them. */
+function netflixCandidates(titles: Awaited<ReturnType<typeof netflixTop10>>, cc: string): Candidate[] {
+  const where = (() => {
+    try {
+      return new Intl.DisplayNames(['en-GB'], { type: 'region' }).of(cc.toUpperCase()) || cc.toUpperCase();
+    } catch {
+      return cc.toUpperCase();
+    }
+  })();
+  return titles.map((t, i) => {
+    const series = t.category.startsWith('TV');
+    return {
+      id: `nf${i + 1}`,
+      name: t.title,
+      kind: `${series ? 'Series' : 'Film'} · Netflix`,
+      area: null,
+      distanceKm: null,
+      facts: [t.season && t.season !== t.title ? t.season : '', t.weeks > 1 ? `${t.weeks} weeks in the Top 10` : 'New in the Top 10'].filter(Boolean),
+      trend: `#${t.rank} ${series ? 'series' : 'film'} on Netflix in ${where} this week`,
+      url: `https://www.netflix.com/search?q=${encodeURIComponent(t.title)}`,
+      image: null,
+    };
+  });
+}
+
+/**
+ * An idea's picture: a photo of its subject, else of its title. A film idea only ever shows a real
+ * poster of the title it names: genre articles' lead photos are film stills not chosen for children.
+ */
+async function ideaPicture(photo: string, title: string, film: boolean): Promise<string | null> {
+  if (film) return (await chartPoster(photo, process.env.DEFAULT_COUNTRY || 'my')) || (await seriesPoster(photo));
+  return (await wikiImage(photo)) || (await wikiImage(title));
+}

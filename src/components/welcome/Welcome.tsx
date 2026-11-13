@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { feel } from '../../feel/feel';
 import { useHousehold } from '../../context/HouseholdContext';
-import { CreateFamily } from '../onboarding/CreateFamily';
-import { JoinFamily } from '../onboarding/JoinFamily';
 import { Felt, FeltName } from '../art/Flower';
 import { Strand, useWidth } from '../art/Garland';
+
+const CreateFamily = lazy(() => import('../onboarding/CreateFamily').then((m) => ({ default: m.CreateFamily })));
+
+const JoinFamily = lazy(() => import('../onboarding/JoinFamily').then((m) => ({ default: m.JoinFamily })));
 
 /** The flat-lay on the cover, laid out for a 393px-wide page and scaled to fit. */
 const SPREAD: { name: FeltName; x: number; y: number; size: number; r: number }[] = [
@@ -21,6 +23,7 @@ const HERO = 430;
 
 export function Welcome() {
   const { startDemo, error, clearError } = useHousehold();
+  const [visited, setVisited] = useState({ create: false, join: false });
   const [sheet, setSheet] = useState<'create' | 'join' | null>(null);
   const [ref, w] = useWidth<HTMLDivElement>();
   const k = w / 393;
@@ -79,10 +82,10 @@ export function Welcome() {
         )}
 
         <div className="mt-auto pt-8 grid gap-3">
-          <button type="button" className="btn btn-primary btn-block" onClick={() => setSheet('create')}>
+          <button type="button" className="btn btn-primary btn-block" onClick={() => { setVisited((v) => ({ ...v, create: true })); setSheet('create'); }}>
             Start your family
           </button>
-          <button type="button" className="btn btn-block" onClick={() => setSheet('join')}>
+          <button type="button" className="btn btn-block" onClick={() => { setVisited((v) => ({ ...v, join: true })); setSheet('join'); }}>
             Join with a code
           </button>
           <button type="button" className="btn btn-quiet btn-block" onClick={startDemo}>
@@ -91,8 +94,8 @@ export function Welcome() {
         </div>
       </motion.div>
 
-      <CreateFamily open={sheet === 'create'} onClose={() => setSheet(null)} />
-      <JoinFamily open={sheet === 'join'} onClose={() => setSheet(null)} />
+      <Suspense fallback={null}>{visited.create && <CreateFamily open={sheet === 'create'} onClose={() => setSheet(null)} />}</Suspense>
+      <Suspense fallback={null}>{visited.join && <JoinFamily open={sheet === 'join'} onClose={() => setSheet(null)} />}</Suspense>
     </div>
   );
 }

@@ -1,23 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { ensureAnonymousUser, testConnection, AppUser } from '../services/firebase';
-import {
-  createHouseholdAtomic,
-  getHousehold,
-  getHouseholdMembers,
-  subscribeToHousehold,
-  subscribeToMembers,
-  subscribeToResponses,
-  addMemberToHousehold,
-  saveMemberAnswers,
-  saveUserSession,
-  getUserSession,
-  clearUserSession,
-} from '../services/householdService';
+import type { AppUser } from '../services/firebase';
 import { buildBrief, FamilyBrief } from '../services/brief';
 import { DEMO_ACTIVE_MEMBER, DEMO_HOUSEHOLD, DEMO_MEMBERS, DEMO_RESPONSES } from '../data/demoFamily';
 import { AVATAR_PALETTE } from '../utils/familyCode';
 import { mergeAnswers, rollbackAnswers } from '../utils/member';
+import { mayHaveSavedSession } from '../utils/savedSession';
 import { Household, HouseholdMember, MemberRole, MemberTasteAnswers } from '../types';
+
+// The demo never talks to Firebase. Keep the SDK off that route's import graph.
+const firebase = () => import('../services/firebase');
+const store = () => import('../services/householdService');
 
 const SESSION_KEY = 'myfamilyai_last_session';
 const DEMO_KEY = 'myfamilyai_demo';
@@ -112,7 +104,12 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       try {
-        await testConnection();
+        // A first-time visitor has no family to restore. Authentication still
+        // happens in ensureUser before creating or joining a real household.
+        if (!await mayHaveSavedSession()) return;
+        const [{ ensureAnonymousUser }, { getUserSession, getHousehold, getHouseholdMembers }] = await Promise.all([
+          firebase(), import('../services/householdReads'),
+        ]);
         const authUser = await ensureAnonymousUser();
         if (!alive) return;
         setUser(authUser);
@@ -162,16 +159,24 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!household?.code || isDemo) return;
     const note = (what: string) => (err: unknown) => console.warn(`Realtime ${what} sync note:`, err);
-    const unsubs = [
-      subscribeToHousehold(household.code, (hh) => hh && setHousehold(hh), note('household')),
-      subscribeToMembers(
-        household.code,
-        (list) => list.length && setMembers(Array.from(new Map(list.map((m) => [m.id, m])).values())),
-        note('members')
-      ),
-      subscribeToResponses(household.code, (r) => setResponses(r), note('responses')),
-    ];
-    return () => unsubs.forEach((u) => u());
+    let cancelled = false;
+    let unsubs: Array<() => void> = [];
+    store().then(({ subscribeToHousehold, subscribeToMembers, subscribeToResponses }) => {
+      if (cancelled) return;
+      unsubs = [
+        subscribeToHousehold(household.code, (hh) => hh && setHousehold(hh), note('household')),
+        subscribeToMembers(
+          household.code,
+          (list) => list.length && setMembers(Array.from(new Map(list.map((m) => [m.id, m])).values())),
+          note('members')
+        ),
+        subscribeToResponses(household.code, (r) => setResponses(r), note('responses')),
+      ];
+    }).catch(note('initialization'));
+    return () => {
+      cancelled = true;
+      unsubs.forEach((u) => u());
+    };
   }, [household?.code, isDemo]);
 
   const activeMember = useMemo(
@@ -191,7 +196,7 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
 
   const ensureUser = useCallback(async () => {
     if (user) return user;
-    const u = await ensureAnonymousUser();
+    const u = await (await firebase()).ensureAnonymousUser();
     setUser(u);
     return u;
   }, [user]);
@@ -201,7 +206,7 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
       setError(null);
       const currentUser = await ensureUser();
       try {
-        const result = await createHouseholdAtomic({
+        const result = await (await store()).createHouseholdAtomic({
           code,
           name,
           creatorUid: currentUser.uid,
@@ -227,12 +232,12 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
       await ensureUser();
       let hh: Household | null;
       try {
-        hh = await getHousehold(code);
+        hh = await (await store()).getHousehold(code);
       } catch (err) {
         throw new Error(errorText(err, 'Couldn’t look up that code. Check your connection and try again.'));
       }
       if (!hh) throw new Error(`No family uses ${code}. Check the letters and numbers with whoever shared it.`);
-      const list = await getHouseholdMembers(code);
+      const list = await (await store()).getHouseholdMembers(code);
       return { household: hh, members: list };
     },
     [ensureUser]
@@ -249,11 +254,11 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
         if ('memberId' in who) {
           memberId = who.memberId;
         } else {
-          const added = await addMemberToHousehold(code, who.role, who.nickname);
+          const added = await (await store()).addMemberToHousehold(code, who.role, who.nickname);
           list = [...list, added];
           memberId = added.id;
         }
-        await saveUserSession(currentUser.uid, code, memberId);
+        await (await store()).saveUserSession(currentUser.uid, code, memberId);
       } catch (err) {
         throw new Error(errorText(err, 'Couldn’t join. Check your connection and try again.'));
       }
@@ -277,7 +282,7 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
       }
       const currentUser = await ensureUser();
       try {
-        await saveUserSession(currentUser.uid, household.code, memberId);
+        await (await store()).saveUserSession(currentUser.uid, household.code, memberId);
       } catch (err) {
         throw new Error(errorText(err, 'Couldn’t switch profiles. Try again.'));
       }
@@ -302,7 +307,7 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
         return m;
       }
       try {
-        const m = await addMemberToHousehold(household.code, role, nickname);
+        const m = await (await store()).addMemberToHousehold(household.code, role, nickname);
         setMembers((prev) => Array.from(new Map([...prev, m].map((x) => [x.id, x])).values()));
         return m;
       } catch (err) {
@@ -324,7 +329,7 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
       setResponses((prev) => ({ ...prev, [id]: merged }));
       if (isDemo) return;
       try {
-        await saveMemberAnswers(household.code, id, merged);
+        await (await store()).saveMemberAnswers(household.code, id, merged);
       } catch (err) {
         responsesRef.current = rollbackAnswers(responsesRef.current, id, merged, previous);
         setResponses((prev) => rollbackAnswers(prev, id, merged, previous));
@@ -349,7 +354,7 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     if (!isDemo && user) {
       try {
-        await clearUserSession(user.uid);
+        await (await store()).clearUserSession(user.uid);
       } catch (err) {
         console.warn('Failed to clear user session on leave:', err);
       }

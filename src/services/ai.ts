@@ -1,7 +1,7 @@
 import { FamilyBrief } from './brief';
 import { PlanTask } from '../types';
 
-export type AiErrorKind = 'offline' | 'unavailable' | 'busy' | 'error';
+export type AiErrorKind = 'offline' | 'unavailable' | 'busy' | 'error' | 'unknown_area';
 
 export class AiError extends Error {
   kind: AiErrorKind;
@@ -37,7 +37,10 @@ async function post<T>(path: string, body: object, signal?: AbortSignal): Promis
     if ((err as Error)?.name === 'AbortError') throw err;
     throw new AiError('offline');
   }
-  if (!res.ok) throw new AiError(kindFor(res.status));
+  if (!res.ok) {
+    if (res.status === 404) throw new AiError('unknown_area');
+    throw new AiError(kindFor(res.status));
+  }
   return (await res.json()) as T;
 }
 
@@ -83,7 +86,39 @@ export interface PlanIdea {
   members: string[];
   tradeoff: string;
   check: string | null;
+  /** A photo of the dish, activity or place, when one was found. */
+  image?: string | null;
 }
+
+/** A real place or film for a chosen idea: facts from the source, the fit line from the AI. */
+export interface RealPick {
+  id: string;
+  name: string;
+  kind: string;
+  area: string | null;
+  distanceKm: number | null;
+  facts: string[];
+  trend: string | null;
+  url: string;
+  image: string | null;
+  /** Set when the picture shows what the place is known for (a dish), not the place itself. */
+  imageExample: string | null;
+  fit: string | null;
+  members: string[];
+}
+
+export type RealSource = 'google-maps' | 'google-search' | 'openstreetmap' | 'netflix' | 'apple-chart';
+
+export interface RealPicks {
+  source: RealSource | null;
+  near: string | null;
+  picks: RealPick[];
+  /** A live search for the same thing, for when the list is empty or they want more. */
+  searchUrl: string;
+}
+
+/** Where to look: a rough position (rounded to about a kilometre) or a typed area. */
+export type Where = { lat: number; lon: number } | { area: string } | null;
 
 export interface PlanIdeas {
   ideas: PlanIdea[];
@@ -98,6 +133,8 @@ export const ai = {
   planAsk: (brief: FamilyBrief, task: PlanTask, who: string[], signal?: AbortSignal) => post<PlanAsk>('plan/ask', { brief, task, who }, signal),
   planIdeas: (brief: FamilyBrief, task: PlanTask, who: string[], answers: { question: string; answer: string }[], signal?: AbortSignal) =>
     post<PlanIdeas>('plan/ideas', { brief, task, who, answers }, signal),
+  planReal: (brief: FamilyBrief, task: PlanTask, who: string[], idea: { title: string; summary: string }, where: Where, signal?: AbortSignal) =>
+    post<RealPicks>('plan/real', { brief, task, who, idea, where }, signal),
   suggest: (brief: FamilyBrief, last?: { question: string; answer: string }, signal?: AbortSignal) =>
     post<{ suggestions: string[] }>('suggest', { brief, lastQuestion: last?.question, lastAnswer: last?.answer }, signal),
 };
@@ -158,6 +195,8 @@ export function aiErrorMessage(err: unknown): string {
       return "You're offline. Check your connection and try again.";
     case 'unavailable':
       return 'The AI helper isn’t switched on for this app yet. Ask whoever set it up to add the Gemini API key.';
+    case 'unknown_area':
+      return 'We couldn’t find that place. Try a town, suburb or postcode.';
     case 'busy':
       return 'The AI helper is busy right now. Try again in a minute.';
     default:

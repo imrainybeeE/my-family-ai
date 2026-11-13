@@ -1,21 +1,23 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, startTransition, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { HouseholdProvider, useHousehold } from './context/HouseholdContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './components/ui/bits';
 import { TabBar } from './components/layout/TabBar';
-import { Welcome } from './components/welcome/Welcome';
-import { GardenView } from './components/home/GardenView';
-import { TogetherView } from './components/together/TogetherView';
-import { PlanView } from './components/plan/PlanView';
-import { AskView } from './components/ask/AskView';
-import { MemberSheet } from './components/profile/MemberSheet';
-import { SettingsSheet } from './components/settings/SettingsSheet';
-import { FoundationFlow } from './components/discovery/FoundationFlow';
-import { RootsFlow } from './components/discovery/RootsFlow';
-import { TastesSheet } from './components/discovery/TastesSheet';
 import { Flower } from './components/art/Flower';
 import { PlanTask, TabType } from './types';
+
+// The two entry screens are eager; other tabs and sheets load on demand.
+import { Welcome } from './components/welcome/Welcome';
+import { GardenView } from './components/home/GardenView';
+const TogetherView = lazy(() => import('./components/together/TogetherView').then((m) => ({ default: m.TogetherView })));
+const PlanView = lazy(() => import('./components/plan/PlanView').then((m) => ({ default: m.PlanView })));
+const AskView = lazy(() => import('./components/ask/AskView').then((m) => ({ default: m.AskView })));
+const MemberSheet = lazy(() => import('./components/profile/MemberSheet').then((m) => ({ default: m.MemberSheet })));
+const SettingsSheet = lazy(() => import('./components/settings/SettingsSheet').then((m) => ({ default: m.SettingsSheet })));
+const FoundationFlow = lazy(() => import('./components/discovery/FoundationFlow').then((m) => ({ default: m.FoundationFlow })));
+const RootsFlow = lazy(() => import('./components/discovery/RootsFlow').then((m) => ({ default: m.RootsFlow })));
+const TastesSheet = lazy(() => import('./components/discovery/TastesSheet').then((m) => ({ default: m.TastesSheet })));
 
 interface UI {
   tab: TabType;
@@ -63,13 +65,13 @@ function Shell() {
   const [tastesOpen, setTastesOpen] = useState(false);
 
   useEffect(() => {
-    const onHash = () => setTab(tabFromHash());
+    const onHash = () => startTransition(() => setTab(tabFromHash()));
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
   const goTab = useCallback((next: TabType) => {
-    setTab(next);
+    startTransition(() => setTab(next));
     window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${next}`);
     window.scrollTo({ top: 0 });
   }, []);
@@ -133,13 +135,20 @@ function Shell() {
       </AnimatePresence>
       <TabBar tab={tab} onChange={goTab} />
 
-      <MemberSheet memberId={memberId} onClose={() => setMemberId(null)} />
-      <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-      <FoundationFlow open={foundationOpen} onClose={() => setFoundationOpen(false)} />
-      <RootsFlow open={rootsOpen} onClose={() => setRootsOpen(false)} />
-      <TastesSheet open={tastesOpen} onClose={() => setTastesOpen(false)} />
+      <Deferred active={!!memberId}><MemberSheet memberId={memberId} onClose={() => setMemberId(null)} /></Deferred>
+      <Deferred active={settingsOpen}><SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} /></Deferred>
+      <Deferred active={foundationOpen}><FoundationFlow open={foundationOpen} onClose={() => setFoundationOpen(false)} /></Deferred>
+      <Deferred active={rootsOpen}><RootsFlow open={rootsOpen} onClose={() => setRootsOpen(false)} /></Deferred>
+      <Deferred active={tastesOpen}><TastesSheet open={tastesOpen} onClose={() => setTastesOpen(false)} /></Deferred>
     </UIContext.Provider>
   );
+}
+
+/** Stay mounted after the first open, preserving drafts and the sheet's exit animation. */
+function Deferred({ active, children }: { active: boolean; children: React.ReactNode }) {
+  const visited = useRef(false);
+  if (active) visited.current = true;
+  return visited.current ? <Suspense fallback={null}>{children}</Suspense> : null;
 }
 
 const PAGE_TURN = {
@@ -168,7 +177,7 @@ export default function App() {
         <ToastProvider>
           <HouseholdProvider>
             <div className="app-column">
-              <Shell />
+              <Suspense fallback={<Loading />}><Shell /></Suspense>
             </div>
           </HouseholdProvider>
         </ToastProvider>

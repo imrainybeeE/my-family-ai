@@ -237,7 +237,7 @@ export function Strand({ d, color = 'var(--yarn)', delay = 0, width = 3.4 }: { d
       <filter id={blur} x="-10%" y="-50%" width="120%" height="200%">
         <feGaussianBlur stdDeviation="1.6" />
       </filter>
-      <motion.path d={d} stroke="rgb(20,30,50)" strokeOpacity={0.12} strokeWidth={width + 1} transform="translate(0 3.5)" filter={`url(#${blur})`} {...draw} />
+      <motion.path d={d} style={{ stroke: "rgb(var(--shade))" }} strokeOpacity={0.12} strokeWidth={width + 1} transform="translate(0 3.5)" filter={`url(#${blur})`} {...draw} />
       <motion.path d={d} stroke={color} strokeWidth={width} {...draw} />
       <motion.path
         d={d}

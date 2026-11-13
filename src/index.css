@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./fonts.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -11,9 +12,18 @@
    Tokens. A family scrapbook: sky-blue cardstock pages, white paper, coloured card stock,
    washi tape and yarn. The felt art is rendered, so it reads the same on both pages; only
    paper, ink and card stock change at night.
+
+   Two palettes share every token name: Ocean (sky-blue cardstock, navy ink) is the default and
+   Forest (sage cardstock, leaf-green ink) is the original paper garden. A palette sets the paper,
+   ink, accent, glass and the tint of shadows and fibre; content colours (flowers, yarn, card stock)
+   stay the same in both so a family's flowers look like themselves whichever paper they're on.
    ------------------------------------------------------------------------------------------ */
 :root {
   color-scheme: light;
+  /* The ink colour as an RGB triple, for shadows, scrims and the sheet backdrop. */
+  --shade: 30 42 68;
+  --scrim: 13 20 34;
+  --tag-ink: #1e2a44;
   --page: #e4ecf5;
   --page-sunk: #d8e2ee;
   --card: #ffffff;
@@ -25,6 +35,7 @@
   --line-strong: #bcc8d9;
 
   --accent: #24345e;
+  --accent-rgb: 36 52 94;
   --accent-press: #121c38;
   --accent-soft: #dfe6f5;
   --accent-ink: #24345e;
@@ -50,8 +61,8 @@
   --danger-soft: #fbe3e0;
   --focus: #24345e;
 
-  --shadow-paper: 0 0 0 0.5px rgba(30, 42, 68, 0.05), 0 1px 2px rgba(30, 42, 68, 0.04), 0 8px 20px -8px rgba(30, 42, 68, 0.12);
-  --shadow-lift: 0 1px 2px rgba(30, 42, 68, 0.06), 0 8px 24px -8px rgba(30, 42, 68, 0.22);
+  --shadow-paper: 0 0 0 0.5px rgb(var(--shade) / 0.05), 0 1px 2px rgb(var(--shade) / 0.04), 0 8px 20px -8px rgb(var(--shade) / 0.12);
+  --shadow-lift: 0 1px 2px rgb(var(--shade) / 0.06), 0 8px 24px -8px rgb(var(--shade) / 0.22);
   --grain: 0.55;
   /* Cardstock fibre, shared by the page and the scrims so their grain lines up. */
   --fibre: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .12 0 0 0 0 .16 0 0 0 0 .27 0 0 0 .08 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -66,13 +77,13 @@
   --glass-top: rgb(255 255 255 / 0.78);
   --glass-bottom: rgb(255 255 255 / 0.64);
   --glass-solid: rgb(250 251 253 / 0.97);
-  --glass-rim: inset 0 0.5px 0 rgb(255 255 255 / 0.7), inset 0 -0.5px 0 rgb(255 255 255 / 0.2), inset 0 0 0 0.5px rgb(30 42 68 / 0.06);
-  --glass-shadow: 0 2px 8px rgb(30 42 68 / 0.08);
+  --glass-rim: inset 0 0.5px 0 rgb(255 255 255 / 0.7), inset 0 -0.5px 0 rgb(255 255 255 / 0.2), inset 0 0 0 0.5px rgb(var(--shade) / 0.06);
+  --glass-shadow: 0 2px 8px rgb(var(--shade) / 0.08);
   --lg-tint: rgb(255 255 255 / 0.5);
-  --lg-shadow: inset 0 0 0 0.5px rgb(30 42 68 / 0.08), 0 2px 8px rgb(30 42 68 / 0.08);
-  --lens: rgb(36 52 94 / 0.1);
+  --lg-shadow: inset 0 0 0 0.5px rgb(var(--shade) / 0.08), 0 2px 8px rgb(var(--shade) / 0.08);
+  --lens: rgb(var(--accent-rgb) / 0.1);
   --press-glow: rgb(255 255 255 / 0.6);
-  --tabbar-lift: 0 2px 8px rgb(30 42 68 / 0.08), 0 18px 36px -18px rgb(30 42 68 / 0.4);
+  --tabbar-lift: 0 2px 8px rgb(var(--shade) / 0.08), 0 18px 36px -18px rgb(var(--shade) / 0.4);
   --tabbar-h: 62px;
   /* Springs, as linear() curves; --motion scales every movement and is 0 with reduced motion. */
   --motion: 1;
@@ -141,6 +152,65 @@
   --lens: rgb(255 255 255 / 0.08);
   --press-glow: rgb(255 255 255 / 0.22);
   --tabbar-lift: 0 1px 2px rgb(0 0 0 / 0.12), 0 4px 12px rgb(0 0 0 / 0.12);
+}
+/* Forest: the original paper garden. Sage cardstock and white paper by day, a night garden after dark. */
+:root[data-palette='forest'] {
+  --shade: 29 43 34;
+  --scrim: 10 17 13;
+  --tag-ink: #1d2b22;
+  --page: #e6ede2;
+  --page-sunk: #dae3d5;
+  --card: #ffffff;
+  --card-2: #f2f6ef;
+  --ink: #1d2b22;
+  --ink-2: #4b5a50;
+  --ink-3: #536257;
+  --line: #d3dccd;
+  --line-strong: #b9c6b2;
+
+  --accent: #2e6b4a;
+  --accent-rgb: 46 107 74;
+  --accent-press: #1d4c33;
+  --accent-soft: #dcebe0;
+  --accent-ink: #1f5136;
+  --on-accent: #ffffff;
+  --focus: #2e6b4a;
+
+  --wash-base: #f6f9f4;
+  --fibre: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .11 0 0 0 0 .19 0 0 0 0 .13 0 0 0 .08 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  --glass-top: rgb(255 255 255 / 0.78);
+  --glass-bottom: rgb(255 255 255 / 0.64);
+  --glass-solid: rgb(250 252 249 / 0.97);
+  --lg-tint: rgb(255 255 255 / 0.5);
+}
+:root[data-palette='forest'].dark {
+  --shade: 0 0 0;
+  --scrim: 4 8 6;
+  --tag-ink: #1d2b22;
+  --page: #111a15;
+  --page-sunk: #0b120e;
+  --card: #19251f;
+  --card-2: #203028;
+  --ink: #edf3ec;
+  --ink-2: #b7c5bb;
+  --ink-3: #9cada1;
+  --line: #29382f;
+  --line-strong: #3a4b40;
+
+  --accent: #8fdcae;
+  --accent-rgb: 143 220 174;
+  --accent-press: #5fb585;
+  --accent-soft: #1d3a2b;
+  --accent-ink: #a9e8c2;
+  --on-accent: #0b1a12;
+  --focus: #8fdcae;
+
+  --wash-base: var(--page);
+  --fibre: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .11 0 0 0 0 .19 0 0 0 0 .13 0 0 0 .08 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  --glass-top: rgb(42 58 48 / 0.74);
+  --glass-bottom: rgb(32 46 38 / 0.7);
+  --glass-solid: rgb(25 37 31 / 0.97);
+  --lg-tint: rgb(36 52 42 / 0.46);
 }
 @media (prefers-reduced-motion: reduce) {
   :root {
@@ -384,7 +454,7 @@ button .font-semibold {
   height: 26px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 1px 3px rgba(30, 42, 68, 0.3);
+  box-shadow: 0 1px 3px rgb(var(--shade) / 0.3);
   transition: transform 260ms cubic-bezier(0.3, 1.4, 0.5, 1);
 }
 .switch:checked {
@@ -513,14 +583,14 @@ button .font-semibold {
   display: inline-block;
   padding: 3px 10px 2px;
   background: #ffffff;
-  color: #1e2a44;
+  color: var(--tag-ink);
   border-radius: 3px;
   font-family: var(--font-hand);
   font-weight: 600;
   font-size: 0.875rem;
   line-height: 1.25;
   white-space: nowrap;
-  box-shadow: 0 1px 2px rgba(30, 42, 68, 0.18), 0 4px 8px -4px rgba(30, 42, 68, 0.3);
+  box-shadow: 0 1px 2px rgb(var(--shade) / 0.18), 0 4px 8px -4px rgb(var(--shade) / 0.3);
 }
 .dark .tag {
   background: #f4f6fb;
@@ -631,7 +701,8 @@ button .font-semibold {
   background: var(--accent-soft);
 }
 /* The check is a sewing button: four holes, then a cross of thread when picked. */
-.option .seed {
+.option .seed,
+.palette-tile .seed {
   flex: none;
   position: relative;
   display: grid;
@@ -644,9 +715,54 @@ button .font-semibold {
   color: var(--on-accent);
   transition: background-color 160ms, border-color 160ms;
 }
-.option[aria-checked='true'] .seed {
+.option[aria-checked='true'] .seed,
+.palette-tile[aria-checked='true'] .seed {
   background: var(--accent);
   border-color: var(--accent);
+}
+
+/* A theme choice: a miniature scrapbook page in that palette, lifted when it's the one in use. */
+.palette-tile {
+  display: grid;
+  gap: 0.6rem;
+  padding: 8px 8px 10px;
+  border-radius: var(--r-ctl);
+  border: 1.5px solid transparent;
+  background: var(--card);
+  box-shadow: var(--shadow-paper);
+  text-align: left;
+  transition: transform var(--dur-spring-snappy) var(--spring-snappy), border-color 160ms, box-shadow 200ms;
+}
+.palette-tile:active {
+  transform: scale(0.97);
+}
+.palette-tile[aria-checked='true'] {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-lift);
+}
+.palette-tile-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 0.5px rgb(var(--shade) / 0.08);
+}
+.palette-tile-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline: 4px;
+  font-size: 1rem;
+}
+.palette-tile .seed {
+  width: 24px;
+  height: 24px;
+}
+/* The new paper grows over the old one from the tap; the default cross-fade would muddy it. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
 }
 
 .field {
@@ -809,7 +925,7 @@ textarea.field {
 .tabbar[data-pressing] .tabbar-lens-fill {
   transform: scale(calc(1 + 0.18 * var(--motion)), calc(1 + 0.32 * var(--motion)));
   background: rgb(255 255 255 / 0.42);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.95), inset 0 -1px 0 rgb(255 255 255 / 0.35), 0 10px 24px rgb(20 30 50 / 0.16), 0 2px 6px rgb(20 30 50 / 0.08);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.95), inset 0 -1px 0 rgb(255 255 255 / 0.35), 0 10px 24px rgb(var(--shade) / 0.16), 0 2px 6px rgb(var(--shade) / 0.08);
 }
 .dark .tabbar[data-pressing] .tabbar-lens-fill {
   background: rgb(255 255 255 / 0.16);
@@ -925,7 +1041,7 @@ textarea.field {
   position: fixed;
   inset: 0;
   z-index: 40;
-  background: rgba(13, 20, 34, 0.42);
+  background: rgb(var(--scrim) / 0.42);
 }
 .sheet {
   position: fixed;
@@ -1106,4 +1222,130 @@ body:has(.sheet-full) .toast-slot {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+/* ------------------------------------------------------------------------------------------
+   Real picks: the places or films at the end of a plan
+   ------------------------------------------------------------------------------------------ */
+.real-hero {
+  padding: 2px 2px 4px;
+}
+.real-card {
+  position: relative;
+  padding: 1.1rem 1.15rem 1rem;
+  overflow: visible;
+}
+.real-poster {
+  display: block;
+  flex: none;
+  width: 84px;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: 8px;
+  background: var(--card-2);
+  box-shadow: 0 1px 2px rgb(var(--shade) / 0.18), 0 8px 16px -8px rgb(var(--shade) / 0.45);
+  transform: rotate(-2deg);
+}
+/* A felt map pin with the pick's number sewn on. */
+.real-pin {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50% 50% 50% 6px;
+  transform: rotate(-45deg);
+  background: var(--yarn);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1rem;
+  box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.35), 0 4px 10px -4px rgb(var(--shade) / 0.5);
+}
+/* The number stays upright inside the tilted pin. */
+.real-pin > span {
+  transform: rotate(45deg);
+}
+.real-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
+  border-radius: 8px;
+  background: var(--stock-pink);
+  color: var(--stock-pink-ink);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.real-fact {
+  padding: 3px 9px;
+  border-radius: 7px;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+/* Photos from outside sources fade in over their card's colour once they've loaded. */
+.photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 360ms ease;
+}
+.photo[data-ready] {
+  opacity: 1;
+}
+.idea-photo {
+  margin: 0;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+.real-hero-photo {
+  position: relative;
+  margin: -1.1rem -1.15rem 0;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--r-paper) var(--r-paper) 0 0;
+  background: var(--card-2);
+}
+/* An example photo says so in a full-width caption, readable from the back of a room. */
+.real-example {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 7px 14px 7px 64px;
+  background: rgb(var(--scrim) / 0.78);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: right;
+}
+/* The numbered pin sits half on the photo, half on the card. */
+.real-under-photo {
+  margin-top: -22px;
+  position: relative;
+}
+.real-under-photo .t-head {
+  margin-top: 26px;
+}
+.real-poster {
+  overflow: hidden;
+}
+.real-poster-title {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 6px;
+  background: var(--stock-lilac);
+  color: var(--stock-lilac-ink);
+  font-family: var(--font-hand);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  overflow-wrap: anywhere;
 }

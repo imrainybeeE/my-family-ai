@@ -42,7 +42,14 @@ export const FELT_FOR_STYLE: Record<DiscoveryStyleId, FeltName> = {
 };
 
 export function Felt({ name, size, className, style }: { name: FeltName; size: number; className?: string; style?: React.CSSProperties }) {
-  return <img src={`${import.meta.env.BASE_URL}felt/${name}.webp`} width={size} height={size} alt="" aria-hidden className={`felt ${className || ''}`} style={style} draggable={false} decoding="async" />;
+  const base = `${import.meta.env.BASE_URL}felt/`;
+  const sizes = `${Math.ceil(size)}px`;
+  return (
+    <picture style={{ display: 'block', width: size, height: size }}>
+      <source type="image/avif" srcSet={`${base}avif/256/${name}.avif 256w, ${base}avif/384/${name}.avif 384w, ${base}avif/512/${name}.avif 512w`} sizes={sizes} />
+      <img src={`${base}${name}.webp`} srcSet={`${base}256/${name}.webp 256w, ${base}384/${name}.webp 384w, ${base}${name}.webp 512w`} sizes={sizes} width={size} height={size} alt="" aria-hidden className={`felt ${className || ''}`} style={style} draggable={false} decoding="async" />
+    </picture>
+  );
 }
 
 interface FlowerProps {
@@ -83,7 +90,7 @@ export function FlowerBadge({ style, size = 44, ring = true, label }: { style?: 
   return (
     <span
       className="inline-grid place-items-center rounded-full shrink-0 overflow-hidden"
-      style={{ width: size, height: size, background: bg, boxShadow: ring ? '0 0 0 2px var(--card), 0 2px 6px -2px rgba(20,30,50,.35)' : undefined }}
+      style={{ width: size, height: size, background: bg, boxShadow: ring ? '0 0 0 2px var(--card), 0 2px 6px -2px rgb(var(--shade) / .35)' : undefined }}
       role={label ? 'img' : undefined}
       aria-label={label}
     >

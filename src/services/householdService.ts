@@ -8,10 +8,14 @@ import {
   runTransaction,
   onSnapshot,
   Unsubscribe,
+  getFirestore,
 } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from './firebase';
+import { app, handleFirestoreError, OperationType } from './firebase';
+import firebaseConfig from '../../firebase-applet-config.json';
 import { Household, HouseholdMember, MemberRole, UserSession, MemberTasteAnswers } from '../types';
 import { AVATAR_PALETTE } from '../utils/familyCode';
+
+const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 export interface CreateHouseholdParams {
   code: string;

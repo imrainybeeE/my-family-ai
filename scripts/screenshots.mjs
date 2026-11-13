@@ -1,5 +1,6 @@
 // Captures the main screens of the demo family on an iPhone-sized viewport, in light and dark.
-// Usage: node scripts/screenshots.mjs [baseUrl] [outDir] [themes]   (themes: light,dark)
+// Usage: node scripts/screenshots.mjs [baseUrl] [outDir] [themes]
+//   themes: comma list of light, dark, forest-light, forest-dark (default light,dark, the Ocean palette)
 // Needs the app running (npm run dev) and, for AI content, GEMINI_API_KEY on the server.
 import { chromium } from 'playwright';
 import fs from 'node:fs';
@@ -39,42 +40,43 @@ const shot = async (page, name) => {
 const idle = (page, timeout = 60000) =>
   page.waitForFunction(() => !document.querySelector('[aria-busy="true"], [role="status"]'), null, { timeout }).catch(() => {});
 
-for (const theme of (process.argv[4] || 'light,dark').split(',')) {
+for (const spec of (process.argv[4] || 'light,dark').split(',')) {
+  const [palette, theme] = spec.includes('-') ? spec.split('-') : ['ocean', spec];
   const { ctx, page } = await phone(theme);
   // A fresh query string each time forces a full reload, which resets the demo family.
-  const open = (hash) => page.goto(`${base}/?demo=1&theme=${theme}&v=${++visit}#${hash}`);
+  const open = (hash) => page.goto(`${base}/?demo=1&theme=${theme}&palette=${palette}&v=${++visit}#${hash}`);
   const scrollTo = (y) => page.evaluate((top) => window.scrollTo({ top, behavior: 'instant' }), y);
 
-  await page.goto(`${base}/?theme=${theme}`);
+  await page.goto(`${base}/?theme=${theme}&palette=${palette}`);
   await page.getByRole('button', { name: 'Start your family' }).waitFor();
   await page.waitForTimeout(1500);
-  await shot(page, `${theme}-01-welcome`);
+  await shot(page, `${spec}-01-welcome`);
 
   await open('garden');
   await page.getByText('Tonight at the table').waitFor();
   await idle(page);
-  await shot(page, `${theme}-02-garden`);
+  await shot(page, `${spec}-02-garden`);
   await scrollTo(760);
-  await shot(page, `${theme}-03-garden-more`);
+  await shot(page, `${spec}-03-garden-more`);
 
   await scrollTo(0);
   await page.getByRole('button', { name: /^Maya \(you\)/ }).click();
   await page.getByRole('dialog').getByText('with a touch of').waitFor();
-  await shot(page, `${theme}-04-profile`);
+  await shot(page, `${spec}-04-profile`);
 
   await open('together');
   await page.getByText('Shared interests').waitFor({ timeout: 60000 });
-  await shot(page, `${theme}-05-together`);
+  await shot(page, `${spec}-05-together`);
   // The helper sometimes has no idea worth showing; the page is complete without them.
   const ideas = page.getByRole('heading', { name: 'Ideas to try' });
   if (await ideas.waitFor({ timeout: 5000 }).then(() => true, () => false)) {
     await scrollTo(await ideas.evaluate((el) => el.getBoundingClientRect().top + window.scrollY - 90));
-    await shot(page, `${theme}-06-together-ideas`);
+    await shot(page, `${spec}-06-together-ideas`);
   }
 
   if (theme === 'light') {
     await open('plan');
-    await shot(page, `${theme}-07-plan`);
+    await shot(page, `${spec}-07-plan`);
     await page.getByRole('button', { name: /^Eat/ }).first().click();
     await page.getByRole('button', { name: 'Continue' }).click();
     await page.getByRole('button', { name: 'Get three ideas' }).waitFor({ timeout: 60000 });
@@ -82,11 +84,11 @@ for (const theme of (process.argv[4] || 'light,dark').split(',')) {
       const first = group.locator('button.chip').first();
       if (await first.count()) await first.click();
     }
-    await shot(page, `${theme}-08-plan-questions`);
+    await shot(page, `${spec}-08-plan-questions`);
     await page.getByRole('button', { name: 'Get three ideas' }).click();
     await page.getByRole('button', { name: 'Pick for us' }).waitFor({ timeout: 90000 });
     await scrollTo(0);
-    await shot(page, `${theme}-09-plan-ideas`);
+    await shot(page, `${spec}-09-plan-ideas`);
 
     // Leo takes the Foundation questions, through to his bloom.
     await open('garden');
@@ -103,7 +105,7 @@ for (const theme of (process.argv[4] || 'light,dark').split(',')) {
       if (await boxes.count()) {
         await boxes.nth((i * 2) % 6).click();
         await boxes.nth((i * 2 + 3) % 6).click();
-        if (i === 2) await shot(page, `${theme}-10-foundation-question`);
+        if (i === 2) await shot(page, `${spec}-10-foundation-question`);
         await dialog.getByRole('button', { name: /Next|See my flower/ }).click();
       } else {
         await dialog.getByRole('radio').nth([1, 1, 0, 1, 0, 1, 1, 5, 1, 1, 0, 1, 1, 5, 1, 1, 1, 1][i]).click();
@@ -111,7 +113,7 @@ for (const theme of (process.argv[4] || 'light,dark').split(',')) {
     }
     await page.getByRole('dialog').getByText('with a touch of').waitFor({ timeout: 15000 });
     await page.getByText('Try this week').waitFor({ timeout: 60000 }).catch(() => {});
-    await shot(page, `${theme}-11-bloom-reveal`);
+    await shot(page, `${spec}-11-bloom-reveal`);
 
     // Leo carries on into Advanced discovery and gets a reflection from the helper.
     await page.getByRole('button', { name: 'Grow deeper roots' }).click();
@@ -119,20 +121,20 @@ for (const theme of (process.argv[4] || 'light,dark').split(',')) {
     await page.getByRole('dialog').locator('textarea').fill('When someone remembers the little things');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: /^(Continue|Save and continue|Finish)$/ }).waitFor({ timeout: 60000 });
-    await shot(page, `${theme}-12-roots-reflection`);
+    await shot(page, `${spec}-12-roots-reflection`);
   }
 
   await open('ask');
   await page.getByText('Try asking').waitFor();
   await idle(page, 30000);
-  await shot(page, `${theme}-13-ask`);
+  await shot(page, `${spec}-13-ask`);
   await page.getByRole('button', { name: 'More questions' }).click();
   await page.getByRole('button', { name: 'What do we have in common?' }).click();
   await page.getByRole('button', { name: 'New chat' }).waitFor();
   await idle(page);
   await page.waitForTimeout(3000);
   await scrollTo(0);
-  await shot(page, `${theme}-14-ask-answer`);
+  await shot(page, `${spec}-14-ask-answer`);
 
   await ctx.close();
 }
