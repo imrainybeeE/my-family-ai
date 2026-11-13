@@ -1,3 +1,4 @@
+import { sameName } from './media.ts';
 // Real places and films for a chosen plan idea. Facts come from a data source (Google Maps or
 // Search through Gemini grounding, OpenStreetMap, or Apple's film chart); the AI only chooses
 // which of them suit the family and says why. Nothing here is stored.
@@ -191,10 +192,8 @@ export async function chartFilms(country: string): Promise<Candidate[]> {
 
 /** A poster for a title from this week's chart, when the title is on it. */
 export async function chartPoster(title: string, country: string): Promise<string | null> {
-  const t = title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-  if (!t) return null;
   const films = await chartFilms(country).catch(() => []);
-  return films.find((f) => f.name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().startsWith(t))?.image ?? null;
+  return films.find((f) => sameName(f.name, title))?.image ?? null;
 }
 
 async function fetchChart(cc: string): Promise<Candidate[]> {

@@ -29,6 +29,9 @@ test('names match apart from case, punctuation and qualifiers', () => {
   assert.ok(sameName('Zootopia 2 (film)', 'Zootopia 2'));
   assert.ok(sameName('Kuala Lumpur City Gallery', 'kuala lumpur city gallery'));
   assert.ok(!sameName('Kuala Lumpur City Centre', 'Kuala Lumpur City Gallery'));
+  assert.ok(!sameName('Home Alone', 'Home'), 'a sequel or longer title is a different title');
+  assert.ok(!sameName('流浪地球', '三体'), 'titles in other scripts stay distinct');
+  assert.ok(sameName('Amélie', 'amelie'));
 });
 
 test('logos and maps are not used as card photos', () => {

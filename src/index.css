@@ -1312,18 +1312,17 @@ body:has(.sheet-full) .toast-slot {
   border-radius: var(--r-paper) var(--r-paper) 0 0;
   background: var(--card-2);
 }
-/* An example photo says so, on a small paper label in the corner. */
+/* An example photo says so in a full-width caption, readable from the back of a room. */
 .real-example {
   position: absolute;
-  right: 10px;
-  bottom: 10px;
-  padding: 3px 9px;
-  border-radius: 7px;
-  background: rgb(255 255 255 / 0.92);
-  color: var(--tag-ink);
-  font-size: 0.75rem;
-  font-weight: 700;
-  box-shadow: 0 1px 3px rgb(var(--shade) / 0.25);
+  inset: auto 0 0 0;
+  padding: 7px 14px 7px 64px;
+  background: rgb(var(--scrim) / 0.78);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: right;
 }
 /* The numbered pin sits half on the photo, half on the card. */
 .real-under-photo {

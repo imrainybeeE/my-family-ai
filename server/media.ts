@@ -27,7 +27,8 @@ async function getJson(url: string, ms = 5000): Promise<any> {
 }
 
 const DAY = 24 * 60 * 60_000;
-const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, ' ').trim();
+/** Lower case, accents folded, punctuation dropped; letters and digits of every script are kept. */
+export const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/\p{M}+/gu, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 /** Wikipedia thumbnails come in fixed widths; 640 is sharp on a phone at 2x without being heavy. */
 const sized = (url: string) => url.replace(/\?utm_[^]*$/, '');
 
@@ -79,11 +80,10 @@ export async function wikiPageImage(title: string): Promise<string | null> {
   });
 }
 
-/** True when two names are the same apart from case, punctuation and a trailing qualifier. */
+/** True when two names are the same apart from case, punctuation and a trailing "(film)"-style qualifier. */
 export function sameName(a: string, b: string): boolean {
   const x = norm(a.replace(/\s*\(.*\)$/, ''));
-  const y = norm(b);
-  return x === y || (x.length > 6 && y.startsWith(x)) || (y.length > 6 && x.startsWith(y));
+  return x !== '' && x === norm(b.replace(/\s*\(.*\)$/, ''));
 }
 
 /** A series poster from TVmaze, which lists Netflix originals too. */
@@ -177,8 +177,9 @@ export async function netflixTop10(iso2: string, waitMs = 6000): Promise<ChartTi
   const hit = netflix.get(cc);
   if (hit && Date.now() - hit.at < 12 * 60 * 60_000) return hit.titles;
   const job = loadNetflix(cc);
-  const timeout = new Promise<ChartTitle[]>((r) => setTimeout(() => r(hit?.titles || []), waitMs));
-  return Promise.race([job.catch(() => hit?.titles || []), timeout]);
+  // An expired chart is never served as "this week": with no fresh one, the caller falls back.
+  const timeout = new Promise<ChartTitle[]>((r) => setTimeout(() => r([]), waitMs));
+  return Promise.race([job.catch(() => []), timeout]);
 }
 
 /** Warms the default country's chart when the server starts. */

@@ -223,7 +223,7 @@ function PickCard({ pick, index, films }: { pick: RealPick; index: number; films
       {hero && (
         <figure className="real-hero-photo">
           <Photo src={pick.image!} alt={pick.imageExample ? `Example photo: ${pick.imageExample}` : pick.name} onFail={() => setPhoto(false)} />
-          {pick.imageExample && <figcaption className="real-example">Example: {pick.imageExample}</figcaption>}
+          {pick.imageExample && <figcaption className="real-example">Example photo of {pick.imageExample.toLowerCase()}, not this place</figcaption>}
         </figure>
       )}
       <div className={`flex gap-3.5 items-start ${hero ? 'real-under-photo' : ''}`}>

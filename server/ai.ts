@@ -381,7 +381,7 @@ async function generate<T extends z.ZodType>(
     const broken = rules?.(data) || [];
     if (broken.length) {
       feedback = broken.slice(0, 4).join('; ');
-      console.warn('Gemini reply broke a rule', { attempt, rules: broken.length });
+      console.warn('Gemini reply broke a rule', { attempt, rules: broken.slice(0, 3) });
       if (attempt === 0) continue;
       return { ok: false, status: 502, error: 'ai_invalid' };
     }
@@ -921,7 +921,7 @@ Order them from most specific to most general, and make the last one broad enoug
   // Too few nearby: look further with the broadest search, keeping the nearby ones first.
   const wider = await osmPlaces(searches.slice(-1), place, radius * 3);
   const seen = new Set(found.map((c) => c.name.toLowerCase()));
-  return [...found, ...wider.filter((c) => !seen.has(c.name.toLowerCase()))].slice(0, 16);
+  return [...found, ...wider.filter((c) => !seen.has(c.name.toLowerCase()))].slice(0, 16).map((c, i) => ({ ...c, id: `osm${i + 1}` }));
 }
 
 /**
