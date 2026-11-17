@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My Family AI film</title>
+  <meta name="description" content="My Family AI: find your flower, plan things everyone loves." />
+  <meta property="og:title" content="My Family AI film" />
+  <meta property="og:type" content="video.other" />
+  <meta property="og:image" content="poster.jpg" />
+  <meta property="og:video" content="my-family-ai.mp4" />
+  <link rel="icon" href="sunflower.webp" />
+  <style>
+    @font-face { font-family: 'Bricolage Grotesque'; font-weight: 400 800; src: url('bricolage-latin.woff2') format('woff2'); font-display: swap; }
+    :root { --bg: #e4ecf5; --ink: #1e2a44; --soft: #5b6680; }
+    * { box-sizing: border-box; margin: 0; }
+    html, body { height: 100%; }
+    body { background: var(--bg); color: var(--ink); font-family: 'Bricolage Grotesque', sans-serif; -webkit-font-smoothing: antialiased; display: grid; place-items: center; padding: 32px 16px; }
+    main { width: min(1280px, 100%); display: grid; gap: 28px; }
+    header { display: flex; align-items: center; gap: 14px; }
+    header img { width: 44px; height: 44px; }
+    h1 { font-size: clamp(28px, 4vw, 44px); font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+    p { color: var(--soft); font-size: 17px; margin-top: 6px; }
+    .frame { position: relative; border-radius: 28px; overflow: hidden; background: #141e37; box-shadow: 0 50px 110px -40px rgb(13 20 34 / .45), 0 4px 14px rgb(13 20 34 / .12); aspect-ratio: 16 / 9; }
+    video { display: block; width: 100%; height: 100%; }
+    a { color: var(--ink); font-weight: 600; }
+    footer { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; color: var(--soft); font-size: 15px; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <img src="sunflower.webp" alt="" />
+      <div>
+        <h1>My Family AI</h1>
+        <p>Find your flower. Plan things everyone loves.</p>
+      </div>
+    </header>
+    <div class="frame">
+      <video src="my-family-ai.mp4" poster="poster.jpg" controls playsinline preload="metadata"></video>
+    </div>
+    <footer>
+      <span>61 seconds · music: Euphoria</span>
+      <a href="../">Open the app</a>
+    </footer>
+  </main>
+</body>
+</html>
